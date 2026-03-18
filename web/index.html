@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Splendor Web</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Splendor</h1>
+      <p class="subtitle">Browser UI powered by your Java game engine</p>
+    </header>
+
+    <main>
+      <section id="start-screen" class="panel">
+        <h2>Start a New Game</h2>
+        <p class="hint">Choose how many players you want, and optionally make Player 2 an AI opponent.</p>
+        <label>Number of players:
+          <select id="start-num-players">
+            <option value="2" selected>2 players</option>
+            <option value="3">3 players</option>
+            <option value="4">4 players</option>
+          </select>
+        </label>
+        <div class="player-types">
+          <div class="player-type-row">
+            <span>Player 1:</span>
+            <select id="player1-type">
+              <option value="human" selected>Human</option>
+              <option value="easy">AI (Easy)</option>
+              <option value="medium">AI (Medium)</option>
+              <option value="hard">AI (Hard)</option>
+            </select>
+          </div>
+          <div class="player-type-row">
+            <span>Player 2:</span>
+            <select id="player2-type">
+              <option value="human" selected>Human</option>
+              <option value="easy">AI (Easy)</option>
+              <option value="medium">AI (Medium)</option>
+              <option value="hard">AI (Hard)</option>
+            </select>
+          </div>
+          <div class="player-type-row">
+            <span>Player 3:</span>
+            <select id="player3-type">
+              <option value="human" selected>Human</option>
+              <option value="easy">AI (Easy)</option>
+              <option value="medium">AI (Medium)</option>
+              <option value="hard">AI (Hard)</option>
+            </select>
+          </div>
+          <div class="player-type-row">
+            <span>Player 4:</span>
+            <select id="player4-type">
+              <option value="human" selected>Human</option>
+              <option value="easy">AI (Easy)</option>
+              <option value="medium">AI (Medium)</option>
+              <option value="hard">AI (Hard)</option>
+            </select>
+          </div>
+          <p class="hint small">Only the first N players are used, where N is the number of players selected above.</p>
+        </div>
+        <div class="start-actions">
+          <button id="start-game-btn">Start Game</button>
+          <button id="start-guided-btn" type="button" class="secondary">Start Guided Tutorial</button>
+          <button id="open-tutorial-btn" type="button" class="secondary">How to Play</button>
+        </div>
+      </section>
+
+      <section class="panel video-panel">
+        <h2>Video Tutorial</h2>
+        <p class="hint">Prefer watching instead of reading? This short video explains how to play Splendor.</p>
+        <div class="video-wrapper">
+          <iframe
+            src="https://www.tiktok.com/embed/7298732802088914207"
+            title="Splendor tutorial video"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </section>
+
+      <section id="tutorial-panel" class="panel hidden">
+        <div class="tutorial-header">
+          <h2>How to Play Splendor</h2>
+          <button id="close-tutorial-btn" type="button">Close</button>
+        </div>
+        <div class="tutorial-body">
+          <p><strong>Goal</strong>: Be the first player to reach the required prestige points (default 15) to win.</p>
+          <p><strong>On your turn, choose ONE action:</strong></p>
+          <ol>
+            <li><strong>Take gems</strong>
+              <ul>
+                <li>Option A: Take 3 different colored gems (e.g., R, E, S).</li>
+                <li>Option B: Take 2 of the same color (only if there are 4+ of that color on the board).</li>
+                <li>You cannot take GOLD directly and you cannot exceed 10 total gems.</li>
+              </ul>
+            </li>
+            <li><strong>Reserve a card</strong>
+              <ul>
+                <li>Reserve a face-up card from the board (max 3 reserved cards).</li>
+                <li>Gain 1 GOLD (wild) gem if any are available.</li>
+              </ul>
+            </li>
+            <li><strong>Purchase a card</strong>
+              <ul>
+                <li>Buy a face-up card or one of your reserved cards.</li>
+                <li>Pay using gems in hand plus permanent color bonuses from cards you already own.</li>
+                <li>GOLD gems can substitute any color.</li>
+              </ul>
+            </li>
+          </ol>
+          <p><strong>Cards and bonuses</strong></p>
+          <ul>
+            <li>Level 1 cards: cheap, usually 0 points, but give permanent color bonuses (discounts).</li>
+            <li>Level 2 cards: mid-cost, often 1–2 prestige.</li>
+            <li>Level 3 cards: expensive, give lots of prestige.</li>
+            <li>Each purchased card’s color gives you a permanent discount of that color for future cards.</li>
+          </ul>
+          <p><strong>Nobles</strong></p>
+          <ul>
+            <li>Nobles show color requirements in permanent bonuses (not loose gems).</li>
+            <li>At the end of your turn, if your bonuses meet a noble’s requirement, that noble visits you automatically and gives extra points.</li>
+          </ul>
+          <p><strong>Winning & tie-breaker</strong></p>
+          <ul>
+            <li>When a player reaches the winning points, finish the round so everyone has played the same number of turns.</li>
+            <li>Highest prestige wins; if tied, the player with <em>fewer</em> purchased cards wins.</li>
+          </ul>
+          <p><strong>Tips</strong></p>
+          <ul>
+            <li>Buy cheap Level 1 cards early to build strong discounts.</li>
+            <li>Plan towards nobles—they are free extra points once your bonuses match.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="game-ui" class="hidden">
+      <div id="guided-overlay" class="guided-overlay hidden">
+        <div class="guided-card">
+          <div class="guided-header">
+            <h2>Guided Tutorial</h2>
+            <span id="guided-step-label"></span>
+          </div>
+          <p id="guided-step-text"></p>
+          <div class="guided-actions">
+            <button id="guided-prev-btn" type="button" class="secondary">Back</button>
+            <button id="guided-exit-btn" type="button" class="secondary">End Tutorial</button>
+            <button id="guided-next-btn" type="button">Next</button>
+          </div>
+        </div>
+      </div>
+      <section class="status">
+        <div id="turn-info"></div>
+        <div id="game-over" class="hidden"></div>
+      </section>
+
+      <section class="board">
+        <div class="panel">
+          <h2>Board Gems</h2>
+          <div id="board-gems" class="pill-row"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Nobles</h2>
+          <div id="nobles"></div>
+        </div>
+
+        <div class="panel levels">
+          <h2>Development Cards</h2>
+          <div class="levels-row">
+            <div class="level-col">
+              <h3>Level 3</h3>
+              <ul id="level-3" class="card-list"></ul>
+            </div>
+            <div class="level-col">
+              <h3>Level 2</h3>
+              <ul id="level-2" class="card-list"></ul>
+            </div>
+            <div class="level-col">
+              <h3>Level 1</h3>
+              <ul id="level-1" class="card-list"></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="players panel">
+        <h2>Players</h2>
+        <div id="players" class="players-row"></div>
+      </section>
+
+      <section class="actions panel">
+        <h2>Actions</h2>
+        <div class="actions-grid">
+          <div>
+            <h3>Take Gems</h3>
+            <p class="hint">Select up to 3 different gems OR 2 of the same color (if rules allow).</p>
+            <div id="take-gems-options" class="pill-row"></div>
+            <button id="take-gems-btn">Confirm Take Gems</button>
+          </div>
+          <div>
+            <h3>Reserve Card</h3>
+            <label>Level:
+              <select id="reserve-level">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </label>
+            <label>Index:
+              <input id="reserve-index" type="number" min="0" value="0">
+            </label>
+            <button id="reserve-btn">Reserve</button>
+          </div>
+          <div>
+            <h3>Purchase Visible</h3>
+            <label>Level:
+              <select id="purchase-level">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </label>
+            <label>Index:
+              <input id="purchase-index" type="number" min="0" value="0">
+            </label>
+            <button id="purchase-btn">Purchase</button>
+          </div>
+          <div>
+            <h3>Purchase Reserved</h3>
+            <label>Reserved Index:
+              <input id="purchase-reserved-index" type="number" min="0" value="0">
+            </label>
+            <button id="purchase-reserved-btn">Purchase Reserved</button>
+          </div>
+        </div>
+        <div id="action-message" class="message"></div>
+      </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
+

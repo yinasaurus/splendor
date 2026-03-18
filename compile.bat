@@ -5,7 +5,9 @@ REM Create classes directory if it doesn't exist
 if not exist "classes" mkdir classes
 
 REM Compile all Java source files using sourcepath
-javac -d classes -cp "lib/*;classes" -sourcepath src src\splendor\main\SplendorGame.java
+javac -d classes -cp "lib/*;classes" -sourcepath src ^
+  src\splendor\main\SplendorGame.java ^
+  src\splendor\web\WebServer.java
 
 if %ERRORLEVEL% EQU 0 (
     echo Compilation complete. Class files are in the classes directory.

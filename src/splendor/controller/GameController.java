@@ -341,6 +341,38 @@ public class GameController {
 	}
 
 	/**
+	 * Executes a purchase action for a visible card on the board.
+	 *
+	 * @param level the card level (1, 2, or 3)
+	 * @param cardIndex the index of the card in the visible cards list
+	 * @return true if the action was successful
+	 */
+	public boolean purchaseVisibleCard(int level, int cardIndex) {
+		List<Card> cards = board.getVisibleCards(level);
+		if (cardIndex < 0 || cardIndex >= cards.size()) {
+			return false;
+		}
+		Card card = cards.get(cardIndex);
+		return purchaseCard(card);
+	}
+
+	/**
+	 * Executes a purchase action for one of the current player's reserved cards.
+	 *
+	 * @param reservedIndex the index of the reserved card
+	 * @return true if the action was successful
+	 */
+	public boolean purchaseReservedCard(int reservedIndex) {
+		Player player = getCurrentPlayer();
+		List<Card> reserved = player.getReservedCards();
+		if (reservedIndex < 0 || reservedIndex >= reserved.size()) {
+			return false;
+		}
+		Card card = reserved.get(reservedIndex);
+		return purchaseCard(card);
+	}
+
+	/**
 	 * Checks if the current player can visit any nobles and handles it.
 	 *
 	 * @param player the player to check

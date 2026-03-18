@@ -9,10 +9,13 @@ fi
 # Create classes directory if it doesn't exist
 if [ ! -d "classes" ]; then
     mkdir classes
+    
 fi
 
-# Compile all Java source files using sourcepath
-javac -d classes -cp "lib/*:classes" -sourcepath src src/splendor/main/SplendorGame.java
+# Compile main console app and web server entry point
+javac -d classes -cp "lib/*:classes" -sourcepath src \
+  src/splendor/main/SplendorGame.java \
+  src/splendor/web/WebServer.java
 
 if [ $? -eq 0 ]; then
     echo "Compilation complete. Class files are in the classes directory."
