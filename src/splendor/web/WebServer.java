@@ -25,6 +25,7 @@ import splendor.model.GameBoard;
 import splendor.model.GemType;
 import splendor.model.Noble;
 import splendor.model.Player;
+import splendor.rules.GameRules;
 
 /**
  * Simple embedded HTTP server that exposes the Splendor game via a web UI.
@@ -239,25 +240,73 @@ public class WebServer {
 				}
 			}
 			if (!gemsToTake.isEmpty()) {
-				success = controller.takeGems(gemsToTake);
-				message = success ? "Gems taken" : "Invalid gem action";
+				GameRules.ValidationResult vr = controller.getRules().validateTakeGems(
+					gemsToTake,
+					controller.getBoard().getAvailableGems(),
+					controller.getCurrentPlayer().getGems()
+				);
+				if (!vr.isValid()) {
+					success = false;
+					message = vr.getMessage();
+				} else {
+					success = controller.takeGems(gemsToTake);
+					message = success ? "Gems taken." : "Could not take gems.";
+				}
 			} else {
 				message = "No valid gems specified";
 			}
 		} else if (lower.contains("\"type\"") && lower.contains("reserve")) {
 			int level = extractIntField(body, "level", 1);
 			int index = extractIntField(body, "index", 0);
-			success = controller.reserveCard(level, index);
-			message = success ? "Card reserved" : "Cannot reserve this card";
+			GameRules.ValidationResult vr = controller.getRules().validateReserveCard(controller.getCurrentPlayer());
+			List<Card> visible = controller.getBoard().getVisibleCards(level);
+			if (!vr.isValid()) {
+				success = false;
+				message = vr.getMessage();
+			} else if (index < 0 || index >= visible.size()) {
+				success = false;
+				message = "Invalid card index for this level.";
+			} else {
+				success = controller.reserveCard(level, index);
+				message = success ? "Card reserved." : "Cannot reserve this card.";
+			}
 		} else if (lower.contains("\"type\"") && lower.contains("purchasevisible")) {
 			int level = extractIntField(body, "level", 1);
 			int index = extractIntField(body, "index", 0);
-			success = controller.purchaseVisibleCard(level, index);
-			message = success ? "Card purchased" : "Cannot purchase this card";
+			List<Card> visible = controller.getBoard().getVisibleCards(level);
+			if (index < 0 || index >= visible.size()) {
+				success = false;
+				message = "Invalid card index for this level.";
+			} else {
+				Card card = visible.get(index);
+				Map<GemType, Integer> payment = controller.getRules().calculatePayment(card, controller.getCurrentPlayer());
+				GameRules.ValidationResult vr = controller.getRules().validatePurchaseCard(card, controller.getCurrentPlayer(), payment);
+				if (!vr.isValid()) {
+					success = false;
+					message = vr.getMessage();
+				} else {
+					success = controller.purchaseVisibleCard(level, index);
+					message = success ? "Card purchased." : "Cannot purchase this card.";
+				}
+			}
 		} else if (lower.contains("\"type\"") && lower.contains("purchasereserved")) {
 			int index = extractIntField(body, "index", 0);
-			success = controller.purchaseReservedCard(index);
-			message = success ? "Reserved card purchased" : "Cannot purchase this reserved card";
+			List<Card> reserved = controller.getCurrentPlayer().getReservedCards();
+			if (index < 0 || index >= reserved.size()) {
+				success = false;
+				message = "Invalid reserved card index.";
+			} else {
+				Card card = reserved.get(index);
+				Map<GemType, Integer> payment = controller.getRules().calculatePayment(card, controller.getCurrentPlayer());
+				GameRules.ValidationResult vr = controller.getRules().validatePurchaseCard(card, controller.getCurrentPlayer(), payment);
+				if (!vr.isValid()) {
+					success = false;
+					message = vr.getMessage();
+				} else {
+					success = controller.purchaseReservedCard(index);
+					message = success ? "Reserved card purchased." : "Cannot purchase this reserved card.";
+				}
+			}
 		}
 
 		// Advance turns (including AI turns) if action succeeded
@@ -446,7 +495,7 @@ public class WebServer {
 		}
 		sb.append("},");
 
-		// Visible cards by level (as simple strings)
+		// Visible cards by level (structured JSON so the UI can render nicely)
 		sb.append("\"levels\":{");
 		for (int level = 1; level <= 3; level++) {
 			if (level > 1) {
@@ -458,20 +507,64 @@ public class WebServer {
 				if (i > 0) {
 					sb.append(",");
 				}
-				sb.append("\"").append(escape(cards.get(i).toString())).append("\"");
+				Card card = cards.get(i);
+				sb.append("{");
+				sb.append("\"id\":").append(card.getCardId()).append(",");
+				sb.append("\"points\":").append(card.getPrestigePoints()).append(",");
+				sb.append("\"bonusGem\":\"").append(card.getBonusGem().name()).append("\",");
+				sb.append("\"bonusAbbr\":\"").append(card.getBonusGem().getAbbreviation()).append("\",");
+				sb.append("\"affordable\":").append(card.canAfford(current.getGems(), current.getBonuses())).append(",");
+				sb.append("\"clickHint\":\"Click to buy this card.\",");
+
+				// Only include non-zero costs so we don't get "O:0, D:0, E:0 ..." in the UI.
+				sb.append("\"cost\":{");
+				boolean firstCost = true;
+				for (Map.Entry<GemType, Integer> entry : card.getCost().entrySet()) {
+					int qty = entry.getValue() == null ? 0 : entry.getValue().intValue();
+					if (qty <= 0) {
+						continue;
+					}
+					if (!firstCost) {
+						sb.append(",");
+					}
+					firstCost = false;
+					sb.append("\"").append(entry.getKey().name()).append("\":").append(qty);
+				}
+				sb.append("}");
+
+				sb.append("}");
 			}
 			sb.append("]");
 		}
 		sb.append("},");
 
-		// Nobles
+		// Nobles (structured JSON)
 		sb.append("\"nobles\":[");
 		List<Noble> nobles = board.getAvailableNobles();
 		for (int i = 0; i < nobles.size(); i++) {
 			if (i > 0) {
 				sb.append(",");
 			}
-			sb.append("\"").append(escape(nobles.get(i).toString())).append("\"");
+			Noble noble = nobles.get(i);
+			sb.append("{");
+			sb.append("\"id\":").append(noble.getNobleId()).append(",");
+			sb.append("\"name\":\"").append(escape(noble.getName())).append("\",");
+			sb.append("\"points\":").append(noble.getPrestigePoints()).append(",");
+			sb.append("\"requirements\":{");
+			boolean firstReq = true;
+			for (Map.Entry<GemType, Integer> entry : noble.getRequirement().entrySet()) {
+				int qty = entry.getValue() == null ? 0 : entry.getValue().intValue();
+				if (qty <= 0) {
+					continue;
+				}
+				if (!firstReq) {
+					sb.append(",");
+				}
+				firstReq = false;
+				sb.append("\"").append(entry.getKey().name()).append("\":").append(qty);
+			}
+			sb.append("}");
+			sb.append("}");
 		}
 		sb.append("]");
 

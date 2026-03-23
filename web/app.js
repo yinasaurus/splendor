@@ -60,9 +60,9 @@ const guidedSteps = [
   "First, look at the top-left status bar: it shows whose turn it is and whether the game is over.",
   "Check the 'Board Gems' panel. These are the tokens you can take on your turn.",
   "Now, try the 'Take Gems' action: click a few gem buttons, then 'Confirm Take Gems'.",
-  "After you have some gems, look at the Level 1 cards. These are cheap cards to start your engine.",
-  "Try purchasing a Level 1 card you can afford using 'Purchase Visible'. Notice your bonuses update.",
-  "Watch the 'Players' panel: it shows your gems, bonuses, nobles, and prestige points.",
+  "After you have some gems, look at the Level 1 cards. Each card has a cost (what you pay) and a bonus (a permanent discount color).",
+  "Try purchasing a card you can afford using 'Purchase Visible' (or by clicking a card). When you buy it, you permanently gain that card’s bonus color as a discount.",
+  "Watch the 'Players' panel: your 'bonuses' are your permanent discounts, and they reduce future card costs of that color.",
   "Nobles are free points if your bonuses match their requirements. Plan your cards towards a noble.",
   "When any player reaches at least 15 prestige points (the default winning score), the game will finish the round and declare a winner.",
   "That's it! You can now exit the tutorial and play a full game, with or without AI."
@@ -100,10 +100,25 @@ function renderState(state) {
   nobles.innerHTML = "";
   if (state.nobles) {
     state.nobles.forEach((n) => {
-      const div = document.createElement("div");
-      div.className = "pill";
-      div.textContent = n;
-      nobles.appendChild(div);
+      const card = document.createElement("div");
+      card.className = "card-item";
+      const req = n.requirements || {};
+
+      // Title line
+      card.textContent = `${n.name} · ${n.points} pts`;
+
+      // Requirement pills
+      const row = document.createElement("div");
+      row.className = "pill-row";
+      Object.entries(req).forEach(([gem, count]) => {
+        const pill = document.createElement("div");
+        pill.className = `pill gem-${gem}`;
+        pill.textContent = `${gem[0]}:${count}`;
+        row.appendChild(pill);
+      });
+
+      card.appendChild(row);
+      nobles.appendChild(card);
     });
   }
 
@@ -112,10 +127,136 @@ function renderState(state) {
     const ul = document.getElementById(`level-${lvl}`);
     ul.innerHTML = "";
     const cards = state.levels?.[lvl] || [];
-    cards.forEach((c, index) => {
+    cards.forEach((card, index) => {
       const li = document.createElement("li");
       li.className = "card-item";
-      li.textContent = `[${index}] ${c}`;
+      li.style.cursor = "pointer";
+
+      const cost = card.cost || {};
+      const bonusAbbr = card.bonusAbbr || "";
+      const bonusGem = card.bonusGem || "";
+
+      function gemName(gemEnum) {
+        switch (gemEnum) {
+          case "RUBY":
+            return "Ruby";
+          case "EMERALD":
+            return "Emerald";
+          case "SAPPHIRE":
+            return "Sapphire";
+          case "DIAMOND":
+            return "Diamond";
+          case "ONYX":
+            return "Onyx";
+          default:
+            return gemEnum || "";
+        }
+      }
+
+      li.innerHTML = `
+        <div class="card-header">
+          <span class="card-index">[${index}]</span>
+          <span>Level ${lvl}</span>
+          <span class="card-id">ID:${card.id}</span>
+          <span class="card-points">+${card.points} pts</span>
+        </div>
+      `;
+
+      const statusRow = document.createElement("div");
+      statusRow.className = "pill-row";
+      const affordability = document.createElement("div");
+      affordability.className = "pill " + (card.affordable ? "affordable" : "not-affordable");
+      affordability.textContent = card.affordable ? "Affordable now" : "Need more gems";
+      statusRow.appendChild(affordability);
+
+      // Bonus pill
+      const bonusRow = document.createElement("div");
+      bonusRow.className = "pill-row card-bonus-row";
+      const bonusPill = document.createElement("div");
+      bonusPill.className = `pill gem-${bonusGem}`;
+      bonusPill.textContent = `Bonus: ${bonusAbbr} (${gemName(bonusGem)} discount)`;
+      bonusRow.appendChild(bonusPill);
+
+      // Cost pills
+      const costRow = document.createElement("div");
+      costRow.className = "pill-row card-cost-row";
+      const costLabel = document.createElement("div");
+      costLabel.className = "card-label";
+      costLabel.textContent = "Cost:";
+      costRow.appendChild(costLabel);
+      Object.entries(cost).forEach(([gem, count]) => {
+        const pill = document.createElement("div");
+        pill.className = `pill gem-${gem}`;
+        pill.textContent = `${gem[0]}:${count}`;
+        costRow.appendChild(pill);
+      });
+
+      li.appendChild(bonusRow);
+      li.appendChild(costRow);
+      li.appendChild(statusRow);
+
+      const cardActions = document.createElement("div");
+      cardActions.className = "card-actions";
+      const buyBtn = document.createElement("button");
+      buyBtn.type = "button";
+      buyBtn.textContent = "Buy";
+      buyBtn.disabled = !card.affordable;
+      const reserveBtn = document.createElement("button");
+      reserveBtn.type = "button";
+      reserveBtn.className = "secondary";
+      reserveBtn.textContent = "Reserve";
+
+      buyBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        try {
+          const result = await postAction({ type: "purchaseVisible", level: lvl, index });
+          const msg = document.getElementById("action-message");
+          msg.textContent = result.message || (result.success ? "Purchased." : "Purchase failed.");
+          msg.className = "message " + (result.success ? "ok" : "error");
+          const newState = await fetchState();
+          renderState(newState);
+        } catch (e2) {
+          const msg = document.getElementById("action-message");
+          msg.textContent = "Error purchasing card.";
+          msg.className = "message error";
+        }
+      });
+
+      reserveBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        try {
+          const result = await postAction({ type: "reserve", level: lvl, index });
+          const msg = document.getElementById("action-message");
+          msg.textContent = result.message || (result.success ? "Reserved." : "Reserve failed.");
+          msg.className = "message " + (result.success ? "ok" : "error");
+          const newState = await fetchState();
+          renderState(newState);
+        } catch (e2) {
+          const msg = document.getElementById("action-message");
+          msg.textContent = "Error reserving card.";
+          msg.className = "message error";
+        }
+      });
+
+      cardActions.appendChild(buyBtn);
+      cardActions.appendChild(reserveBtn);
+      li.appendChild(cardActions);
+
+      li.addEventListener("click", async () => {
+        try {
+          const result = await postAction({ type: "purchaseVisible", level: lvl, index });
+          const msg = document.getElementById("action-message");
+          msg.textContent = result.message || (result.success ? "Purchased." : "Purchase failed.");
+          msg.className = "message " + (result.success ? "ok" : "error");
+          const newState = await fetchState();
+          renderState(newState);
+        } catch (e) {
+          const msg = document.getElementById("action-message");
+          msg.textContent = "Error purchasing card.";
+          msg.className = "message error";
+        }
+      });
+
       ul.appendChild(li);
     });
   });
@@ -273,6 +414,7 @@ function setupOtherActions() {
 async function init() {
   const startScreen = document.getElementById("start-screen");
   const gameUi = document.getElementById("game-ui");
+  const videoPanel = document.querySelector(".video-panel");
   const startBtn = document.getElementById("start-game-btn");
   const startGuidedBtn = document.getElementById("start-guided-btn");
   const numPlayersSelect = document.getElementById("start-num-players");
@@ -369,17 +511,14 @@ async function init() {
       p4Type: p4Type.value,
     };
     try {
-      // Ensure any previous guided state is fully cleared
-      tutorialFlags.active = false;
-      // Hard reset guided overlay visibility in case it was left open
-      const overlay = document.getElementById("guided-overlay");
-      if (overlay) {
-        overlay.classList.add("hidden");
-        overlay.style.display = "";
-      }
+      // Ensure any previous guided/How-to-play state is fully cleared
+      closeGuided();
+      tutorialPanel.classList.add("hidden");
+
       await postNewGame(body);
       startScreen.classList.add("hidden");
       gameUi.classList.remove("hidden");
+      if (videoPanel) videoPanel.classList.add("hidden");
 
       setupGemSelection();
       setupOtherActions();
@@ -408,6 +547,7 @@ async function init() {
       });
       startScreen.classList.add("hidden");
       gameUi.classList.remove("hidden");
+      if (videoPanel) videoPanel.classList.add("hidden");
 
       setupGemSelection();
       setupOtherActions();
@@ -477,6 +617,7 @@ async function init() {
     tutorialFlags.active = false;
     startScreen.classList.remove("hidden");
     gameUi.classList.add("hidden");
+    if (videoPanel) videoPanel.classList.remove("hidden");
   });
 }
 

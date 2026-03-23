@@ -92,6 +92,18 @@ main {
 
 .level-col {
   flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 10px 10px 8px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.level-col h3 {
+  margin: 0 0 8px 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .players {
@@ -131,13 +143,13 @@ main {
 .pill-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 
 .pill {
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 999px;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -174,18 +186,78 @@ main {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 150px;
-  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: none;
+  overflow: visible;
 }
 
 .card-item {
   background: rgba(255, 255, 255, 0.04);
   border-radius: 6px;
-  padding: 4px 6px;
+  padding: 8px 8px;
   font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.card-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.card-index {
+  color: #90caf9;
+  font-weight: 800;
+}
+
+.card-id {
+  color: #cfd8dc;
+}
+
+.card-points {
+  color: #ffcc80;
+}
+
+.card-bonus-row {
+  margin-top: 2px;
+}
+
+.card-cost-row {
+  margin-top: 2px;
+  align-items: center;
+}
+
+.card-label {
+  font-weight: 700;
+  color: #e0e0e0;
+  margin-right: 2px;
+}
+
+.pill.affordable {
+  background: rgba(46, 125, 50, 0.45);
+  border-color: rgba(129, 199, 132, 0.75);
+}
+
+.pill.not-affordable {
+  background: rgba(140, 140, 140, 0.3);
+  border-color: rgba(180, 180, 180, 0.5);
+}
+
+.card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.card-actions button {
+  margin-top: 0;
+  padding: 4px 8px;
+  font-size: 0.75rem;
 }
 
 .actions-grid {

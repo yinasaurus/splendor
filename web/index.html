@@ -118,6 +118,21 @@
             <li>Level 3 cards: expensive, give lots of prestige.</li>
             <li>Each purchased card’s color gives you a permanent discount of that color for future cards.</li>
           </ul>
+          <p><strong>What “discount” means (UI)</strong></p>
+          <ul>
+            <li>On each card, the <strong>bonus</strong> is the discount color you get after buying it.</li>
+            <li>Your <strong>player bonuses</strong> (in the Players panel) are permanent discounts that apply to ALL future purchases of that gem color.</li>
+            <li>A noble’s requirements look at <strong>bonuses</strong>, not loose gems.</li>
+          </ul>
+          <p><strong>How to read the screen</strong></p>
+          <ul>
+            <li><strong>Board Gems</strong>: the tokens you can take from the bank.</li>
+            <li><strong>Card cost</strong>: how many gems (or wild/gold substitutions) you must pay to buy it.</li>
+            <li><strong>Card bonus</strong>: the permanent discount color you gain after purchase.</li>
+            <li><strong>Players → gems</strong>: loose gems you currently hold.</li>
+            <li><strong>Players → bonuses</strong>: permanent discounts you earned.</li>
+            <li><strong>Nobles</strong>: requirements for bonuses (free extra prestige).</li>
+          </ul>
           <p><strong>Nobles</strong></p>
           <ul>
             <li>Nobles show color requirements in permanent bonuses (not loose gems).</li>
@@ -210,8 +225,9 @@
               </select>
             </label>
             <label>Index:
-              <input id="reserve-index" type="number" min="0" value="0">
+              <input id="reserve-index" type="number" min="0" value="0" placeholder="0-3">
             </label>
+            <p class="hint small">If using the manual index box: use the visible card index ([0..3]) shown on each card.</p>
             <button id="reserve-btn">Reserve</button>
           </div>
           <div>
@@ -224,8 +240,9 @@
               </select>
             </label>
             <label>Index:
-              <input id="purchase-index" type="number" min="0" value="0">
+              <input id="purchase-index" type="number" min="0" value="0" placeholder="0-3">
             </label>
+            <p class="hint small">If using the manual index box: use the visible card index ([0..3]) shown on each card.</p>
             <button id="purchase-btn">Purchase</button>
           </div>
           <div>
