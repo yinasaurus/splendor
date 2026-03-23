@@ -16,6 +16,11 @@ let tutorialFlags = {
   boughtLevel1Once: false,
 };
 
+const uiState = {
+  gemUiInitialized: false,
+  actionUiBound: false,
+};
+
 async function postAction(payload) {
   const res = await fetch(API_ACTION, {
     method: "POST",
@@ -309,6 +314,9 @@ function renderState(state) {
 }
 
 function setupGemSelection() {
+  if (uiState.gemUiInitialized) {
+    return;
+  }
   const container = document.getElementById("take-gems-options");
   const selected = new Map(); // gem -> count
 
@@ -355,14 +363,24 @@ function setupGemSelection() {
       messageEl.className = "message " + (result.success ? "ok" : "error");
       const state = await fetchState();
       renderState(state);
+      // Clear previous selection to avoid accidental repeated submits.
+      selected.clear();
+      container.querySelectorAll("button").forEach((b) => {
+        b.style.outline = "none";
+      });
     } catch (e) {
       messageEl.textContent = "Error sending action.";
       messageEl.className = "message error";
     }
   });
+
+  uiState.gemUiInitialized = true;
 }
 
 function setupOtherActions() {
+  if (uiState.actionUiBound) {
+    return;
+  }
   const msg = document.getElementById("action-message");
 
   document.getElementById("reserve-btn").addEventListener("click", async () => {
@@ -409,6 +427,8 @@ function setupOtherActions() {
       msg.className = "message error";
     }
   });
+
+  uiState.actionUiBound = true;
 }
 
 async function init() {
@@ -607,6 +627,7 @@ async function init() {
       closeGuided();
       startScreen.classList.remove("hidden");
       gameUi.classList.add("hidden");
+      if (videoPanel) videoPanel.classList.remove("hidden");
     }
   });
 
