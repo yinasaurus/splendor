@@ -2,64 +2,96 @@
   box-sizing: border-box;
 }
 
+:root {
+  --bg-deep: #0e0e14;
+  --bg-elevated: rgba(22, 22, 34, 0.92);
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --accent: #f9a825;
+  --accent-dim: rgba(249, 168, 37, 0.35);
+  --text-muted: #9aa0b4;
+}
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: radial-gradient(circle at top, #222 0, #111 55%, #050505 100%);
-  color: #f5f5f5;
+  background: var(--bg-deep);
+  background-image: radial-gradient(ellipse 120% 80% at 50% -20%, rgba(60, 40, 90, 0.22), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 100% 100%, rgba(30, 50, 80, 0.12), transparent 45%);
+  color: #f0f2f8;
+  line-height: 1.45;
 }
 
 .app {
-  max-width: 1200px;
+  max-width: 1180px;
   margin: 0 auto;
-  padding: 16px 20px 32px;
+  padding: 20px 20px 40px;
 }
 
 header {
   text-align: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 header h1 {
   margin: 0;
-  font-size: 2.4rem;
-  letter-spacing: 0.08em;
+  font-size: 2.15rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+  color: #f2f4fa;
 }
 
 .subtitle {
-  margin-top: 4px;
-  font-size: 0.95rem;
-  color: #c3c3c3;
+  margin-top: 6px;
+  font-size: 0.92rem;
+  color: var(--text-muted);
 }
 
 main {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .panel {
-  background: rgba(16, 16, 24, 0.96);
-  border-radius: 12px;
-  padding: 12px 14px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--bg-elevated);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(8px);
 }
 
 .panel h2 {
   margin-top: 0;
-  margin-bottom: 8px;
-  font-size: 1.15rem;
-  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #f0f0f0;
+  color: #e8eaf0;
 }
 
 .status {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+}
+
+.status-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 .status #turn-info {
@@ -71,8 +103,9 @@ main {
   font-weight: 600;
 }
 
+/* Must override any later display:flex|grid rules on the same element (e.g. .guided-overlay) */
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 .board {
@@ -92,11 +125,16 @@ main {
 
 .level-col {
   flex: 1;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
-  padding: 10px 10px 8px;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 12px 10px 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.level-col:hover {
+  border-color: rgba(255, 255, 255, 0.09);
 }
 
 .level-col h3 {
@@ -119,15 +157,20 @@ main {
 
 .player-card {
   min-width: 190px;
-  background: linear-gradient(145deg, #1b1b26, #101017);
-  border-radius: 10px;
-  padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(12, 12, 22, 0.85);
+  border-radius: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.player-card:hover {
+  transform: translateY(-1px);
 }
 
 .player-card.current {
-  border-color: #ff9800;
-  box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.5);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-dim), 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 
 .player-name {
@@ -155,30 +198,33 @@ main {
 }
 
 .pill.gem-RUBY {
-  background: linear-gradient(120deg, #b71c1c, #f44336);
+  background: #c62828;
+  color: #fff;
 }
 
 .pill.gem-EMERALD {
-  background: linear-gradient(120deg, #1b5e20, #4caf50);
+  background: #2e7d32;
+  color: #fff;
 }
 
 .pill.gem-SAPPHIRE {
-  background: linear-gradient(120deg, #0d47a1, #2196f3);
+  background: #1565c0;
+  color: #fff;
 }
 
 .pill.gem-DIAMOND {
-  background: linear-gradient(120deg, #e0e0e0, #ffffff);
+  background: #eceff1;
   color: #111;
 }
 
 .pill.gem-ONYX {
-  background: linear-gradient(120deg, #444, #000000);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: #263238;
+  border-color: rgba(255, 255, 255, 0.35);
   color: #f5f5f5;
 }
 
 .pill.gem-GOLD {
-  background: linear-gradient(120deg, #fbc02d, #ffeb3b);
+  background: #fbc02d;
   color: #111;
 }
 
@@ -216,10 +262,6 @@ main {
   font-weight: 800;
 }
 
-.card-id {
-  color: #cfd8dc;
-}
-
 .card-points {
   color: #ffcc80;
 }
@@ -251,13 +293,35 @@ main {
 
 .card-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
+  margin-top: 2px;
 }
 
 .card-actions button {
   margin-top: 0;
-  padding: 4px 8px;
-  font-size: 0.75rem;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  border-radius: 6px;
+}
+
+/* Buy when unaffordable: clearly faded, no “active” affordance */
+.card-actions .card-buy-btn:disabled,
+.card-actions button.card-buy-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+  box-shadow: none;
+}
+
+.card-actions .card-buy-btn:disabled:hover,
+.card-actions button.card-buy-btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+  opacity: 0.38;
+}
+
+.card-actions .card-buy-btn:not(:disabled):hover {
+  filter: brightness(1.06);
 }
 
 .actions-grid {
@@ -289,25 +353,29 @@ input, select {
 
 button {
   margin-top: 4px;
-  padding: 6px 10px;
-  border-radius: 4px;
+  padding: 7px 12px;
+  border-radius: 8px;
   border: none;
-  background: linear-gradient(135deg, #ff9800, #ffc107);
-  color: #111;
+  background: var(--accent);
+  color: #1a1208;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.08s ease;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.1s ease, filter 0.1s ease;
 }
 
-button:hover {
+button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 14px rgba(249, 168, 37, 0.35);
 }
 
-button:active {
+button:active:not(:disabled) {
   transform: translateY(0);
   box-shadow: none;
-  opacity: 0.85;
+  opacity: 0.92;
+}
+
+button:disabled {
+  cursor: not-allowed;
 }
 
 .hint {
@@ -340,9 +408,14 @@ button:active {
 }
 
 button.secondary {
-  background: transparent;
-  color: #ffc107;
-  border: 1px solid rgba(255, 193, 7, 0.7);
+  background: rgba(255, 193, 7, 0.08);
+  color: #ffd54f;
+  border: 1px solid rgba(255, 193, 7, 0.45);
+}
+
+button.secondary:hover:not(:disabled) {
+  background: rgba(255, 193, 7, 0.14);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 .tutorial-header {
@@ -376,12 +449,15 @@ button.secondary {
 
 .video-wrapper {
   position: relative;
-  padding-bottom: 56.25%; /* 16:9 */
-  height: 0;
+  width: min(100%, 360px);
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  height: auto;
   border-radius: 10px;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0a0a12;
 }
 
 .video-wrapper iframe {
@@ -414,56 +490,90 @@ button.secondary {
   display: none;
 }
 
+/* Bottom sheet only — no full-screen layer, so status / board / header stay visible */
 .guided-overlay {
   position: fixed;
-  inset: 0;
-  /* Very light tint so it doesn't feel blocking */
-  background: rgba(0, 0, 0, 0.15);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
   display: flex;
-  align-items: flex-end;
   justify-content: center;
-  padding: 18px;
+  align-items: flex-end;
+  padding: 0 18px 18px;
   z-index: 1000;
-  pointer-events: none; /* allow clicking the game UI behind */
+  pointer-events: none;
+  background: transparent;
 }
 
 .guided-card {
-  width: min(560px, calc(100vw - 40px));
-  background: radial-gradient(circle at top left, #1f1b10 0, #0b0b15 55%, #05050a 100%);
+  width: min(580px, calc(100vw - 40px));
+  max-height: min(38vh, 380px);
+  overflow: auto;
+  background: rgba(16, 16, 24, 0.98);
   border-radius: 12px;
-  padding: 14px 18px 16px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.9);
+  padding: 16px 20px 18px;
+  box-shadow:
+    0 -6px 28px rgba(0, 0, 0, 0.55),
+    0 18px 40px rgba(0, 0, 0, 0.9);
   border: 2px solid rgba(255, 193, 7, 0.9);
-  pointer-events: auto; /* keep tutorial buttons clickable */
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .guided-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 193, 7, 0.35);
 }
 
 .guided-header h2 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
 }
 
-#guided-step-label {
-  font-size: 0.85rem;
+.guided-step-label {
+  font-size: 0.8rem;
+  font-weight: 600;
   color: #ffeb3b;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
-#guided-step-text {
-  margin: 6px 0 10px;
-  font-size: 0.9rem;
-  line-height: 1.4;
+.guided-step-body {
+  margin: 0 0 12px;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  white-space: pre-line;
+  min-height: 3.2em;
+  flex: 1;
+  text-align: left;
+  color: #ddd8cc;
 }
 
 .guided-actions {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+  align-items: stretch;
+  pointer-events: auto;
+  flex-shrink: 0;
+}
+
+.guided-actions button {
+  width: 100%;
+  pointer-events: auto;
+  margin-top: 0;
+  padding: 6px 8px;
+  font-size: 0.8rem;
 }
 
 .guided-highlight {
@@ -484,6 +594,27 @@ button.secondary {
 
   .actions-grid {
     grid-template-columns: 1fr;
+  }
+
+  .guided-overlay {
+    top: 8px;
+    right: 8px;
+    left: 8px;
+    bottom: auto;
+    width: auto;
+    max-width: none;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .guided-card {
+    max-height: min(32vh, 260px);
+  }
+}
+
+@media (max-width: 520px) {
+  header h1 {
+    font-size: 1.65rem;
   }
 }
 

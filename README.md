@@ -89,6 +89,45 @@ Shows:
 - **Nobles**: Give free prestige if your **bonuses** meet their color requirements (no gems paid).
 - **Tie-breaker**: If multiple players reach the goal, highest prestige wins; tie goes to the player with **fewer purchased cards**.
 
+## How the AI Works
+
+The AI uses the **Strategy** pattern: `AIStrategy` defines `makeMove(GameController, Player)`, and `AIPlayer` delegates to a concrete strategy (`EasyAIStrategy`, `MediumAIStrategy`, or `HardAIStrategy`). Shared helpers live on the interface:
+
+- **`evaluateCard`** — Scores a card: prestige × 3, a small bonus if the AI already has that bonus color, minus a penalty for total chip cost.
+- **`canAffordCard`** — Uses `Card.canAfford` with the AI’s gems and permanent bonuses.
+
+After a human acts (console or web), the controller advances turns; each AI seat calls **`ai.makeMove(controller)`** once per turn, using the same purchase / reserve / take-gems paths as players.
+
+### Easy (`EasyAIStrategy`)
+
+1. Collect every **visible** card (levels 1–3) and **reserved** card the AI can afford.
+2. If any, **pick one at random** and purchase it.
+3. Otherwise try to take gems: if at least three non-gold colors are on the board and the AI has fewer than 10 gems, take **one of each of the first three** available types (order follows how gem types are collected).
+4. If that fails, the turn effectively passes.
+
+### Medium (`MediumAIStrategy`)
+
+1. Among all affordable visible and reserved cards, sort by **`evaluateCard`** (highest first) and **buy the best**.
+2. If no buy: if fewer than three reserved cards, **reserve** a visible card with **prestige > 0**, preferring higher level and higher prestige.
+3. If no reserve: **take gems** toward colors that visible (unaffordable) cards still need—aggregate “missing” gems vs bonuses, then take up to three of the most-needed colors if the move is legal.
+4. Fallback: take any three different available colors; otherwise pass.
+
+### Hard (`HardAIStrategy`)
+
+Priority order:
+
+1. **Win now** — If an affordable card’s prestige is enough to reach the **winning score** from `config`, buy it.
+2. **Noble focus** — Pick the noble with the **smallest total “missing” bonuses** (sum of shortfalls per color). If an affordable card’s **bonus color** helps that gap most, buy the best by `evaluateCard`.
+3. **Best strategic buy** — Among affordable cards, rank by `evaluateCard` plus extra weight on prestige minus cost.
+4. **Reserve** — Prefer visible cards with **prestige ≥ 3**, highest first.
+5. **Gems** — Prefer colors needed for the target noble, then colors needed for cards; only calls `takeGems` when exactly three gems are chosen (same pattern as Medium’s strategic take); otherwise may pass.
+
+### Caveats
+
+- Easy’s gem line uses a **fixed** order of gem types, not a fully random triple.
+- Medium and Hard often require **exactly three** gems for a take-gems action; if fewer than three types are chosen, the AI may pass even when a smaller legal take exists.
+- Hard’s “closest noble” is **myopic** (missing bonuses only); it does not model opponents’ plans.
+
 ## Files of Interest
 
 - `src/splendor/main/SplendorGame.java` – Main entry point, tutorial, game loop

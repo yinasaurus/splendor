@@ -13,8 +13,93 @@ import splendor.model.Noble;
 
 /**
  * Loads noble data from CSV files.
+ * Supports legacy rows ({@code id,name,points,reqR,reqE,reqS,reqD,reqO}) and distribution
+ * sheets ({@code Game, points, total cost, Black, Red, Green, Blue, White} dev cards).
  */
 public class NobleLoader {
+
+	private static String stripBom(String line) {
+		if (line != null && !line.isEmpty() && line.charAt(0) == '\uFEFF') {
+			return line.substring(1);
+		}
+		return line;
+	}
+
+	private static boolean isDistributionNoblesHeader(String line) {
+		String lower = line.toLowerCase();
+		return lower.contains("black dev cards") || (lower.contains("game") && lower.contains("prestige"));
+	}
+
+	/**
+	 * Distribution: Game, Prestige Points, Total Dev Card Cost, Black, Red, Green, Blue, White.
+	 */
+	private static Noble parseDistributionNobleLine(String line, int nobleId, String name) {
+		String[] parts = line.split(",", -1);
+		if (parts.length < 8) {
+			return null;
+		}
+		String game = parts[0].trim();
+		if (!game.equalsIgnoreCase("Base") && !game.equalsIgnoreCase("Expansion")) {
+			return null;
+		}
+		int prestigePoints;
+		try {
+			prestigePoints = Integer.parseInt(parts[1].trim());
+		} catch (NumberFormatException e) {
+			return null;
+		}
+		// Columns 3–7: Black, Red, Green, Blue, White → O, R, E, S, D
+		GemType[] types = {
+			GemType.ONYX, GemType.RUBY, GemType.EMERALD, GemType.SAPPHIRE, GemType.DIAMOND
+		};
+		Map<GemType, Integer> requirement = new HashMap<>();
+		for (int i = 0; i < 5; i++) {
+			String c = parts[3 + i].trim();
+			if (c.isEmpty()) {
+				continue;
+			}
+			try {
+				int n = Integer.parseInt(c);
+				if (n > 0) {
+					requirement.put(types[i], n);
+				}
+			} catch (NumberFormatException e) {
+				return null;
+			}
+		}
+		if (requirement.isEmpty()) {
+			return null;
+		}
+		return new Noble(nobleId, name, prestigePoints, requirement);
+	}
+
+	/**
+	 * Legacy: nobleId,name,prestigePoints,reqRuby,reqEmerald,reqSapphire,reqDiamond,reqOnyx
+	 */
+	private static Noble parseLegacyNobleLine(String line) {
+		try {
+			String[] parts = line.split(",");
+			if (parts.length < 8) {
+				return null;
+			}
+
+			int nobleId = Integer.parseInt(parts[0].trim());
+			String name = parts[1].trim();
+			int prestigePoints = Integer.parseInt(parts[2].trim());
+
+			Map<GemType, Integer> requirement = new HashMap<>();
+			requirement.put(GemType.RUBY, Integer.parseInt(parts[3].trim()));
+			requirement.put(GemType.EMERALD, Integer.parseInt(parts[4].trim()));
+			requirement.put(GemType.SAPPHIRE, Integer.parseInt(parts[5].trim()));
+			requirement.put(GemType.DIAMOND, Integer.parseInt(parts[6].trim()));
+			requirement.put(GemType.ONYX, Integer.parseInt(parts[7].trim()));
+
+			return new Noble(nobleId, name, prestigePoints, requirement);
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
 	/**
 	 * Loads nobles from a CSV file.
 	 *
@@ -23,66 +108,66 @@ public class NobleLoader {
 	 */
 	public static List<Noble> loadNobles(String filePath) {
 		List<Noble> nobles = new ArrayList<>();
-		
+
 		try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-			String line;
-			boolean isFirstLine = true;
-			
-			while ((line = br.readLine()) != null) {
-				if (isFirstLine) {
-					isFirstLine = false;
-					continue; // Skip header
+			String first = stripBom(br.readLine());
+			if (first == null) {
+				return generateDefaultNobles();
+			}
+			boolean distribution = isDistributionNoblesHeader(first);
+
+			if (distribution) {
+				int baseCount = 0;
+				int expCount = 0;
+				String line;
+				while ((line = br.readLine()) != null) {
+					line = line.trim();
+					if (line.isEmpty()) {
+						break;
+					}
+					String[] p = line.split(",", -1);
+					if (p.length < 1) {
+						continue;
+					}
+					String g = p[0].trim();
+					String name;
+					if (g.equalsIgnoreCase("Base")) {
+						baseCount++;
+						name = "Base #" + baseCount;
+					} else if (g.equalsIgnoreCase("Expansion")) {
+						expCount++;
+						name = "Expansion #" + expCount;
+					} else {
+						continue;
+					}
+					int id = nobles.size() + 1;
+					Noble n = parseDistributionNobleLine(line, id, name);
+					if (n != null) {
+						nobles.add(n);
+					}
 				}
-				
-				line = line.trim();
-				if (line.isEmpty()) {
-					continue;
-				}
-				
-				Noble noble = parseNobleLine(line);
-				if (noble != null) {
-					nobles.add(noble);
+			} else {
+				// Legacy: first line (header) already consumed as `first`; skip it like the old loader
+				String line;
+				while ((line = br.readLine()) != null) {
+					line = line.trim();
+					if (line.isEmpty()) {
+						continue;
+					}
+					Noble noble = parseLegacyNobleLine(line);
+					if (noble != null) {
+						nobles.add(noble);
+					}
 				}
 			}
 		} catch (IOException e) {
-			System.err.println("Warning: Could not load nobles from " + filePath + 
-				". Using default nobles.");
-			nobles = generateDefaultNobles();
+			return generateDefaultNobles();
 		}
-		
-		return nobles;
-	}
 
-	/**
-	 * Parses a single line from the CSV file.
-	 * Expected format: nobleId,name,prestigePoints,reqRuby,reqEmerald,reqSapphire,reqDiamond,reqOnyx
-	 *
-	 * @param line the CSV line
-	 * @return a Noble object, or null if parsing fails
-	 */
-	private static Noble parseNobleLine(String line) {
-		try {
-			String[] parts = line.split(",");
-			if (parts.length < 8) {
-				return null;
-			}
-			
-			int nobleId = Integer.parseInt(parts[0].trim());
-			String name = parts[1].trim();
-			int prestigePoints = Integer.parseInt(parts[2].trim());
-			
-			Map<GemType, Integer> requirement = new HashMap<>();
-			requirement.put(GemType.RUBY, Integer.parseInt(parts[3].trim()));
-			requirement.put(GemType.EMERALD, Integer.parseInt(parts[4].trim()));
-			requirement.put(GemType.SAPPHIRE, Integer.parseInt(parts[5].trim()));
-			requirement.put(GemType.DIAMOND, Integer.parseInt(parts[6].trim()));
-			requirement.put(GemType.ONYX, Integer.parseInt(parts[7].trim()));
-			
-			return new Noble(nobleId, name, prestigePoints, requirement);
-		} catch (Exception e) {
-			System.err.println("Error parsing noble line: " + line);
-			return null;
+		if (nobles.isEmpty()) {
+			return generateDefaultNobles();
 		}
+		return nobles;
 	}
 
 	/**
@@ -92,11 +177,10 @@ public class NobleLoader {
 	 */
 	private static List<Noble> generateDefaultNobles() {
 		List<Noble> nobles = new ArrayList<>();
-		String[] names = {"Isabella", "Francis", "Catherine", "Charles", "Marie"};
-		
+		String[] names = { "Isabella", "Francis", "Catherine", "Charles", "Marie" };
+
 		for (int i = 0; i < 5; i++) {
 			Map<GemType, Integer> requirement = new HashMap<>();
-			// Each noble requires 3 gems of different types
 			GemType[] types = GemType.values();
 			for (int j = 0; j < 3; j++) {
 				requirement.put(types[j], 3);

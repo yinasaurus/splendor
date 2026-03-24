@@ -4,6 +4,9 @@ setlocal enabledelayedexpansion
 REM Create classes directory if it doesn't exist
 if not exist "classes" mkdir classes
 
+echo Cleaning old class files...
+del /s /q classes\*.class 2>nul
+
 REM Compile all Java source files using sourcepath
 javac -d classes -cp "lib/*;classes" -sourcepath src ^
   src\splendor\main\SplendorGame.java ^

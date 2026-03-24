@@ -42,10 +42,10 @@ public class GameConfig {
 		properties.setProperty("gems.diamond.initial", "4,5,7");
 		properties.setProperty("gems.onyx.initial", "4,5,7");
 		properties.setProperty("gems.gold.initial", "5,5,5");
-		properties.setProperty("cards.level1.path", "data/level1_cards.csv");
-		properties.setProperty("cards.level2.path", "data/level2_cards.csv");
-		properties.setProperty("cards.level3.path", "data/level3_cards.csv");
-		properties.setProperty("nobles.path", "data/nobles.csv");
+		properties.setProperty("cards.level1.path", "data/Splendor_CardDistribution - Cards.csv");
+		properties.setProperty("cards.level2.path", "data/Splendor_CardDistribution - Cards.csv");
+		properties.setProperty("cards.level3.path", "data/Splendor_CardDistribution - Cards.csv");
+		properties.setProperty("nobles.path", "data/Splendor_CardDistribution - Nobles.csv");
 		properties.setProperty("max.gems.per.player", "10");
 		properties.setProperty("max.reserved.cards", "3");
 	}

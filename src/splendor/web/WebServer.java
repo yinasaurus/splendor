@@ -53,6 +53,7 @@ public class WebServer {
 		server.createContext("/api/state", new StateHandler());
 		server.createContext("/api/action", new ActionHandler());
 		server.createContext("/api/newgame", new NewGameHandler());
+		server.createContext("/api/quit", new QuitHandler());
 
 		server.setExecutor(null);
 		server.start();
@@ -162,6 +163,24 @@ public class WebServer {
 			resp.put("p4Type", types[3]);
 			String json = toJson(resp);
 			sendResponse(exchange, 200, json, "application/json; charset=utf-8");
+		}
+	}
+
+	/**
+	 * Resets server-side game state to the default 2-player lobby (all human),
+	 * matching startup. Used when the browser returns to the start screen.
+	 */
+	private static class QuitHandler implements HttpHandler {
+		@Override
+		public void handle(HttpExchange exchange) throws IOException {
+			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+				return;
+			}
+			startNewGame(2, new String[] { "human", "human", "human", "human" });
+			Map<String, Object> resp = new HashMap<>();
+			resp.put("success", true);
+			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 		}
 	}
 

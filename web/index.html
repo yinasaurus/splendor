@@ -71,12 +71,15 @@
 
       <section class="panel video-panel">
         <h2>Video Tutorial</h2>
-        <p class="hint">Prefer watching instead of reading? This short video explains how to play Splendor.</p>
+        <p class="hint">Prefer watching instead of reading? This quick rules overview is about three minutes.</p>
         <div class="video-wrapper">
           <iframe
-            src="https://www.tiktok.com/embed/7298732802088914207"
-            title="Splendor tutorial video"
+            src="https://www.youtube-nocookie.com/embed/2A0CQ0xsrv0?rel=0&amp;modestbranding=1"
+            title="How to Play Splendor in 3 Minutes (The Rules Girl)"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowfullscreen
+            loading="lazy"
+            referrerpolicy="strict-origin-when-cross-origin"
           ></iframe>
         </div>
       </section>
@@ -156,9 +159,9 @@
         <div class="guided-card">
           <div class="guided-header">
             <h2>Guided Tutorial</h2>
-            <span id="guided-step-label"></span>
+            <span id="guided-step-label" class="guided-step-label"></span>
           </div>
-          <p id="guided-step-text"></p>
+          <div id="guided-step-text" class="guided-step-body"></div>
           <div class="guided-actions">
             <button id="guided-prev-btn" type="button" class="secondary">Back</button>
             <button id="guided-exit-btn" type="button" class="secondary">End Tutorial</button>
@@ -167,8 +170,11 @@
         </div>
       </div>
       <section class="status">
-        <div id="turn-info"></div>
-        <div id="game-over" class="hidden"></div>
+        <div class="status-main">
+          <div id="turn-info"></div>
+          <div id="game-over" class="hidden"></div>
+        </div>
+        <button id="quit-game-btn" type="button" class="secondary">Quit to menu</button>
       </section>
 
       <section class="board">
@@ -215,7 +221,7 @@
             <div id="take-gems-options" class="pill-row"></div>
             <button id="take-gems-btn">Confirm Take Gems</button>
           </div>
-          <div>
+          <div id="reserve-card-block">
             <h3>Reserve Card</h3>
             <label>Level:
               <select id="reserve-level">

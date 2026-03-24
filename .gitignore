@@ -1,0 +1,5 @@
+# Compiled Java output (assignment expects an empty classes/ folder in submissions)
+classes/
+
+# Class files anywhere (if compiled outside classes/)
+*.class

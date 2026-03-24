@@ -1,6 +1,7 @@
 const API_STATE = "/api/state";
 const API_ACTION = "/api/action";
 const API_NEW_GAME = "/api/newgame";
+const API_QUIT = "/api/quit";
 
 async function fetchState() {
   const res = await fetch(API_STATE);
@@ -60,17 +61,36 @@ async function postNewGame(payload) {
   return res.json();
 }
 
+async function postQuit() {
+  const res = await fetch(API_QUIT, { method: "POST" });
+  if (!res.ok) {
+    throw new Error("Quit failed");
+  }
+  return res.json();
+}
+
 const guidedSteps = [
-  "Welcome! In this tutorial you will play as Player 1 against an AI opponent and learn the basic flow of Splendor.",
-  "First, look at the top-left status bar: it shows whose turn it is and whether the game is over.",
-  "Check the 'Board Gems' panel. These are the tokens you can take on your turn.",
-  "Now, try the 'Take Gems' action: click a few gem buttons, then 'Confirm Take Gems'.",
-  "After you have some gems, look at the Level 1 cards. Each card has a cost (what you pay) and a bonus (a permanent discount color).",
-  "Try purchasing a card you can afford using 'Purchase Visible' (or by clicking a card). When you buy it, you permanently gain that card’s bonus color as a discount.",
-  "Watch the 'Players' panel: your 'bonuses' are your permanent discounts, and they reduce future card costs of that color.",
-  "Nobles are free points if your bonuses match their requirements. Plan your cards towards a noble.",
-  "When any player reaches at least 15 prestige points (the default winning score), the game will finish the round and declare a winner.",
-  "That's it! You can now exit the tutorial and play a full game, with or without AI."
+  "Welcome!\n\nYou play as Player 1 against an AI. This walkthrough explains the main screen and the three core actions: take gems, reserve a card, and buy a card.",
+
+  "Status bar (top)\n\nHere you see whose turn it is and whether the game has ended. When it is your turn, the Actions section below is yours to use.",
+
+  "Board Gems\n\nThese chips are the supply. On your turn you can take gems from here (rules: 3 different colors, or 2 of the same if enough remain). You cannot take gold directly by \"taking gems\"—gold usually comes from reserving.",
+
+  "Take Gems\n\nOpen the Take Gems row, pick a legal combination, then press \"Confirm Take Gems\". Try it once so you have tokens to spend later.\n\nTip: you cannot hold more than 10 gems total.",
+
+  "Reserve a card\n\nInstead of buying now, you can reserve a face-up card from the board (choose level + index, same [0–3] as on the cards).\n\n• You may hold at most 3 reserved cards.\n• When you reserve, you gain 1 gold (wild) gem if any are left in the bank—gold can pay for any color when you buy.\n• Reserved cards are private to you; buy them later with \"Purchase Reserved\".\n\nReserving is useful to lock a card you want before someone else takes it.",
+
+  "Development cards — Level 1\n\nEach card shows its cost and a bonus gem color. After you buy a card, that color becomes a permanent discount on future purchases.",
+
+  "Purchase a visible card\n\nUse \"Purchase Visible\" (level + index) or click a card if your client supports it. Pay with gems in hand plus your discounts. Try to buy at least one Level 1 card when you can afford it.",
+
+  "Players panel\n\nWatch bonuses (permanent discounts), gems in hand, reserved cards, and prestige. Bonuses stack and make expensive cards easier over time.",
+
+  "Nobles\n\nNobles award free prestige if your bonuses match their requirements—they count bonuses, not loose gems. Plan your buys towards a noble when it fits your strategy.",
+
+  "Winning the game\n\nWhen someone reaches 15 prestige (default), the round finishes so everyone gets the same number of turns, then the highest score wins. Ties go to the player who bought fewer development cards.",
+
+  "You're set!\n\nEnd the tutorial anytime with \"End Tutorial\", or tap \"Finish\" to return to the start screen. Have fun!"
 ];
 
 function renderState(state) {
@@ -162,7 +182,6 @@ function renderState(state) {
         <div class="card-header">
           <span class="card-index">[${index}]</span>
           <span>Level ${lvl}</span>
-          <span class="card-id">ID:${card.id}</span>
           <span class="card-points">+${card.points} pts</span>
         </div>
       `;
@@ -204,6 +223,7 @@ function renderState(state) {
       cardActions.className = "card-actions";
       const buyBtn = document.createElement("button");
       buyBtn.type = "button";
+      buyBtn.className = "card-buy-btn";
       buyBtn.textContent = "Buy";
       buyBtn.disabled = !card.affordable;
       const reserveBtn = document.createElement("button");
@@ -479,25 +499,24 @@ async function init() {
 
     // Point to relevant part of the UI for the current step
     if (guidedIndex === 0 || guidedIndex === 1) {
-      // Status bar (current player)
       const status = document.querySelector(".status");
       if (status) status.classList.add("guided-highlight");
-    } else if (guidedIndex === 2 || guidedIndex === 3) {
-      // Board gems + take gems
-      const gemsPanel = document.querySelector(".board .panel");
+    } else if (guidedIndex === 2) {
+      const gemsPanel = document.querySelector(".board .panel:first-child");
       if (gemsPanel) gemsPanel.classList.add("guided-highlight");
+    } else if (guidedIndex === 3) {
       const takeGemsBlock = document.getElementById("take-gems-options")?.parentElement;
       if (takeGemsBlock) takeGemsBlock.classList.add("guided-highlight");
-    } else if (guidedIndex === 4 || guidedIndex === 5) {
-      // Level 1 cards area
+    } else if (guidedIndex === 4) {
+      const reserveBlock = document.getElementById("reserve-card-block");
+      if (reserveBlock) reserveBlock.classList.add("guided-highlight");
+    } else if (guidedIndex === 5 || guidedIndex === 6) {
       const level1 = document.getElementById("level-1");
       if (level1) level1.classList.add("guided-highlight");
-    } else if (guidedIndex === 6) {
-      // Players panel
+    } else if (guidedIndex === 7) {
       const playersPanel = document.querySelector(".players.panel");
       if (playersPanel) playersPanel.classList.add("guided-highlight");
-    } else if (guidedIndex === 7) {
-      // Nobles panel
+    } else if (guidedIndex === 8) {
       const noblesPanel = document.querySelector(".board .panel:nth-child(2)");
       if (noblesPanel) noblesPanel.classList.add("guided-highlight");
     }
@@ -508,6 +527,7 @@ async function init() {
     tutorialFlags.active = true;
     tutorialFlags.tookGemsOnce = false;
     tutorialFlags.boughtLevel1Once = false;
+    tutorialPanel.classList.add("hidden");
     updateGuidedOverlay();
     guidedOverlay.classList.remove("hidden");
   }
@@ -519,6 +539,20 @@ async function init() {
     document.querySelectorAll(".guided-highlight").forEach((el) => {
       el.classList.remove("guided-highlight");
     });
+  }
+
+  async function returnToMenu() {
+    closeGuided();
+    tutorialFlags.active = false;
+    tutorialPanel.classList.add("hidden");
+    try {
+      await postQuit();
+    } catch (_) {
+      /* show menu anyway; user can refresh if the server is down */
+    }
+    startScreen.classList.remove("hidden");
+    gameUi.classList.add("hidden");
+    if (videoPanel) videoPanel.classList.remove("hidden");
   }
 
   startBtn.addEventListener("click", async () => {
@@ -552,6 +586,9 @@ async function init() {
 
   startGuidedBtn.addEventListener("click", async () => {
     try {
+      closeGuided();
+      tutorialPanel.classList.add("hidden");
+
       // Guided tutorial uses Player 1 as human and Player 2 as AI.
       // If Player 2 dropdown is set to Human, default to AI (Medium).
       let p2 = p2Type.value;
@@ -610,7 +647,7 @@ async function init() {
         return;
       }
     }
-    if (guidedIndex === 5 && !tutorialFlags.boughtLevel1Once) {
+    if (guidedIndex === 6 && !tutorialFlags.boughtLevel1Once) {
       const ok = confirm(
         "You haven't purchased a card yet (maybe you chose gems that don't match any card cost). Do you want to continue the tutorial anyway?"
       );
@@ -623,22 +660,16 @@ async function init() {
       guidedIndex += 1;
       updateGuidedOverlay();
     } else {
-      // "Finish" behaves like End Tutorial: exit to start screen
-      closeGuided();
-      startScreen.classList.remove("hidden");
-      gameUi.classList.add("hidden");
-      if (videoPanel) videoPanel.classList.remove("hidden");
+      returnToMenu();
     }
   });
 
   guidedExitBtn.addEventListener("click", () => {
-    // Close overlay and return to start screen so the player
-    // clearly exits the tutorial context.
-    closeGuided();
-    tutorialFlags.active = false;
-    startScreen.classList.remove("hidden");
-    gameUi.classList.add("hidden");
-    if (videoPanel) videoPanel.classList.remove("hidden");
+    returnToMenu();
+  });
+
+  document.getElementById("quit-game-btn").addEventListener("click", () => {
+    returnToMenu();
   });
 }
 

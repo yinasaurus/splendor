@@ -113,7 +113,7 @@ public class Card {
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("Card L").append(level).append(" [ID:").append(cardId).append("] ");
+		sb.append("Card L").append(level).append(" ");
 		sb.append("Points:").append(prestigePoints).append(" ");
 		sb.append("Bonus:").append(bonusGem.getAbbreviation()).append(" ");
 		sb.append("Cost:");
