@@ -22,6 +22,40 @@ const uiState = {
   actionUiBound: false,
 };
 
+let toastTimer = null;
+
+function showToast(message, type = "ok") {
+  const toast = document.getElementById("action-toast");
+  if (!toast) {
+    return;
+  }
+  toast.textContent = message;
+  toast.className = `toast ${type} show`;
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+  }
+  toastTimer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 3200);
+}
+
+function clearTransientUi() {
+  const msg = document.getElementById("action-message");
+  if (msg) {
+    msg.textContent = "";
+    msg.className = "message";
+  }
+  const toast = document.getElementById("action-toast");
+  if (toast) {
+    toast.classList.remove("show");
+    toast.textContent = "";
+  }
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+}
+
 async function postAction(payload) {
   const res = await fetch(API_ACTION, {
     method: "POST",
@@ -78,11 +112,11 @@ const guidedSteps = [
 
   "Take Gems\n\nOpen the Take Gems row, pick a legal combination, then press \"Confirm Take Gems\". Try it once so you have tokens to spend later.\n\nTip: you cannot hold more than 10 gems total.",
 
-  "Reserve a card\n\nInstead of buying now, you can reserve a face-up card from the board (choose level + index, same [0–3] as on the cards).\n\n• You may hold at most 3 reserved cards.\n• When you reserve, you gain 1 gold (wild) gem if any are left in the bank—gold can pay for any color when you buy.\n• Reserved cards are private to you; buy them later with \"Purchase Reserved\".\n\nReserving is useful to lock a card you want before someone else takes it.",
+  "Reserve a card\n\nUse a card's \"Reserve\" button (under each visible card).\n\n• Max 3 reserved cards.\n• Gain 1 gold if available.\n• Buy it later with \"Purchase Reserved\".\n\nReserve helps you lock a card before others take it.",
 
   "Development cards — Level 1\n\nEach card shows its cost and a bonus gem color. After you buy a card, that color becomes a permanent discount on future purchases.",
 
-  "Purchase a visible card\n\nUse \"Purchase Visible\" (level + index) or click a card if your client supports it. Pay with gems in hand plus your discounts. Try to buy at least one Level 1 card when you can afford it.",
+  "Purchase a visible card\n\nUse a card's \"Buy\" button (or click the card) when it is affordable. You pay with gems in hand plus permanent discounts from your bonuses. Try to buy one Level 1 card early.",
 
   "Players panel\n\nWatch bonuses (permanent discounts), gems in hand, reserved cards, and prestige. Bonuses stack and make expensive cards easier over time.",
 
@@ -238,6 +272,9 @@ function renderState(state) {
           const msg = document.getElementById("action-message");
           msg.textContent = result.message || (result.success ? "Purchased." : "Purchase failed.");
           msg.className = "message " + (result.success ? "ok" : "error");
+          if (result.success) {
+            showToast("Card purchased.");
+          }
           const newState = await fetchState();
           renderState(newState);
         } catch (e2) {
@@ -254,6 +291,9 @@ function renderState(state) {
           const msg = document.getElementById("action-message");
           msg.textContent = result.message || (result.success ? "Reserved." : "Reserve failed.");
           msg.className = "message " + (result.success ? "ok" : "error");
+          if (result.success) {
+            showToast("Card reserved successfully.");
+          }
           const newState = await fetchState();
           renderState(newState);
         } catch (e2) {
@@ -273,6 +313,9 @@ function renderState(state) {
           const msg = document.getElementById("action-message");
           msg.textContent = result.message || (result.success ? "Purchased." : "Purchase failed.");
           msg.className = "message " + (result.success ? "ok" : "error");
+          if (result.success) {
+            showToast("Card purchased.");
+          }
           const newState = await fetchState();
           renderState(newState);
         } catch (e) {
@@ -403,36 +446,6 @@ function setupOtherActions() {
   }
   const msg = document.getElementById("action-message");
 
-  document.getElementById("reserve-btn").addEventListener("click", async () => {
-    const level = parseInt(document.getElementById("reserve-level").value, 10);
-    const index = parseInt(document.getElementById("reserve-index").value, 10) || 0;
-    try {
-      const result = await postAction({ type: "reserve", level, index });
-      msg.textContent = result.message || (result.success ? "Reserved." : "Reserve failed.");
-      msg.className = "message " + (result.success ? "ok" : "error");
-      const state = await fetchState();
-      renderState(state);
-    } catch (e) {
-      msg.textContent = "Error reserving card.";
-      msg.className = "message error";
-    }
-  });
-
-  document.getElementById("purchase-btn").addEventListener("click", async () => {
-    const level = parseInt(document.getElementById("purchase-level").value, 10);
-    const index = parseInt(document.getElementById("purchase-index").value, 10) || 0;
-    try {
-      const result = await postAction({ type: "purchaseVisible", level, index });
-      msg.textContent = result.message || (result.success ? "Purchased." : "Purchase failed.");
-      msg.className = "message " + (result.success ? "ok" : "error");
-      const state = await fetchState();
-      renderState(state);
-    } catch (e) {
-      msg.textContent = "Error purchasing card.";
-      msg.className = "message error";
-    }
-  });
-
   document.getElementById("purchase-reserved-btn").addEventListener("click", async () => {
     const index = parseInt(document.getElementById("purchase-reserved-index").value, 10) || 0;
     try {
@@ -440,6 +453,9 @@ function setupOtherActions() {
       msg.textContent =
         result.message || (result.success ? "Reserved card purchased." : "Purchase reserved failed.");
       msg.className = "message " + (result.success ? "ok" : "error");
+      if (result.success) {
+        showToast("Reserved card purchased.");
+      }
       const state = await fetchState();
       renderState(state);
     } catch (e) {
@@ -470,13 +486,71 @@ async function init() {
   const openTutorialBtn = document.getElementById("open-tutorial-btn");
   const closeTutorialBtn = document.getElementById("close-tutorial-btn");
   const guidedOverlay = document.getElementById("guided-overlay");
+  const guidedCard = document.querySelector("#guided-overlay .guided-card");
+  const guidedHeader = document.querySelector("#guided-overlay .guided-header");
   const guidedStepLabel = document.getElementById("guided-step-label");
   const guidedStepText = document.getElementById("guided-step-text");
   const guidedPrevBtn = document.getElementById("guided-prev-btn");
   const guidedNextBtn = document.getElementById("guided-next-btn");
   const guidedExitBtn = document.getElementById("guided-exit-btn");
+  const guidedSizeSmBtn = document.getElementById("guided-size-sm");
+  const guidedSizeLgBtn = document.getElementById("guided-size-lg");
 
   let guidedIndex = 0;
+  let guidedSize = "md";
+  let dragState = null;
+
+  function applyGuidedSizeClass() {
+    guidedOverlay.classList.remove("guided-size-sm", "guided-size-lg");
+    if (guidedSize === "sm") {
+      guidedOverlay.classList.add("guided-size-sm");
+    } else if (guidedSize === "lg") {
+      guidedOverlay.classList.add("guided-size-lg");
+    }
+  }
+
+  function beginGuidedDrag(e) {
+    // Allow size buttons to be clicked without starting drag
+    if (e.target.closest(".guided-size-controls")) {
+      return;
+    }
+    const rect = guidedOverlay.getBoundingClientRect();
+    dragState = {
+      startX: e.clientX,
+      startY: e.clientY,
+      left: rect.left,
+      top: rect.top,
+    };
+    // Switch from bottom-centered transform mode to explicit position mode.
+    guidedOverlay.style.left = `${rect.left}px`;
+    guidedOverlay.style.top = `${rect.top}px`;
+    guidedOverlay.style.bottom = "auto";
+    guidedOverlay.style.transform = "none";
+    document.body.style.userSelect = "none";
+  }
+
+  function onGuidedDrag(e) {
+    if (!dragState) {
+      return;
+    }
+    const dx = e.clientX - dragState.startX;
+    const dy = e.clientY - dragState.startY;
+    const overlayRect = guidedOverlay.getBoundingClientRect();
+    const maxLeft = Math.max(8, window.innerWidth - overlayRect.width - 8);
+    const maxTop = Math.max(8, window.innerHeight - overlayRect.height - 8);
+    const nextLeft = Math.min(Math.max(8, dragState.left + dx), maxLeft);
+    const nextTop = Math.min(Math.max(8, dragState.top + dy), maxTop);
+    guidedOverlay.style.left = `${nextLeft}px`;
+    guidedOverlay.style.top = `${nextTop}px`;
+  }
+
+  function endGuidedDrag() {
+    if (!dragState) {
+      return;
+    }
+    dragState = null;
+    document.body.style.userSelect = "";
+  }
 
   function updatePlayerRows() {
     const n = parseInt(numPlayersSelect.value, 10);
@@ -508,8 +582,9 @@ async function init() {
       const takeGemsBlock = document.getElementById("take-gems-options")?.parentElement;
       if (takeGemsBlock) takeGemsBlock.classList.add("guided-highlight");
     } else if (guidedIndex === 4) {
-      const reserveBlock = document.getElementById("reserve-card-block");
-      if (reserveBlock) reserveBlock.classList.add("guided-highlight");
+      // Manual reserve block is hidden; highlight level 1 cards where Reserve buttons live.
+      const level1 = document.getElementById("level-1");
+      if (level1) level1.classList.add("guided-highlight");
     } else if (guidedIndex === 5 || guidedIndex === 6) {
       const level1 = document.getElementById("level-1");
       if (level1) level1.classList.add("guided-highlight");
@@ -523,6 +598,8 @@ async function init() {
   }
 
   function openGuided() {
+    clearTransientUi();
+    applyGuidedSizeClass();
     guidedIndex = 0;
     tutorialFlags.active = true;
     tutorialFlags.tookGemsOnce = false;
@@ -542,17 +619,17 @@ async function init() {
   }
 
   async function returnToMenu() {
+    clearTransientUi();
     closeGuided();
     tutorialFlags.active = false;
     tutorialPanel.classList.add("hidden");
-    try {
-      await postQuit();
-    } catch (_) {
-      /* show menu anyway; user can refresh if the server is down */
-    }
     startScreen.classList.remove("hidden");
     gameUi.classList.add("hidden");
     if (videoPanel) videoPanel.classList.remove("hidden");
+    // Reset backend state in background; UI should not wait on network.
+    postQuit().catch(() => {
+      /* user is already back at menu; ignore API quit failure */
+    });
   }
 
   startBtn.addEventListener("click", async () => {
@@ -565,6 +642,7 @@ async function init() {
       p4Type: p4Type.value,
     };
     try {
+      clearTransientUi();
       // Ensure any previous guided/How-to-play state is fully cleared
       closeGuided();
       tutorialPanel.classList.add("hidden");
@@ -586,6 +664,7 @@ async function init() {
 
   startGuidedBtn.addEventListener("click", async () => {
     try {
+      clearTransientUi();
       closeGuided();
       tutorialPanel.classList.add("hidden");
 
@@ -667,6 +746,31 @@ async function init() {
   guidedExitBtn.addEventListener("click", () => {
     returnToMenu();
   });
+
+  if (guidedSizeSmBtn) {
+    guidedSizeSmBtn.addEventListener("click", () => {
+      guidedSize = guidedSize === "sm" ? "md" : "sm";
+      applyGuidedSizeClass();
+    });
+  }
+
+  if (guidedSizeLgBtn) {
+    guidedSizeLgBtn.addEventListener("click", () => {
+      guidedSize = guidedSize === "lg" ? "md" : "lg";
+      applyGuidedSizeClass();
+    });
+  }
+
+  if (guidedHeader) {
+    guidedHeader.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) {
+        return;
+      }
+      beginGuidedDrag(e);
+    });
+  }
+  window.addEventListener("mousemove", onGuidedDrag);
+  window.addEventListener("mouseup", endGuidedDrag);
 
   document.getElementById("quit-game-btn").addEventListener("click", () => {
     returnToMenu();

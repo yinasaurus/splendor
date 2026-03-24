@@ -158,7 +158,9 @@
       <div id="guided-overlay" class="guided-overlay hidden">
         <div class="guided-card">
           <div class="guided-header">
-            <h2>Guided Tutorial</h2>
+            <div class="guided-header-top">
+              <h2>Guided Tutorial</h2>
+            </div>
             <span id="guided-step-label" class="guided-step-label"></span>
           </div>
           <div id="guided-step-text" class="guided-step-body"></div>
@@ -221,36 +223,6 @@
             <div id="take-gems-options" class="pill-row"></div>
             <button id="take-gems-btn">Confirm Take Gems</button>
           </div>
-          <div id="reserve-card-block">
-            <h3>Reserve Card</h3>
-            <label>Level:
-              <select id="reserve-level">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-              </select>
-            </label>
-            <label>Index:
-              <input id="reserve-index" type="number" min="0" value="0" placeholder="0-3">
-            </label>
-            <p class="hint small">If using the manual index box: use the visible card index ([0..3]) shown on each card.</p>
-            <button id="reserve-btn">Reserve</button>
-          </div>
-          <div>
-            <h3>Purchase Visible</h3>
-            <label>Level:
-              <select id="purchase-level">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-              </select>
-            </label>
-            <label>Index:
-              <input id="purchase-index" type="number" min="0" value="0" placeholder="0-3">
-            </label>
-            <p class="hint small">If using the manual index box: use the visible card index ([0..3]) shown on each card.</p>
-            <button id="purchase-btn">Purchase</button>
-          </div>
           <div>
             <h3>Purchase Reserved</h3>
             <label>Reserved Index:
@@ -264,6 +236,7 @@
       </section>
     </main>
   </div>
+  <div id="action-toast" class="toast" aria-live="polite"></div>
 
   <script src="app.js"></script>
 </body>
