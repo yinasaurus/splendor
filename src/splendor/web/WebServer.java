@@ -3,9 +3,11 @@ package splendor.web;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,14 +35,80 @@ import splendor.rules.GameRules;
  */
 public class WebServer {
 
-	private static GameController controller;
-	private static Map<Integer, AIPlayer> aiPlayers = new HashMap<>();
+	private static final String DEFAULT_ROOM = "Room A";
+	private static final Map<String, GameSession> sessions = new HashMap<>();
+
+	private static class GameSession {
+		GameController controller;
+		Map<Integer, AIPlayer> aiPlayers = new HashMap<>();
+		List<String> actionLog = new ArrayList<>();
+		int turnNumber = 1;
+	}
+
+	private static void addActionLog(GameSession session, String text) {
+		if (text == null || text.trim().isEmpty()) {
+			return;
+		}
+		session.actionLog.add(text.trim());
+		// Keep the feed short and readable.
+		if (session.actionLog.size() > 15) {
+			session.actionLog = new ArrayList<>(
+				session.actionLog.subList(session.actionLog.size() - 15, session.actionLog.size()));
+		}
+	}
+
+	private static String cleanRoomName(String room) {
+		if (room == null) {
+			return DEFAULT_ROOM;
+		}
+		String trimmed = room.trim();
+		if (trimmed.isEmpty()) {
+			return DEFAULT_ROOM;
+		}
+		return trimmed;
+	}
+
+	private static String getRoomFromQuery(HttpExchange exchange) {
+		URI uri = exchange.getRequestURI();
+		if (uri == null || uri.getQuery() == null) {
+			return DEFAULT_ROOM;
+		}
+		String query = uri.getQuery();
+		for (String kv : query.split("&")) {
+			int eq = kv.indexOf('=');
+			if (eq <= 0) {
+				continue;
+			}
+			String key = kv.substring(0, eq);
+			String value = kv.substring(eq + 1);
+			if ("room".equalsIgnoreCase(key)) {
+				try {
+					return cleanRoomName(java.net.URLDecoder.decode(value, StandardCharsets.UTF_8.name()));
+				} catch (Exception e) {
+					return cleanRoomName(value);
+				}
+			}
+		}
+		return DEFAULT_ROOM;
+	}
+
+	private static GameSession getOrCreateSession(String roomName) {
+		String room = cleanRoomName(roomName);
+		GameSession existing = sessions.get(room);
+		if (existing != null) {
+			return existing;
+		}
+		GameSession created = new GameSession();
+		startNewGame(created, 2, new String[] { "human", "human", "human", "human" });
+		sessions.put(room, created);
+		return created;
+	}
 
 	public static void main(String[] args) throws IOException {
 		System.out.println("Starting Splendor Web Server on http://localhost:8080");
 
-		// Initialize a default game (will be replaced when player starts a new game).
-		startNewGame(2, new String[] { "human", "human", "human", "human" });
+		// Initialize default room.
+		getOrCreateSession(DEFAULT_ROOM);
 
 		HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
 
@@ -64,7 +132,7 @@ public class WebServer {
 	 *
 	 * @param numPlayers number of players (2-4)
 	 */
-	private static void startNewGame(int numPlayers, String[] types) {
+	private static void startNewGame(GameSession session, int numPlayers, String[] types) {
 		if (numPlayers < 2) {
 			numPlayers = 2;
 		} else if (numPlayers > 4) {
@@ -83,20 +151,23 @@ public class WebServer {
 			boolean isHuman = !(t.equals("easy") || t.equals("medium") || t.equals("hard"));
 			playerTypes.add(isHuman);
 		}
-		controller = new GameController(numPlayers, playerNames, playerTypes);
+		session.controller = new GameController(numPlayers, playerNames, playerTypes);
 
 		// Initialize AI map
-		aiPlayers.clear();
+		session.aiPlayers.clear();
 		for (int i = 0; i < numPlayers; i++) {
 			String t = types[i] == null ? "human" : types[i].toLowerCase();
 			if (t.equals("easy")) {
-				aiPlayers.put(i, new AIPlayer(new EasyAIStrategy()));
+				session.aiPlayers.put(i, new AIPlayer(new EasyAIStrategy()));
 			} else if (t.equals("medium")) {
-				aiPlayers.put(i, new AIPlayer(new MediumAIStrategy()));
+				session.aiPlayers.put(i, new AIPlayer(new MediumAIStrategy()));
 			} else if (t.equals("hard")) {
-				aiPlayers.put(i, new AIPlayer(new HardAIStrategy()));
+				session.aiPlayers.put(i, new AIPlayer(new HardAIStrategy()));
 			}
 		}
+		session.actionLog.clear();
+		addActionLog(session, "New game started.");
+		session.turnNumber = 1;
 	}
 
 	/**
@@ -146,13 +217,15 @@ public class WebServer {
 			}
 
 			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+			String room = extractStringField(body, "room", DEFAULT_ROOM);
+			GameSession session = getOrCreateSession(room);
 			int numPlayers = extractIntField(body, "numPlayers", 2);
 			String[] types = new String[4];
 			types[0] = extractStringField(body, "p1Type", "human");
 			types[1] = extractStringField(body, "p2Type", "human");
 			types[2] = extractStringField(body, "p3Type", "human");
 			types[3] = extractStringField(body, "p4Type", "human");
-			startNewGame(numPlayers, types);
+			startNewGame(session, numPlayers, types);
 
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
@@ -161,6 +234,7 @@ public class WebServer {
 			resp.put("p2Type", types[1]);
 			resp.put("p3Type", types[2]);
 			resp.put("p4Type", types[3]);
+			resp.put("room", cleanRoomName(room));
 			String json = toJson(resp);
 			sendResponse(exchange, 200, json, "application/json; charset=utf-8");
 		}
@@ -177,9 +251,13 @@ public class WebServer {
 				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
 				return;
 			}
-			startNewGame(2, new String[] { "human", "human", "human", "human" });
+			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+			String room = extractStringField(body, "room", DEFAULT_ROOM);
+			GameSession session = getOrCreateSession(room);
+			startNewGame(session, 2, new String[] { "human", "human", "human", "human" });
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
+			resp.put("room", cleanRoomName(room));
 			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 		}
 	}
@@ -195,7 +273,9 @@ public class WebServer {
 				return;
 			}
 
-			String json = buildGameStateJson();
+			String room = getRoomFromQuery(exchange);
+			GameSession session = getOrCreateSession(room);
+			String json = buildGameStateJson(session);
 			sendResponse(exchange, 200, json, "application/json; charset=utf-8");
 		}
 	}
@@ -217,13 +297,15 @@ public class WebServer {
 			}
 
 			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-			Map<String, Object> result = handleAction(body);
+			String room = extractStringField(body, "room", DEFAULT_ROOM);
+			GameSession session = getOrCreateSession(room);
+			Map<String, Object> result = handleAction(session, body);
 			String json = toJson(result);
 			sendResponse(exchange, 200, json, "application/json; charset=utf-8");
 		}
 	}
 
-	private static Map<String, Object> handleAction(String body) {
+	private static Map<String, Object> handleAction(GameSession session, String body) {
 		Map<String, Object> response = new HashMap<>();
 		body = body.trim();
 		if (body.isEmpty()) {
@@ -236,6 +318,8 @@ public class WebServer {
 		String lower = body.toLowerCase();
 		boolean success = false;
 		String message = "Unknown action";
+		String actor = session.controller.getCurrentPlayer().getName();
+		String actionSummary = null;
 
 		if (lower.contains("\"type\"") && lower.contains("takegems")) {
 			// Extract gems array e.g. "gems":["R","E","S"]
@@ -259,17 +343,27 @@ public class WebServer {
 				}
 			}
 			if (!gemsToTake.isEmpty()) {
-				GameRules.ValidationResult vr = controller.getRules().validateTakeGems(
+				GameRules.ValidationResult vr = session.controller.getRules().validateTakeGems(
 					gemsToTake,
-					controller.getBoard().getAvailableGems(),
-					controller.getCurrentPlayer().getGems()
+					session.controller.getBoard().getAvailableGems(),
+					session.controller.getCurrentPlayer().getGems()
 				);
 				if (!vr.isValid()) {
 					success = false;
 					message = vr.getMessage();
 				} else {
-					success = controller.takeGems(gemsToTake);
+					success = session.controller.takeGems(gemsToTake);
 					message = success ? "Gems taken." : "Could not take gems.";
+					if (success) {
+						StringBuilder taken = new StringBuilder();
+						for (Map.Entry<GemType, Integer> e : gemsToTake.entrySet()) {
+							if (taken.length() > 0) {
+								taken.append(", ");
+							}
+							taken.append(e.getKey().getAbbreviation()).append("x").append(e.getValue());
+						}
+						actionSummary = actor + " took gems: " + taken + ".";
+					}
 				}
 			} else {
 				message = "No valid gems specified";
@@ -277,8 +371,8 @@ public class WebServer {
 		} else if (lower.contains("\"type\"") && lower.contains("reserve")) {
 			int level = extractIntField(body, "level", 1);
 			int index = extractIntField(body, "index", 0);
-			GameRules.ValidationResult vr = controller.getRules().validateReserveCard(controller.getCurrentPlayer());
-			List<Card> visible = controller.getBoard().getVisibleCards(level);
+			GameRules.ValidationResult vr = session.controller.getRules().validateReserveCard(session.controller.getCurrentPlayer());
+			List<Card> visible = session.controller.getBoard().getVisibleCards(level);
 			if (!vr.isValid()) {
 				success = false;
 				message = vr.getMessage();
@@ -286,58 +380,70 @@ public class WebServer {
 				success = false;
 				message = "Invalid card index for this level.";
 			} else {
-				success = controller.reserveCard(level, index);
+				success = session.controller.reserveCard(level, index);
 				message = success ? "Card reserved." : "Cannot reserve this card.";
+				if (success) {
+					actionSummary = actor + " reserved a card (L" + level + " #" + index + ").";
+				}
 			}
 		} else if (lower.contains("\"type\"") && lower.contains("purchasevisible")) {
 			int level = extractIntField(body, "level", 1);
 			int index = extractIntField(body, "index", 0);
-			List<Card> visible = controller.getBoard().getVisibleCards(level);
+			List<Card> visible = session.controller.getBoard().getVisibleCards(level);
 			if (index < 0 || index >= visible.size()) {
 				success = false;
 				message = "Invalid card index for this level.";
 			} else {
 				Card card = visible.get(index);
-				Map<GemType, Integer> payment = controller.getRules().calculatePayment(card, controller.getCurrentPlayer());
-				GameRules.ValidationResult vr = controller.getRules().validatePurchaseCard(card, controller.getCurrentPlayer(), payment);
+				Map<GemType, Integer> payment = session.controller.getRules().calculatePayment(card, session.controller.getCurrentPlayer());
+				GameRules.ValidationResult vr = session.controller.getRules().validatePurchaseCard(card, session.controller.getCurrentPlayer(), payment);
 				if (!vr.isValid()) {
 					success = false;
 					message = vr.getMessage();
 				} else {
-					success = controller.purchaseVisibleCard(level, index);
+					success = session.controller.purchaseVisibleCard(level, index);
 					message = success ? "Card purchased." : "Cannot purchase this card.";
+					if (success) {
+						actionSummary = actor + " purchased a visible card (L" + level + " #" + index + ").";
+					}
 				}
 			}
 		} else if (lower.contains("\"type\"") && lower.contains("purchasereserved")) {
 			int index = extractIntField(body, "index", 0);
-			List<Card> reserved = controller.getCurrentPlayer().getReservedCards();
+			List<Card> reserved = session.controller.getCurrentPlayer().getReservedCards();
 			if (index < 0 || index >= reserved.size()) {
 				success = false;
 				message = "Invalid reserved card index.";
 			} else {
 				Card card = reserved.get(index);
-				Map<GemType, Integer> payment = controller.getRules().calculatePayment(card, controller.getCurrentPlayer());
-				GameRules.ValidationResult vr = controller.getRules().validatePurchaseCard(card, controller.getCurrentPlayer(), payment);
+				Map<GemType, Integer> payment = session.controller.getRules().calculatePayment(card, session.controller.getCurrentPlayer());
+				GameRules.ValidationResult vr = session.controller.getRules().validatePurchaseCard(card, session.controller.getCurrentPlayer(), payment);
 				if (!vr.isValid()) {
 					success = false;
 					message = vr.getMessage();
 				} else {
-					success = controller.purchaseReservedCard(index);
+					success = session.controller.purchaseReservedCard(index);
 					message = success ? "Reserved card purchased." : "Cannot purchase this reserved card.";
+					if (success) {
+						actionSummary = actor + " purchased reserved card #" + index + ".";
+					}
 				}
 			}
 		}
 
 		// Advance turns (including AI turns) if action succeeded
-		if (success && !controller.isGameOver()) {
-			advanceTurnsAfterHuman();
+		if (success && !session.controller.isGameOver()) {
+			if (actionSummary != null) {
+				addActionLog(session, actionSummary);
+			}
+			advanceTurnsAfterHuman(session);
 		}
 
 		response.put("success", success);
 		response.put("message", message);
-		response.put("gameOver", controller.isGameOver());
-		if (controller.isGameOver() && controller.getWinner() != null) {
-			response.put("winner", controller.getWinner().getName());
+		response.put("gameOver", session.controller.isGameOver());
+		if (session.controller.isGameOver() && session.controller.getWinner() != null) {
+			response.put("winner", session.controller.getWinner().getName());
 		}
 
 		return response;
@@ -416,40 +522,44 @@ public class WebServer {
 	 * After a human finishes an action, advance the turn and let any AI players
 	 * take their turns until it is a human's turn again or the game ends.
 	 */
-	private static void advanceTurnsAfterHuman() {
-		while (!controller.isGameOver()) {
-			controller.nextTurn();
-			Player current = controller.getCurrentPlayer();
-			List<Player> players = controller.getPlayers();
+	private static void advanceTurnsAfterHuman(GameSession session) {
+		while (!session.controller.isGameOver()) {
+			session.controller.nextTurn();
+			session.turnNumber++;
+			Player current = session.controller.getCurrentPlayer();
+			List<Player> players = session.controller.getPlayers();
 			int idx = players.indexOf(current);
-			AIPlayer ai = aiPlayers.get(idx);
+			AIPlayer ai = session.aiPlayers.get(idx);
 			if (ai == null) {
 				// next player is human, stop here
 				break;
 			}
 			// Let AI take its move. AI strategies always choose legal moves.
-			ai.makeMove(controller);
-			if (controller.isGameOver()) {
+			String aiAction = ai.makeMove(session.controller);
+			addActionLog(session, current.getName() + ": " + (aiAction == null ? "took a turn." : aiAction));
+			if (session.controller.isGameOver()) {
 				break;
 			}
 		}
 	}
 
-	private static String buildGameStateJson() {
+	private static String buildGameStateJson(GameSession session) {
 		StringBuilder sb = new StringBuilder();
-		GameBoard board = controller.getBoard();
-		Player current = controller.getCurrentPlayer();
+		GameBoard board = session.controller.getBoard();
+		Player current = session.controller.getCurrentPlayer();
 
 		sb.append("{");
 		sb.append("\"currentPlayer\":\"").append(escape(current.getName())).append("\",");
-		sb.append("\"gameOver\":").append(controller.isGameOver()).append(",");
-		if (controller.isGameOver() && controller.getWinner() != null) {
-			sb.append("\"winner\":\"").append(escape(controller.getWinner().getName())).append("\",");
+		sb.append("\"turnNumber\":").append(session.turnNumber).append(",");
+		sb.append("\"isHumanTurn\":").append(current.isHuman()).append(",");
+		sb.append("\"gameOver\":").append(session.controller.isGameOver()).append(",");
+		if (session.controller.isGameOver() && session.controller.getWinner() != null) {
+			sb.append("\"winner\":\"").append(escape(session.controller.getWinner().getName())).append("\",");
 		}
 
 		// Players
 		sb.append("\"players\":[");
-		List<Player> players = controller.getPlayers();
+		List<Player> players = session.controller.getPlayers();
 		for (int i = 0; i < players.size(); i++) {
 			Player p = players.get(i);
 			if (i > 0) {
@@ -584,6 +694,16 @@ public class WebServer {
 			}
 			sb.append("}");
 			sb.append("}");
+		}
+		sb.append("],");
+
+		// Recent actions feed
+		sb.append("\"recentActions\":[");
+		for (int i = 0; i < session.actionLog.size(); i++) {
+			if (i > 0) {
+				sb.append(",");
+			}
+			sb.append("\"").append(escape(session.actionLog.get(i))).append("\"");
 		}
 		sb.append("]");
 

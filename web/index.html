@@ -23,6 +23,9 @@
             <option value="4">4 players</option>
           </select>
         </label>
+        <label>Room (local lobby):
+          <input id="room-name" type="text" value="Room A" placeholder="Enter room name">
+        </label>
         <div class="player-types">
           <div class="player-type-row">
             <span>Player 1:</span>
@@ -32,6 +35,7 @@
               <option value="medium">AI (Medium)</option>
               <option value="hard">AI (Hard)</option>
             </select>
+            <label class="ready-toggle"><input id="player1-ready" type="checkbox" checked> Ready</label>
           </div>
           <div class="player-type-row">
             <span>Player 2:</span>
@@ -41,6 +45,7 @@
               <option value="medium">AI (Medium)</option>
               <option value="hard">AI (Hard)</option>
             </select>
+            <label class="ready-toggle"><input id="player2-ready" type="checkbox"> Ready</label>
           </div>
           <div class="player-type-row">
             <span>Player 3:</span>
@@ -50,6 +55,7 @@
               <option value="medium">AI (Medium)</option>
               <option value="hard">AI (Hard)</option>
             </select>
+            <label class="ready-toggle"><input id="player3-ready" type="checkbox"> Ready</label>
           </div>
           <div class="player-type-row">
             <span>Player 4:</span>
@@ -59,11 +65,14 @@
               <option value="medium">AI (Medium)</option>
               <option value="hard">AI (Hard)</option>
             </select>
+            <label class="ready-toggle"><input id="player4-ready" type="checkbox"> Ready</label>
           </div>
-          <p class="hint small">Only the first N players are used, where N is the number of players selected above.</p>
+          <p class="hint small">Only the first N players are used. Active players must be marked Ready before starting.</p>
         </div>
         <div class="start-actions">
           <button id="start-game-btn">Start Game</button>
+          <button id="join-room-btn" type="button" class="secondary">Join Room</button>
+          <button id="rejoin-room-btn" type="button" class="secondary hidden">Rejoin Last Room</button>
           <button id="start-guided-btn" type="button" class="secondary">Start Guided Tutorial</button>
           <button id="open-tutorial-btn" type="button" class="secondary">How to Play</button>
         </div>
@@ -176,7 +185,19 @@
           <div id="turn-info"></div>
           <div id="game-over" class="hidden"></div>
         </div>
+        <button id="open-rulebook-btn" type="button" class="secondary">Rule Book</button>
         <button id="quit-game-btn" type="button" class="secondary">Quit to menu</button>
+      </section>
+
+      <section class="panel assist-panel">
+        <div>
+          <h2>Recommended Steps</h2>
+          <ul id="recommended-steps" class="assist-list"></ul>
+        </div>
+        <div>
+          <h2>Recent Actions</h2>
+          <ul id="activity-log" class="assist-list"></ul>
+        </div>
       </section>
 
       <section class="board">

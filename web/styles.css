@@ -71,6 +71,16 @@ main {
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-subtle);
   backdrop-filter: blur(8px);
+  position: relative;
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: radial-gradient(120% 120% at -10% -15%, rgba(255, 193, 7, 0.08), transparent 40%);
+  pointer-events: none;
 }
 
 .panel h2 {
@@ -110,6 +120,21 @@ main {
 .status #game-over {
   color: #ffeb3b;
   font-weight: 600;
+}
+
+.assist-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.assist-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: #d7dbeb;
 }
 
 /* Must override any later display:flex|grid rules on the same element (e.g. .guided-overlay) */
@@ -202,8 +227,24 @@ main {
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 0.78rem;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gem-pill-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+
+.gem-pill-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
 }
 
 .pill.gem-RUBY {
@@ -257,6 +298,11 @@ main {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+}
+
+.card-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
 }
 
 .card-header {
@@ -513,6 +559,7 @@ button.secondary:hover:not(:disabled) {
   align-items: center;
   gap: 6px;
   font-size: 0.85rem;
+  flex-wrap: wrap;
 }
 
 .player-type-row span {
@@ -521,6 +568,19 @@ button.secondary:hover:not(:disabled) {
 
 .player-type-row.hidden {
   display: none;
+}
+
+.ready-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.76rem;
+  color: #d9deef;
+  white-space: nowrap;
+}
+
+.ready-toggle input {
+  width: auto;
 }
 
 /* Overlay mode: bottom-centered and wider */
@@ -656,6 +716,10 @@ button.secondary:hover:not(:disabled) {
   }
 
   .actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assist-panel {
     grid-template-columns: 1fr;
   }
 

@@ -2,9 +2,13 @@ const API_STATE = "/api/state";
 const API_ACTION = "/api/action";
 const API_NEW_GAME = "/api/newgame";
 const API_QUIT = "/api/quit";
+let currentRoom = "Room A";
+const LAST_ROOM_KEY = "splendor.lastRoom";
+let playerViewOffset = 0;
 
 async function fetchState() {
-  const res = await fetch(API_STATE);
+  const roomParam = encodeURIComponent(currentRoom || "Room A");
+  const res = await fetch(`${API_STATE}?room=${roomParam}`);
   if (!res.ok) {
     throw new Error("Failed to load state");
   }
@@ -23,6 +27,33 @@ const uiState = {
 };
 
 let toastTimer = null;
+let latestState = null;
+
+const GEM_ICON_URI = {
+  RUBY:
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polygon points='12,2 20,9 16,21 8,21 4,9' fill='%23ef5350' stroke='%23b71c1c' stroke-width='1.8'/><polygon points='12,4.8 17.2,9.4 14.7,18.7 9.3,18.7 6.8,9.4' fill='%23ffcdd2' opacity='0.35'/></svg>"),
+  EMERALD:
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polygon points='12,2 20,9 16,21 8,21 4,9' fill='%2366bb6a' stroke='%231b5e20' stroke-width='1.8'/><polygon points='12,4.8 17.2,9.4 14.7,18.7 9.3,18.7 6.8,9.4' fill='%23e8f5e9' opacity='0.35'/></svg>"),
+  SAPPHIRE:
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polygon points='12,2 20,9 16,21 8,21 4,9' fill='%2342a5f5' stroke='%230d47a1' stroke-width='1.8'/><polygon points='12,4.8 17.2,9.4 14.7,18.7 9.3,18.7 6.8,9.4' fill='%23e3f2fd' opacity='0.35'/></svg>"),
+  DIAMOND:
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polygon points='12,2 20,9 16,21 8,21 4,9' fill='%23eceff1' stroke='%2390a4ae' stroke-width='1.8'/><polygon points='12,4.8 17.2,9.4 14.7,18.7 9.3,18.7 6.8,9.4' fill='%23ffffff' opacity='0.55'/></svg>"),
+  ONYX:
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polygon points='12,2 20,9 16,21 8,21 4,9' fill='%23263238' stroke='%23000000' stroke-width='1.8'/><polygon points='12,4.8 17.2,9.4 14.7,18.7 9.3,18.7 6.8,9.4' fill='%23b0bec5' opacity='0.2'/></svg>"),
+  GOLD:
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polygon points='12,2 20,9 16,21 8,21 4,9' fill='%23ffd54f' stroke='%23f57f17' stroke-width='1.8'/><polygon points='12,4.8 17.2,9.4 14.7,18.7 9.3,18.7 6.8,9.4' fill='%23fff8e1' opacity='0.4'/></svg>"),
+};
+
+function gemPillMarkup(gem, text) {
+  const icon = GEM_ICON_URI[gem] || GEM_ICON_URI.DIAMOND;
+  return `<span class="gem-pill-content"><img class="gem-pill-icon" src="${icon}" alt="${gem} gem" /><span>${text}</span></span>`;
+}
 
 function showToast(message, type = "ok") {
   const toast = document.getElementById("action-toast");
@@ -56,11 +87,36 @@ function clearTransientUi() {
   }
 }
 
+function rememberRoom(room) {
+  const safeRoom = (room || "Room A").trim() || "Room A";
+  currentRoom = safeRoom;
+  try {
+    window.localStorage.setItem(LAST_ROOM_KEY, safeRoom);
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
+function getRememberedRoom() {
+  try {
+    const saved = window.localStorage.getItem(LAST_ROOM_KEY);
+    return saved && saved.trim() ? saved.trim() : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function randomizePlayerView(state) {
+  const n = Math.max(1, (state.players || []).length);
+  playerViewOffset = Math.floor(Math.random() * n);
+}
+
 async function postAction(payload) {
+  const withRoom = { ...payload, room: currentRoom };
   const res = await fetch(API_ACTION, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(withRoom),
   });
   if (!res.ok) {
     throw new Error("Action failed");
@@ -84,10 +140,11 @@ async function postAction(payload) {
 }
 
 async function postNewGame(payload) {
+  const withRoom = { ...payload, room: currentRoom };
   const res = await fetch(API_NEW_GAME, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(withRoom),
   });
   if (!res.ok) {
     throw new Error("New game failed");
@@ -96,7 +153,11 @@ async function postNewGame(payload) {
 }
 
 async function postQuit() {
-  const res = await fetch(API_QUIT, { method: "POST" });
+  const res = await fetch(API_QUIT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ room: currentRoom }),
+  });
   if (!res.ok) {
     throw new Error("Quit failed");
   }
@@ -128,11 +189,17 @@ const guidedSteps = [
 ];
 
 function renderState(state) {
+  latestState = state;
   const turnInfo = document.getElementById("turn-info");
   const gameOver = document.getElementById("game-over");
   const boardGems = document.getElementById("board-gems");
   const nobles = document.getElementById("nobles");
   const players = document.getElementById("players");
+  const recommendedSteps = document.getElementById("recommended-steps");
+  const activityLog = document.getElementById("activity-log");
+  const currentPlayerData = (state.players || []).find((p) => p.name === state.currentPlayer) || null;
+  const isHumanTurn = !!state.isHumanTurn;
+  const currentReservedCount = currentPlayerData ? (currentPlayerData.reservedCount || 0) : 0;
 
   if (state.gameOver) {
     gameOver.classList.remove("hidden");
@@ -142,7 +209,8 @@ function renderState(state) {
     gameOver.classList.add("hidden");
   }
 
-  turnInfo.textContent = `Current Player: ${state.currentPlayer}`;
+  const turnNo = Number.isFinite(state.turnNumber) ? state.turnNumber : 1;
+  turnInfo.textContent = `Turn ${turnNo} · Current Player: ${state.currentPlayer}${isHumanTurn ? " (Your turn)" : " (AI turn)"}`;
 
   // Gems on board
   boardGems.innerHTML = "";
@@ -150,7 +218,7 @@ function renderState(state) {
     Object.entries(state.gems).forEach(([gem, count]) => {
       const pill = document.createElement("div");
       pill.className = `pill gem-${gem}`;
-      pill.textContent = `${gem}: ${count}`;
+      pill.innerHTML = gemPillMarkup(gem, `${gem}: ${count}`);
       boardGems.appendChild(pill);
     });
   }
@@ -172,7 +240,7 @@ function renderState(state) {
       Object.entries(req).forEach(([gem, count]) => {
         const pill = document.createElement("div");
         pill.className = `pill gem-${gem}`;
-        pill.textContent = `${gem[0]}:${count}`;
+        pill.innerHTML = gemPillMarkup(gem, `${gem[0]}:${count}`);
         row.appendChild(pill);
       });
 
@@ -232,7 +300,7 @@ function renderState(state) {
       bonusRow.className = "pill-row card-bonus-row";
       const bonusPill = document.createElement("div");
       bonusPill.className = `pill gem-${bonusGem}`;
-      bonusPill.textContent = `Bonus: ${bonusAbbr} (${gemName(bonusGem)} discount)`;
+      bonusPill.innerHTML = gemPillMarkup(bonusGem, `Bonus: ${bonusAbbr} (${gemName(bonusGem)} discount)`);
       bonusRow.appendChild(bonusPill);
 
       // Cost pills
@@ -245,7 +313,7 @@ function renderState(state) {
       Object.entries(cost).forEach(([gem, count]) => {
         const pill = document.createElement("div");
         pill.className = `pill gem-${gem}`;
-        pill.textContent = `${gem[0]}:${count}`;
+        pill.innerHTML = gemPillMarkup(gem, `${gem[0]}:${count}`);
         costRow.appendChild(pill);
       });
 
@@ -259,11 +327,12 @@ function renderState(state) {
       buyBtn.type = "button";
       buyBtn.className = "card-buy-btn";
       buyBtn.textContent = "Buy";
-      buyBtn.disabled = !card.affordable;
+      buyBtn.disabled = !isHumanTurn || !card.affordable;
       const reserveBtn = document.createElement("button");
       reserveBtn.type = "button";
       reserveBtn.className = "secondary";
       reserveBtn.textContent = "Reserve";
+      reserveBtn.disabled = !isHumanTurn || currentReservedCount >= 3;
 
       buyBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
@@ -308,6 +377,9 @@ function renderState(state) {
       li.appendChild(cardActions);
 
       li.addEventListener("click", async () => {
+        if (!isHumanTurn) {
+          return;
+        }
         try {
           const result = await postAction({ type: "purchaseVisible", level: lvl, index });
           const msg = document.getElementById("action-message");
@@ -332,7 +404,11 @@ function renderState(state) {
   // Players
   players.innerHTML = "";
   if (state.players) {
-    state.players.forEach((p) => {
+    const orderedPlayers = [];
+    for (let i = 0; i < state.players.length; i++) {
+      orderedPlayers.push(state.players[(i + playerViewOffset) % state.players.length]);
+    }
+    orderedPlayers.forEach((p) => {
       const card = document.createElement("div");
       card.className = "player-card";
       if (p.name === state.currentPlayer) {
@@ -343,13 +419,14 @@ function renderState(state) {
       name.textContent = p.name;
       const meta = document.createElement("div");
       meta.className = "player-meta";
-      meta.textContent = `${p.human ? "Human" : "AI"} · ${p.prestige} pts`;
+      const totalCoins = Object.values(p.gems || {}).reduce((sum, n) => sum + Number(n || 0), 0);
+      meta.textContent = `${p.human ? "Human" : "AI"} · ${p.prestige} pts · Coins: ${totalCoins}`;
       const gemsRow = document.createElement("div");
       gemsRow.className = "pill-row";
       Object.entries(p.gems || {}).forEach(([gem, count]) => {
         const pill = document.createElement("div");
         pill.className = `pill gem-${gem}`;
-        pill.textContent = `${gem}: ${count}`;
+        pill.innerHTML = gemPillMarkup(gem, `${gem}: ${count}`);
         gemsRow.appendChild(pill);
       });
       const bonusesRow = document.createElement("div");
@@ -357,14 +434,15 @@ function renderState(state) {
       Object.entries(p.bonuses || {}).forEach(([gem, count]) => {
         const pill = document.createElement("div");
         pill.className = `pill gem-${gem}`;
-        pill.textContent = `+${count} ${gem}`;
+        pill.innerHTML = gemPillMarkup(gem, `+${count} ${gem}`);
         bonusesRow.appendChild(pill);
       });
       const extra = document.createElement("div");
       extra.style.fontSize = "0.78rem";
       extra.style.marginTop = "3px";
       const nobleText = p.noble ? `Noble: ${p.noble}` : "No noble yet";
-      extra.textContent = `${nobleText} · Reserved: ${p.reservedCount}`;
+      const boughtCount = Object.values(p.bonuses || {}).reduce((sum, n) => sum + Number(n || 0), 0);
+      extra.textContent = `${nobleText} · Reserved: ${p.reservedCount} · Bought: ${boughtCount}`;
 
       card.appendChild(name);
       card.appendChild(meta);
@@ -373,6 +451,66 @@ function renderState(state) {
       card.appendChild(extra);
       players.appendChild(card);
     });
+  }
+
+  // Recommended next steps for the current human player.
+  if (recommendedSteps) {
+    recommendedSteps.innerHTML = "";
+    const suggestions = [];
+    const affordableVisible = Object.values(state.levels || {})
+      .flat()
+      .some((c) => !!c.affordable);
+    if (!isHumanTurn) {
+      suggestions.push("Wait for AI turns to finish.");
+    } else {
+      if (currentReservedCount >= 3) {
+        suggestions.push("Reserve is full (3/3). Purchase a reserved card to free a slot.");
+      }
+      if (affordableVisible) {
+        suggestions.push("Buy an affordable visible card to gain points and a permanent bonus.");
+      } else {
+        suggestions.push("Take gems to prepare your next purchase.");
+      }
+      if (currentReservedCount > 0) {
+        suggestions.push("Check 'Purchase Reserved' if one of your reserved cards is now affordable.");
+      }
+      suggestions.push("Plan toward nobles by building bonus colors, not loose gems.");
+    }
+    suggestions.slice(0, 4).forEach((text) => {
+      const li = document.createElement("li");
+      li.textContent = text;
+      recommendedSteps.appendChild(li);
+    });
+  }
+
+  // Activity feed from backend (human + AI moves).
+  if (activityLog) {
+    activityLog.innerHTML = "";
+    const actions = Array.isArray(state.recentActions) ? state.recentActions : [];
+    if (actions.length === 0) {
+      const li = document.createElement("li");
+      li.textContent = "No actions yet.";
+      activityLog.appendChild(li);
+    } else {
+      actions.slice(-6).reverse().forEach((entry) => {
+        const li = document.createElement("li");
+        li.textContent = entry;
+        activityLog.appendChild(li);
+      });
+    }
+  }
+
+  // Only show available actions for the active human turn.
+  const takeBtn = document.getElementById("take-gems-btn");
+  if (takeBtn) {
+    takeBtn.disabled = !isHumanTurn;
+  }
+  document.querySelectorAll("#take-gems-options button").forEach((btn) => {
+    btn.disabled = !isHumanTurn;
+  });
+  const reservedBtn = document.getElementById("purchase-reserved-btn");
+  if (reservedBtn) {
+    reservedBtn.disabled = !isHumanTurn || currentReservedCount <= 0;
   }
 }
 
@@ -472,18 +610,28 @@ async function init() {
   const gameUi = document.getElementById("game-ui");
   const videoPanel = document.querySelector(".video-panel");
   const startBtn = document.getElementById("start-game-btn");
+  const joinRoomBtn = document.getElementById("join-room-btn");
+  const rejoinRoomBtn = document.getElementById("rejoin-room-btn");
   const startGuidedBtn = document.getElementById("start-guided-btn");
   const numPlayersSelect = document.getElementById("start-num-players");
   const p1Type = document.getElementById("player1-type");
   const p2Type = document.getElementById("player2-type");
   const p3Type = document.getElementById("player3-type");
   const p4Type = document.getElementById("player4-type");
+  const roomNameInput = document.getElementById("room-name");
   const p1Row = p1Type.closest(".player-type-row");
   const p2Row = p2Type.closest(".player-type-row");
   const p3Row = p3Type.closest(".player-type-row");
   const p4Row = p4Type.closest(".player-type-row");
+  const readyChecks = [
+    document.getElementById("player1-ready"),
+    document.getElementById("player2-ready"),
+    document.getElementById("player3-ready"),
+    document.getElementById("player4-ready"),
+  ];
   const tutorialPanel = document.getElementById("tutorial-panel");
   const openTutorialBtn = document.getElementById("open-tutorial-btn");
+  const openRulebookBtn = document.getElementById("open-rulebook-btn");
   const closeTutorialBtn = document.getElementById("close-tutorial-btn");
   const guidedOverlay = document.getElementById("guided-overlay");
   const guidedCard = document.querySelector("#guided-overlay .guided-card");
@@ -558,6 +706,22 @@ async function init() {
     p2Row.classList.toggle("hidden", n < 2);
     p3Row.classList.toggle("hidden", n < 3);
     p4Row.classList.toggle("hidden", n < 4);
+    updateLobbyReadiness();
+  }
+
+  function updateLobbyReadiness() {
+    const n = parseInt(numPlayersSelect.value, 10);
+    const allActiveReady = readyChecks.slice(0, n).every((cb) => cb && cb.checked);
+    const roomSet = !roomNameInput || roomNameInput.value.trim().length > 0;
+    const canStart = allActiveReady && roomSet;
+    startBtn.disabled = !canStart;
+    startGuidedBtn.disabled = !canStart;
+    if (joinRoomBtn) {
+      joinRoomBtn.disabled = !roomSet;
+    }
+    if (rejoinRoomBtn) {
+      rejoinRoomBtn.disabled = !roomSet;
+    }
   }
 
   function updateGuidedOverlay() {
@@ -642,6 +806,7 @@ async function init() {
       p4Type: p4Type.value,
     };
     try {
+      rememberRoom(roomNameInput && roomNameInput.value.trim() ? roomNameInput.value.trim() : "Room A");
       clearTransientUi();
       // Ensure any previous guided/How-to-play state is fully cleared
       closeGuided();
@@ -656,6 +821,7 @@ async function init() {
       setupOtherActions();
 
       const state = await fetchState();
+      randomizePlayerView(state);
       renderState(state);
     } catch (e) {
       alert("Failed to start game. Is the server running?");
@@ -664,6 +830,7 @@ async function init() {
 
   startGuidedBtn.addEventListener("click", async () => {
     try {
+      rememberRoom(roomNameInput && roomNameInput.value.trim() ? roomNameInput.value.trim() : "Room A");
       clearTransientUi();
       closeGuided();
       tutorialPanel.classList.add("hidden");
@@ -689,6 +856,7 @@ async function init() {
       setupOtherActions();
 
       const state = await fetchState();
+      randomizePlayerView(state);
       renderState(state);
       openGuided();
     } catch (e) {
@@ -696,18 +864,88 @@ async function init() {
     }
   });
 
+  if (joinRoomBtn) {
+    joinRoomBtn.addEventListener("click", async () => {
+      rememberRoom(roomNameInput && roomNameInput.value.trim() ? roomNameInput.value.trim() : "Room A");
+      try {
+        clearTransientUi();
+        closeGuided();
+        tutorialPanel.classList.add("hidden");
+        const state = await fetchState();
+        randomizePlayerView(state);
+        startScreen.classList.add("hidden");
+        gameUi.classList.remove("hidden");
+        if (videoPanel) videoPanel.classList.add("hidden");
+        setupGemSelection();
+        setupOtherActions();
+        renderState(state);
+        showToast(`Joined ${currentRoom}`);
+      } catch (e) {
+        alert("Could not join room. Is the server running?");
+      }
+    });
+  }
+
+  if (rejoinRoomBtn) {
+    rejoinRoomBtn.addEventListener("click", async () => {
+      const remembered = getRememberedRoom();
+      if (!remembered) {
+        return;
+      }
+      rememberRoom(remembered);
+      if (roomNameInput) {
+        roomNameInput.value = remembered;
+      }
+      try {
+        clearTransientUi();
+        closeGuided();
+        tutorialPanel.classList.add("hidden");
+        const state = await fetchState();
+        randomizePlayerView(state);
+        startScreen.classList.add("hidden");
+        gameUi.classList.remove("hidden");
+        if (videoPanel) videoPanel.classList.add("hidden");
+        setupGemSelection();
+        setupOtherActions();
+        renderState(state);
+        showToast(`Rejoined ${currentRoom}`);
+      } catch (_) {
+        alert("Could not rejoin room.");
+      }
+    });
+  }
+
   openTutorialBtn.addEventListener("click", () => {
     tutorialPanel.classList.remove("hidden");
   });
+
+  if (openRulebookBtn) {
+    openRulebookBtn.addEventListener("click", () => {
+      tutorialPanel.classList.remove("hidden");
+      tutorialPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   closeTutorialBtn.addEventListener("click", () => {
     tutorialPanel.classList.add("hidden");
   });
 
   numPlayersSelect.addEventListener("change", updatePlayerRows);
+  readyChecks.forEach((cb) => cb && cb.addEventListener("change", updateLobbyReadiness));
+  if (roomNameInput) {
+    roomNameInput.addEventListener("input", updateLobbyReadiness);
+  }
 
   // Initial state
+  const remembered = getRememberedRoom();
+  if (remembered && roomNameInput) {
+    roomNameInput.value = remembered;
+  }
+  if (rejoinRoomBtn) {
+    rejoinRoomBtn.classList.toggle("hidden", !remembered);
+  }
   updatePlayerRows();
+  updateLobbyReadiness();
 
   guidedPrevBtn.addEventListener("click", () => {
     if (guidedIndex > 0) {
