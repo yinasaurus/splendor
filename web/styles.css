@@ -122,6 +122,25 @@ main {
   font-weight: 600;
 }
 
+.room-code-display {
+  font-size: 0.8rem;
+  color: #b7c4e8;
+}
+
+.room-code-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.small-btn {
+  margin-top: 0;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  border-radius: 6px;
+}
+
 .assist-panel {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

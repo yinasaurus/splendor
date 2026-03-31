@@ -23,9 +23,10 @@
             <option value="4">4 players</option>
           </select>
         </label>
-        <label>Room (local lobby):
-          <input id="room-name" type="text" value="Room A" placeholder="Enter room name">
+        <label>Game Code:
+          <input id="room-name" type="text" value="Room A" placeholder="Enter game code (e.g. SPLENDOR123)">
         </label>
+        <p class="hint small">Host shares this code. Friends enter the same code to join the same match.</p>
         <div class="player-types">
           <div class="player-type-row">
             <span>Player 1:</span>
@@ -67,7 +68,7 @@
         </div>
         <div class="start-actions">
           <button id="start-game-btn">Start Game</button>
-          <button id="join-room-btn" type="button" class="secondary">Join Room</button>
+          <button id="join-room-btn" type="button" class="secondary">Join by Code</button>
           <button id="rejoin-room-btn" type="button" class="secondary hidden">Rejoin Last Room</button>
           <button id="start-guided-btn" type="button" class="secondary">Start Guided Tutorial</button>
           <button id="open-tutorial-btn" type="button" class="secondary">How to Play</button>
@@ -179,6 +180,10 @@
       <section class="status">
         <div class="status-main">
           <div id="turn-info"></div>
+          <div class="room-code-row">
+            <div id="room-code-display" class="room-code-display"></div>
+            <button id="copy-room-code-btn" type="button" class="secondary small-btn">Copy Code</button>
+          </div>
           <div id="game-over" class="hidden"></div>
         </div>
         <button id="open-rulebook-btn" type="button" class="secondary">Rule Book</button>

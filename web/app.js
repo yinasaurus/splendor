@@ -128,6 +128,45 @@ function randomizePlayerView(state) {
   playerViewOffset = Math.floor(Math.random() * n);
 }
 
+async function copyRoomCodeToClipboard() {
+  const text = String(currentRoom || "").trim();
+  if (!text) {
+    showToast("No game code to copy.", "error");
+    return false;
+  }
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(text);
+      showToast(`Copied game code: ${text}`);
+      return true;
+    }
+  } catch (_) {
+    // Fall through to legacy copy method.
+  }
+
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    ta.style.pointerEvents = "none";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    if (ok) {
+      showToast(`Copied game code: ${text}`);
+      return true;
+    }
+  } catch (_) {
+    // ignore and show failure toast below
+  }
+  showToast("Copy failed. Please copy the code manually.", "error");
+  return false;
+}
+
 async function postAction(payload) {
   const withRoom = { ...payload, room: currentRoom };
   const res = await fetch(API_ACTION, {
@@ -208,6 +247,7 @@ const guidedSteps = [
 function renderState(state) {
   latestState = state;
   const turnInfo = document.getElementById("turn-info");
+  const roomCodeDisplay = document.getElementById("room-code-display");
   const gameOver = document.getElementById("game-over");
   const boardGems = document.getElementById("board-gems");
   const nobles = document.getElementById("nobles");
@@ -229,6 +269,9 @@ function renderState(state) {
   }
 
   turnInfo.textContent = `Turn ${turnNo} · Current Player: ${state.currentPlayer}${isHumanTurn ? " (Your turn)" : " (AI turn)"}`;
+  if (roomCodeDisplay) {
+    roomCodeDisplay.textContent = `Game Code: ${currentRoom}`;
+  }
 
   // Gems on board
   boardGems.innerHTML = "";
@@ -645,6 +688,7 @@ async function init() {
   const startBtn = document.getElementById("start-game-btn");
   const joinRoomBtn = document.getElementById("join-room-btn");
   const rejoinRoomBtn = document.getElementById("rejoin-room-btn");
+  const copyRoomCodeBtn = document.getElementById("copy-room-code-btn");
   const startGuidedBtn = document.getElementById("start-guided-btn");
   const numPlayersSelect = document.getElementById("start-num-players");
   const p1Type = document.getElementById("player1-type");
@@ -913,7 +957,7 @@ async function init() {
         setupGemSelection();
         setupOtherActions();
         renderState(state);
-        showToast(`Joined ${currentRoom}`);
+        showToast(`Joined game code: ${currentRoom}`);
       } catch (e) {
         alert("Could not join room. Is the server running?");
       }
@@ -945,10 +989,16 @@ async function init() {
         setupGemSelection();
         setupOtherActions();
         renderState(state);
-        showToast(`Rejoined ${currentRoom}`);
+        showToast(`Rejoined game code: ${currentRoom}`);
       } catch (_) {
         alert("Could not rejoin room.");
       }
+    });
+  }
+
+  if (copyRoomCodeBtn) {
+    copyRoomCodeBtn.addEventListener("click", async () => {
+      await copyRoomCodeToClipboard();
     });
   }
 
