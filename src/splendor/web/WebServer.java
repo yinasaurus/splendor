@@ -8,9 +8,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
@@ -43,6 +45,11 @@ public class WebServer {
 		Map<Integer, AIPlayer> aiPlayers = new HashMap<>();
 		List<String> actionLog = new ArrayList<>();
 		int turnNumber = 1;
+		boolean gameStarted = false;
+		String ownerName = "Host";
+		int lobbyNumPlayers = 2;
+		String[] lobbyTypes = new String[] { "human", "human", "human", "human" };
+		Map<String, Boolean> readyByPlayer = new LinkedHashMap<>();
 	}
 
 	private static void addActionLog(GameSession session, String text) {
@@ -104,6 +111,43 @@ public class WebServer {
 		return created;
 	}
 
+	private static String generateRoomCode() {
+		String raw = UUID.randomUUID().toString().replace("-", "").toUpperCase();
+		return "SP-" + raw.substring(0, 6);
+	}
+
+	private static void initializeLobby(GameSession session, String ownerName, int numPlayers, String[] types) {
+		session.ownerName = (ownerName == null || ownerName.trim().isEmpty()) ? "Host" : ownerName.trim();
+		session.lobbyNumPlayers = Math.max(2, Math.min(4, numPlayers));
+		session.lobbyTypes = new String[] {
+			types[0] == null ? "human" : types[0].toLowerCase(),
+			types[1] == null ? "human" : types[1].toLowerCase(),
+			types[2] == null ? "human" : types[2].toLowerCase(),
+			types[3] == null ? "human" : types[3].toLowerCase()
+		};
+		session.readyByPlayer.clear();
+		session.readyByPlayer.put(session.ownerName, false);
+		session.gameStarted = false;
+		session.actionLog.clear();
+		addActionLog(session, "Lobby created by " + session.ownerName + ".");
+	}
+
+	private static boolean canStartLobby(GameSession session) {
+		if (session.readyByPlayer.isEmpty()) {
+			return false;
+		}
+		int joined = session.readyByPlayer.size();
+		if (joined < 1) {
+			return false;
+		}
+		for (Boolean ready : session.readyByPlayer.values()) {
+			if (!Boolean.TRUE.equals(ready)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	public static void main(String[] args) throws IOException {
 		int port = 8080;
 		String envPort = System.getenv("PORT");
@@ -131,6 +175,10 @@ public class WebServer {
 		server.createContext("/api/action", new ActionHandler());
 		server.createContext("/api/newgame", new NewGameHandler());
 		server.createContext("/api/quit", new QuitHandler());
+		server.createContext("/api/room/create", new RoomCreateHandler());
+		server.createContext("/api/room/join", new RoomJoinHandler());
+		server.createContext("/api/room/ready", new RoomReadyHandler());
+		server.createContext("/api/room/start", new RoomStartHandler());
 
 		server.setExecutor(null);
 		server.start();
@@ -220,6 +268,9 @@ public class WebServer {
 	private static class NewGameHandler implements HttpHandler {
 		@Override
 		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
 			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
 				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
 				return;
@@ -235,6 +286,8 @@ public class WebServer {
 			types[2] = extractStringField(body, "p3Type", "human");
 			types[3] = extractStringField(body, "p4Type", "human");
 			startNewGame(session, numPlayers, types);
+			initializeLobby(session, "Host", numPlayers, types);
+			session.gameStarted = true;
 
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
@@ -256,6 +309,9 @@ public class WebServer {
 	private static class QuitHandler implements HttpHandler {
 		@Override
 		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
 			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
 				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
 				return;
@@ -264,6 +320,7 @@ public class WebServer {
 			String room = extractStringField(body, "room", DEFAULT_ROOM);
 			GameSession session = getOrCreateSession(room);
 			startNewGame(session, 2, new String[] { "human", "human", "human", "human" });
+			initializeLobby(session, "Host", 2, new String[] { "human", "human", "human", "human" });
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
 			resp.put("room", cleanRoomName(room));
@@ -277,6 +334,9 @@ public class WebServer {
 	private static class StateHandler implements HttpHandler {
 		@Override
 		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
 			if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
 				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
 				return;
@@ -300,6 +360,9 @@ public class WebServer {
 	private static class ActionHandler implements HttpHandler {
 		@Override
 		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
 			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
 				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
 				return;
@@ -311,6 +374,142 @@ public class WebServer {
 			Map<String, Object> result = handleAction(session, body);
 			String json = toJson(result);
 			sendResponse(exchange, 200, json, "application/json; charset=utf-8");
+		}
+	}
+
+	private static class RoomCreateHandler implements HttpHandler {
+		@Override
+		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
+			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+				return;
+			}
+			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+			String requested = extractStringField(body, "room", "");
+			String room = cleanRoomName((requested == null || requested.trim().isEmpty()) ? generateRoomCode() : requested);
+			String owner = extractStringField(body, "ownerName", "Host");
+			int numPlayers = extractIntField(body, "numPlayers", 2);
+			String[] types = new String[4];
+			types[0] = extractStringField(body, "p1Type", "human");
+			types[1] = extractStringField(body, "p2Type", "human");
+			types[2] = extractStringField(body, "p3Type", "human");
+			types[3] = extractStringField(body, "p4Type", "human");
+
+			GameSession session = getOrCreateSession(room);
+			initializeLobby(session, owner, numPlayers, types);
+			Map<String, Object> resp = new HashMap<>();
+			resp.put("success", true);
+			resp.put("room", room);
+			resp.put("owner", session.ownerName);
+			resp.put("numPlayers", session.lobbyNumPlayers);
+			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+		}
+	}
+
+	private static class RoomJoinHandler implements HttpHandler {
+		@Override
+		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
+			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+				return;
+			}
+			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
+			String name = extractStringField(body, "name", "Guest");
+			if (name == null || name.trim().isEmpty()) {
+				name = "Guest";
+			}
+			name = name.trim();
+
+			GameSession session = getOrCreateSession(room);
+			if (!session.readyByPlayer.containsKey(name) && session.readyByPlayer.size() >= 4) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("message", "Room is full (max 4).");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			session.readyByPlayer.putIfAbsent(name, false);
+			addActionLog(session, name + " joined lobby.");
+			Map<String, Object> resp = new HashMap<>();
+			resp.put("success", true);
+			resp.put("room", room);
+			resp.put("name", name);
+			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+		}
+	}
+
+	private static class RoomReadyHandler implements HttpHandler {
+		@Override
+		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
+			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+				return;
+			}
+			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
+			String name = extractStringField(body, "name", "Guest");
+			boolean ready = extractBooleanField(body, "ready", false);
+			GameSession session = getOrCreateSession(room);
+			if (!session.readyByPlayer.containsKey(name)) {
+				session.readyByPlayer.put(name, false);
+			}
+			session.readyByPlayer.put(name, ready);
+			addActionLog(session, name + (ready ? " is ready." : " is not ready."));
+			Map<String, Object> resp = new HashMap<>();
+			resp.put("success", true);
+			resp.put("room", room);
+			resp.put("name", name);
+			resp.put("ready", ready);
+			resp.put("canStart", canStartLobby(session));
+			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+		}
+	}
+
+	private static class RoomStartHandler implements HttpHandler {
+		@Override
+		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
+			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+				return;
+			}
+			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
+			String owner = extractStringField(body, "ownerName", "");
+			GameSession session = getOrCreateSession(room);
+			if (!session.ownerName.equals(owner)) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("message", "Only owner can start.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			if (!canStartLobby(session)) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("message", "Everyone must be ready.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			startNewGame(session, session.lobbyNumPlayers, session.lobbyTypes);
+			session.gameStarted = true;
+			addActionLog(session, "Match started by " + session.ownerName + ".");
+			Map<String, Object> resp = new HashMap<>();
+			resp.put("success", true);
+			resp.put("room", room);
+			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 		}
 	}
 
@@ -715,6 +914,27 @@ public class WebServer {
 			sb.append("\"").append(escape(session.actionLog.get(i))).append("\"");
 		}
 		sb.append("]");
+		sb.append(",");
+		sb.append("\"room\":\"").append(escape(DEFAULT_ROOM)).append("\",");
+		sb.append("\"lobby\":{");
+		sb.append("\"owner\":\"").append(escape(session.ownerName)).append("\",");
+		sb.append("\"gameStarted\":").append(session.gameStarted).append(",");
+		sb.append("\"numPlayers\":").append(session.lobbyNumPlayers).append(",");
+		sb.append("\"canStart\":").append(canStartLobby(session)).append(",");
+		sb.append("\"players\":[");
+		boolean firstLobbyPlayer = true;
+		for (Map.Entry<String, Boolean> e : session.readyByPlayer.entrySet()) {
+			if (!firstLobbyPlayer) {
+				sb.append(",");
+			}
+			firstLobbyPlayer = false;
+			sb.append("{");
+			sb.append("\"name\":\"").append(escape(e.getKey())).append("\",");
+			sb.append("\"ready\":").append(Boolean.TRUE.equals(e.getValue()));
+			sb.append("}");
+		}
+		sb.append("]");
+		sb.append("}");
 
 		sb.append("}");
 		return sb.toString();
@@ -753,10 +973,26 @@ public class WebServer {
 		Headers headers = exchange.getResponseHeaders();
 		headers.set("Content-Type", contentType);
 		headers.set("Access-Control-Allow-Origin", "*");
+		headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+		headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+		headers.set("Access-Control-Max-Age", "86400");
 		exchange.sendResponseHeaders(status, bytes.length);
 		try (OutputStream os = exchange.getResponseBody()) {
 			os.write(bytes);
 		}
+	}
+
+	private static boolean handleCorsPreflight(HttpExchange exchange) throws IOException {
+		if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+			Headers headers = exchange.getResponseHeaders();
+			headers.set("Access-Control-Allow-Origin", "*");
+			headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+			headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+			headers.set("Access-Control-Max-Age", "86400");
+			exchange.sendResponseHeaders(204, -1);
+			return true;
+		}
+		return false;
 	}
 }
 

@@ -16,9 +16,17 @@ const API_STATE = `${API_BASE}/api/state`;
 const API_ACTION = `${API_BASE}/api/action`;
 const API_NEW_GAME = `${API_BASE}/api/newgame`;
 const API_QUIT = `${API_BASE}/api/quit`;
+const API_ROOM_CREATE = `${API_BASE}/api/room/create`;
+const API_ROOM_JOIN = `${API_BASE}/api/room/join`;
+const API_ROOM_READY = `${API_BASE}/api/room/ready`;
+const API_ROOM_START = `${API_BASE}/api/room/start`;
 let currentRoom = "Room A";
 const LAST_ROOM_KEY = "splendor.lastRoom";
+const LAST_NAME_KEY = "splendor.playerName";
 let playerViewOffset = 0;
+let currentPlayerName = "Host";
+let currentReady = false;
+let currentOwner = "";
 
 async function fetchState() {
   const roomParam = encodeURIComponent(currentRoom || "Room A");
@@ -216,6 +224,54 @@ async function postQuit() {
   });
   if (!res.ok) {
     throw new Error("Quit failed");
+  }
+  return res.json();
+}
+
+async function postCreateRoom(payload) {
+  const res = await fetch(API_ROOM_CREATE, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error("Create room failed");
+  }
+  return res.json();
+}
+
+async function postJoinRoom(payload) {
+  const res = await fetch(API_ROOM_JOIN, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error("Join room failed");
+  }
+  return res.json();
+}
+
+async function postReady(payload) {
+  const res = await fetch(API_ROOM_READY, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error("Ready failed");
+  }
+  return res.json();
+}
+
+async function postStartRoom(payload) {
+  const res = await fetch(API_ROOM_START, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error("Start room failed");
   }
   return res.json();
 }
@@ -590,6 +646,42 @@ function renderState(state) {
   suppressRealtimeToasts = false;
 }
 
+function renderLobbyStatus(state) {
+  const ownerEl = document.getElementById("lobby-owner");
+  const playersEl = document.getElementById("lobby-players");
+  const readyBtn = document.getElementById("ready-btn");
+  const startBtn = document.getElementById("start-game-btn");
+  const roomCodeDisplay = document.getElementById("room-code-display");
+  const lobby = state && state.lobby ? state.lobby : null;
+  if (!lobby) {
+    return;
+  }
+  currentOwner = lobby.owner || "";
+  if (ownerEl) {
+    ownerEl.textContent = `Owner: ${currentOwner}`;
+  }
+  if (playersEl) {
+    playersEl.innerHTML = "";
+    (lobby.players || []).forEach((p) => {
+      const li = document.createElement("li");
+      li.textContent = `${p.name} ${p.ready ? "✅ Ready" : "⏳ Not ready"}`;
+      playersEl.appendChild(li);
+    });
+  }
+  if (roomCodeDisplay) {
+    roomCodeDisplay.textContent = `Game Code: ${currentRoom}`;
+  }
+  const me = (lobby.players || []).find((p) => p.name === currentPlayerName);
+  currentReady = !!(me && me.ready);
+  if (readyBtn) {
+    readyBtn.textContent = currentReady ? "Unready" : "Ready";
+  }
+  if (startBtn) {
+    const isOwner = currentPlayerName === currentOwner;
+    startBtn.disabled = !isOwner || !lobby.canStart;
+  }
+}
+
 function setupGemSelection() {
   if (uiState.gemUiInitialized) {
     return;
@@ -686,6 +778,8 @@ async function init() {
   const gameUi = document.getElementById("game-ui");
   const videoPanel = document.querySelector(".video-panel");
   const startBtn = document.getElementById("start-game-btn");
+  const createRoomBtn = document.getElementById("create-room-btn");
+  const readyBtn = document.getElementById("ready-btn");
   const joinRoomBtn = document.getElementById("join-room-btn");
   const rejoinRoomBtn = document.getElementById("rejoin-room-btn");
   const copyRoomCodeBtn = document.getElementById("copy-room-code-btn");
@@ -696,6 +790,7 @@ async function init() {
   const p3Type = document.getElementById("player3-type");
   const p4Type = document.getElementById("player4-type");
   const roomNameInput = document.getElementById("room-name");
+  const playerNameInput = document.getElementById("player-name");
   const p1Row = p1Type.closest(".player-type-row");
   const p2Row = p2Type.closest(".player-type-row");
   const p3Row = p3Type.closest(".player-type-row");
@@ -782,11 +877,18 @@ async function init() {
 
   function updateLobbyReadiness() {
     const roomSet = !roomNameInput || roomNameInput.value.trim().length > 0;
+    const nameSet = !playerNameInput || playerNameInput.value.trim().length > 0;
     const canStart = roomSet;
-    startBtn.disabled = !canStart;
+    startBtn.disabled = !canStart || !nameSet;
     startGuidedBtn.disabled = !canStart;
+    if (createRoomBtn) {
+      createRoomBtn.disabled = !canStart || !nameSet;
+    }
+    if (readyBtn) {
+      readyBtn.disabled = !canStart || !nameSet;
+    }
     if (joinRoomBtn) {
-      joinRoomBtn.disabled = !roomSet;
+      joinRoomBtn.disabled = !roomSet || !nameSet;
     }
     if (rejoinRoomBtn) {
       rejoinRoomBtn.disabled = !roomSet;
@@ -865,40 +967,34 @@ async function init() {
     });
   }
 
-  startBtn.addEventListener("click", async () => {
-    const numPlayers = parseInt(numPlayersSelect.value, 10);
-    const body = {
-      numPlayers,
-      p1Type: p1Type.value,
-      p2Type: p2Type.value,
-      p3Type: p3Type.value,
-      p4Type: p4Type.value,
-    };
-    try {
-      rememberRoom(roomNameInput && roomNameInput.value.trim() ? roomNameInput.value.trim() : "Room A");
-      clearTransientUi();
-      // Ensure any previous guided/How-to-play state is fully cleared
-      closeGuided();
-      tutorialPanel.classList.add("hidden");
-
-      await postNewGame(body);
-      startScreen.classList.add("hidden");
-      gameUi.classList.remove("hidden");
-      if (videoPanel) videoPanel.classList.add("hidden");
-
-      setupGemSelection();
-      setupOtherActions();
-
-      const state = await fetchState();
-      suppressRealtimeToasts = true;
-      lastSeenActionCount = 0;
-      lastSeenTurnNumber = null;
-      randomizePlayerView(state);
-      renderState(state);
-    } catch (e) {
-      alert("Failed to start game. Is the server running?");
-    }
-  });
+  if (createRoomBtn) {
+    createRoomBtn.addEventListener("click", async () => {
+      try {
+        currentPlayerName = playerNameInput && playerNameInput.value.trim() ? playerNameInput.value.trim() : "Host";
+        const numPlayers = parseInt(numPlayersSelect.value, 10);
+        const roomInput = roomNameInput && roomNameInput.value.trim() ? roomNameInput.value.trim() : "";
+        const created = await postCreateRoom({
+          room: roomInput,
+          ownerName: currentPlayerName,
+          numPlayers,
+          p1Type: p1Type.value,
+          p2Type: p2Type.value,
+          p3Type: p3Type.value,
+          p4Type: p4Type.value,
+        });
+        rememberRoom(created.room || roomInput || "Room A");
+        window.localStorage.setItem(LAST_NAME_KEY, currentPlayerName);
+        if (roomNameInput) {
+          roomNameInput.value = currentRoom;
+        }
+        showToast(`Room created: ${currentRoom}`);
+        const state = await fetchState();
+        renderLobbyStatus(state);
+      } catch (_) {
+        alert("Could not create room.");
+      }
+    });
+  }
 
   startGuidedBtn.addEventListener("click", async () => {
     try {
@@ -941,28 +1037,74 @@ async function init() {
 
   if (joinRoomBtn) {
     joinRoomBtn.addEventListener("click", async () => {
-      rememberRoom(roomNameInput && roomNameInput.value.trim() ? roomNameInput.value.trim() : "Room A");
       try {
+        currentPlayerName = playerNameInput && playerNameInput.value.trim() ? playerNameInput.value.trim() : "Guest";
+        rememberRoom(roomNameInput && roomNameInput.value.trim() ? roomNameInput.value.trim() : "Room A");
+        window.localStorage.setItem(LAST_NAME_KEY, currentPlayerName);
+        const joined = await postJoinRoom({ room: currentRoom, name: currentPlayerName });
+        if (!joined.success) {
+          alert(joined.message || "Could not join room.");
+          return;
+        }
         clearTransientUi();
         closeGuided();
         tutorialPanel.classList.add("hidden");
         const state = await fetchState();
+        renderLobbyStatus(state);
         suppressRealtimeToasts = true;
         lastSeenActionCount = 0;
         lastSeenTurnNumber = null;
         randomizePlayerView(state);
-        startScreen.classList.add("hidden");
-        gameUi.classList.remove("hidden");
-        if (videoPanel) videoPanel.classList.add("hidden");
-        setupGemSelection();
-        setupOtherActions();
-        renderState(state);
         showToast(`Joined game code: ${currentRoom}`);
       } catch (e) {
         alert("Could not join room. Is the server running?");
       }
     });
   }
+
+  if (readyBtn) {
+    readyBtn.addEventListener("click", async () => {
+      try {
+        if (!currentPlayerName) {
+          currentPlayerName = playerNameInput && playerNameInput.value.trim() ? playerNameInput.value.trim() : "Guest";
+        }
+        const nextReady = !currentReady;
+        await postReady({ room: currentRoom, name: currentPlayerName, ready: nextReady });
+        const state = await fetchState();
+        renderLobbyStatus(state);
+        showToast(nextReady ? "You are ready." : "You are not ready.");
+      } catch (_) {
+        alert("Could not update ready status.");
+      }
+    });
+  }
+
+  startBtn.addEventListener("click", async () => {
+    try {
+      const resp = await postStartRoom({ room: currentRoom, ownerName: currentPlayerName });
+      if (!resp.success) {
+        alert(resp.message || "Could not start match.");
+        return;
+      }
+      clearTransientUi();
+      closeGuided();
+      tutorialPanel.classList.add("hidden");
+      const state = await fetchState();
+      suppressRealtimeToasts = true;
+      lastSeenActionCount = 0;
+      lastSeenTurnNumber = null;
+      randomizePlayerView(state);
+      startScreen.classList.add("hidden");
+      gameUi.classList.remove("hidden");
+      if (videoPanel) videoPanel.classList.add("hidden");
+      setupGemSelection();
+      setupOtherActions();
+      renderState(state);
+      showToast("Match started.");
+    } catch (_) {
+      alert("Could not start match.");
+    }
+  });
 
   if (rejoinRoomBtn) {
     rejoinRoomBtn.addEventListener("click", async () => {
@@ -1021,17 +1163,35 @@ async function init() {
   if (roomNameInput) {
     roomNameInput.addEventListener("input", updateLobbyReadiness);
   }
+  if (playerNameInput) {
+    playerNameInput.addEventListener("input", updateLobbyReadiness);
+  }
 
   // Initial state
   const remembered = getRememberedRoom();
   if (remembered && roomNameInput) {
     roomNameInput.value = remembered;
   }
+  try {
+    const rememberedName = window.localStorage.getItem(LAST_NAME_KEY);
+    if (rememberedName && playerNameInput) {
+      playerNameInput.value = rememberedName;
+      currentPlayerName = rememberedName;
+    }
+  } catch (_) {
+    // ignore storage errors
+  }
   if (rejoinRoomBtn) {
     rejoinRoomBtn.classList.toggle("hidden", !remembered);
   }
   updatePlayerRows();
   updateLobbyReadiness();
+  try {
+    const state = await fetchState();
+    renderLobbyStatus(state);
+  } catch (_) {
+    // ignore initial fetch failure
+  }
 
   guidedPrevBtn.addEventListener("click", () => {
     if (guidedIndex > 0) {

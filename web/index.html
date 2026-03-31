@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Splendor Web</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -14,8 +15,11 @@
 
     <main>
       <section id="start-screen" class="panel">
-        <h2>Start a New Game</h2>
-        <p class="hint">Choose how many players you want, and optionally make Player 2 an AI opponent.</p>
+        <h2>Lobby</h2>
+        <p class="hint">Create room, share code, let everyone ready up, then start.</p>
+        <label>Your name:
+          <input id="player-name" type="text" value="Host" placeholder="Enter your name">
+        </label>
         <label>Number of players:
           <select id="start-num-players">
             <option value="2" selected>2 players</option>
@@ -67,11 +71,18 @@
           <p class="hint small">Only the first N players are used.</p>
         </div>
         <div class="start-actions">
-          <button id="start-game-btn">Start Game</button>
-          <button id="join-room-btn" type="button" class="secondary">Join by Code</button>
+          <button id="create-room-btn" type="button">Create Room</button>
+          <button id="join-room-btn" type="button" class="secondary">Join Room</button>
+          <button id="ready-btn" type="button" class="secondary">Ready</button>
+          <button id="start-game-btn" type="button">Start Match</button>
           <button id="rejoin-room-btn" type="button" class="secondary hidden">Rejoin Last Room</button>
           <button id="start-guided-btn" type="button" class="secondary">Start Guided Tutorial</button>
           <button id="open-tutorial-btn" type="button" class="secondary">How to Play</button>
+        </div>
+        <div class="panel lobby-status-panel">
+          <h3>Room Status</h3>
+          <div id="lobby-owner" class="hint small"></div>
+          <ul id="lobby-players" class="assist-list"></ul>
         </div>
       </section>
 
