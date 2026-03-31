@@ -20,6 +20,7 @@ const API_ROOM_CREATE = `${API_BASE}/api/room/create`;
 const API_ROOM_JOIN = `${API_BASE}/api/room/join`;
 const API_ROOM_READY = `${API_BASE}/api/room/ready`;
 const API_ROOM_START = `${API_BASE}/api/room/start`;
+const API_ROOM_RENAME = `${API_BASE}/api/room/rename`;
 let currentRoom = "Room A";
 const LAST_ROOM_KEY = "splendor.lastRoom";
 const LAST_NAME_KEY = "splendor.playerName";
@@ -272,6 +273,18 @@ async function postStartRoom(payload) {
   });
   if (!res.ok) {
     throw new Error("Start room failed");
+  }
+  return res.json();
+}
+
+async function postRename(payload) {
+  const res = await fetch(API_ROOM_RENAME, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error("Rename failed");
   }
   return res.json();
 }
@@ -652,6 +665,7 @@ function renderLobbyStatus(state) {
   const readyBtn = document.getElementById("ready-btn");
   const startBtn = document.getElementById("start-game-btn");
   const roomCodeDisplay = document.getElementById("room-code-display");
+  const waitingRoomCode = document.getElementById("waiting-room-code");
   const lobby = state && state.lobby ? state.lobby : null;
   if (!lobby) {
     return;
@@ -671,10 +685,45 @@ function renderLobbyStatus(state) {
   if (roomCodeDisplay) {
     roomCodeDisplay.textContent = `Game Code: ${currentRoom}`;
   }
+  if (waitingRoomCode) {
+    waitingRoomCode.textContent = `Game Code: ${currentRoom}`;
+  }
   const me = (lobby.players || []).find((p) => p.name === currentPlayerName);
   currentReady = !!(me && me.ready);
   if (readyBtn) {
     readyBtn.textContent = currentReady ? "Unready" : "Ready";
+  }
+
+  if (updateNameBtn) {
+    updateNameBtn.addEventListener("click", async () => {
+      const nextName = waitingPlayerNameInput && waitingPlayerNameInput.value.trim()
+        ? waitingPlayerNameInput.value.trim()
+        : "";
+      if (!nextName) {
+        showToast("Enter a valid name.", "error");
+        return;
+      }
+      try {
+        const resp = await postRename({ room: currentRoom, oldName: currentPlayerName, newName: nextName });
+        if (!resp.success) {
+          showToast(resp.message || "Could not rename.", "error");
+          return;
+        }
+        currentPlayerName = nextName;
+        window.localStorage.setItem(LAST_NAME_KEY, currentPlayerName);
+        if (playerNameInput) {
+          playerNameInput.value = currentPlayerName;
+        }
+        if (waitingPlayerNameInput) {
+          waitingPlayerNameInput.value = currentPlayerName;
+        }
+        const state = await fetchState();
+        renderLobbyStatus(state);
+        showToast(`Name updated to ${currentPlayerName}`);
+      } catch (_) {
+        showToast("Could not update name.", "error");
+      }
+    });
   }
   if (startBtn) {
     const isOwner = currentPlayerName === currentOwner;
@@ -775,14 +824,18 @@ function setupOtherActions() {
 
 async function init() {
   const startScreen = document.getElementById("start-screen");
+  const waitingRoom = document.getElementById("waiting-room");
   const gameUi = document.getElementById("game-ui");
   const videoPanel = document.querySelector(".video-panel");
   const startBtn = document.getElementById("start-game-btn");
+  const updateNameBtn = document.getElementById("update-name-btn");
+  const backToHomeBtn = document.getElementById("back-to-home-btn");
   const createRoomBtn = document.getElementById("create-room-btn");
   const readyBtn = document.getElementById("ready-btn");
   const joinRoomBtn = document.getElementById("join-room-btn");
   const rejoinRoomBtn = document.getElementById("rejoin-room-btn");
   const copyRoomCodeBtn = document.getElementById("copy-room-code-btn");
+  const copyRoomCodeLobbyBtn = document.getElementById("copy-room-code-btn-lobby");
   const startGuidedBtn = document.getElementById("start-guided-btn");
   const numPlayersSelect = document.getElementById("start-num-players");
   const p1Type = document.getElementById("player1-type");
@@ -791,6 +844,8 @@ async function init() {
   const p4Type = document.getElementById("player4-type");
   const roomNameInput = document.getElementById("room-name");
   const playerNameInput = document.getElementById("player-name");
+  const waitingPlayerNameInput = document.getElementById("waiting-player-name");
+  const waitingRoomCode = document.getElementById("waiting-room-code");
   const p1Row = p1Type.closest(".player-type-row");
   const p2Row = p2Type.closest(".player-type-row");
   const p3Row = p3Type.closest(".player-type-row");
@@ -878,14 +933,13 @@ async function init() {
   function updateLobbyReadiness() {
     const roomSet = !roomNameInput || roomNameInput.value.trim().length > 0;
     const nameSet = !playerNameInput || playerNameInput.value.trim().length > 0;
-    const canStart = roomSet;
-    startBtn.disabled = !canStart || !nameSet;
-    startGuidedBtn.disabled = !canStart;
+    startBtn.disabled = !nameSet;
+    startGuidedBtn.disabled = !roomSet;
     if (createRoomBtn) {
-      createRoomBtn.disabled = !canStart || !nameSet;
+      createRoomBtn.disabled = !roomSet || !nameSet;
     }
     if (readyBtn) {
-      readyBtn.disabled = !canStart || !nameSet;
+      readyBtn.disabled = !nameSet;
     }
     if (joinRoomBtn) {
       joinRoomBtn.disabled = !roomSet || !nameSet;
@@ -893,6 +947,26 @@ async function init() {
     if (rejoinRoomBtn) {
       rejoinRoomBtn.disabled = !roomSet;
     }
+  }
+
+  function showWaitingRoom() {
+    startScreen.classList.add("hidden");
+    waitingRoom.classList.remove("hidden");
+    gameUi.classList.add("hidden");
+    if (videoPanel) videoPanel.classList.add("hidden");
+    if (waitingRoomCode) {
+      waitingRoomCode.textContent = `Game Code: ${currentRoom}`;
+    }
+    if (waitingPlayerNameInput) {
+      waitingPlayerNameInput.value = currentPlayerName || "Guest";
+    }
+  }
+
+  function showHome() {
+    waitingRoom.classList.add("hidden");
+    startScreen.classList.remove("hidden");
+    gameUi.classList.add("hidden");
+    if (videoPanel) videoPanel.classList.remove("hidden");
   }
 
   function updateGuidedOverlay() {
@@ -958,9 +1032,7 @@ async function init() {
     closeGuided();
     tutorialFlags.active = false;
     tutorialPanel.classList.add("hidden");
-    startScreen.classList.remove("hidden");
-    gameUi.classList.add("hidden");
-    if (videoPanel) videoPanel.classList.remove("hidden");
+    showHome();
     // Reset backend state in background; UI should not wait on network.
     postQuit().catch(() => {
       /* user is already back at menu; ignore API quit failure */
@@ -987,6 +1059,7 @@ async function init() {
         if (roomNameInput) {
           roomNameInput.value = currentRoom;
         }
+        showWaitingRoom();
         showToast(`Room created: ${currentRoom}`);
         const state = await fetchState();
         renderLobbyStatus(state);
@@ -1049,6 +1122,7 @@ async function init() {
         clearTransientUi();
         closeGuided();
         tutorialPanel.classList.add("hidden");
+        showWaitingRoom();
         const state = await fetchState();
         renderLobbyStatus(state);
         suppressRealtimeToasts = true;
@@ -1095,6 +1169,7 @@ async function init() {
       lastSeenTurnNumber = null;
       randomizePlayerView(state);
       startScreen.classList.add("hidden");
+      waitingRoom.classList.add("hidden");
       gameUi.classList.remove("hidden");
       if (videoPanel) videoPanel.classList.add("hidden");
       setupGemSelection();
@@ -1117,20 +1192,9 @@ async function init() {
         roomNameInput.value = remembered;
       }
       try {
-        clearTransientUi();
-        closeGuided();
-        tutorialPanel.classList.add("hidden");
         const state = await fetchState();
-        suppressRealtimeToasts = true;
-        lastSeenActionCount = 0;
-        lastSeenTurnNumber = null;
-        randomizePlayerView(state);
-        startScreen.classList.add("hidden");
-        gameUi.classList.remove("hidden");
-        if (videoPanel) videoPanel.classList.add("hidden");
-        setupGemSelection();
-        setupOtherActions();
-        renderState(state);
+        showWaitingRoom();
+        renderLobbyStatus(state);
         showToast(`Rejoined game code: ${currentRoom}`);
       } catch (_) {
         alert("Could not rejoin room.");
@@ -1141,6 +1205,16 @@ async function init() {
   if (copyRoomCodeBtn) {
     copyRoomCodeBtn.addEventListener("click", async () => {
       await copyRoomCodeToClipboard();
+    });
+  }
+  if (copyRoomCodeLobbyBtn) {
+    copyRoomCodeLobbyBtn.addEventListener("click", async () => {
+      await copyRoomCodeToClipboard();
+    });
+  }
+  if (backToHomeBtn) {
+    backToHomeBtn.addEventListener("click", () => {
+      showHome();
     });
   }
 
@@ -1177,6 +1251,9 @@ async function init() {
     if (rememberedName && playerNameInput) {
       playerNameInput.value = rememberedName;
       currentPlayerName = rememberedName;
+      if (waitingPlayerNameInput) {
+        waitingPlayerNameInput.value = rememberedName;
+      }
     }
   } catch (_) {
     // ignore storage errors

@@ -71,13 +71,35 @@
           <p class="hint small">Only the first N players are used.</p>
         </div>
         <div class="start-actions">
-          <button id="create-room-btn" type="button">Create Room</button>
-          <button id="join-room-btn" type="button" class="secondary">Join Room</button>
-          <button id="ready-btn" type="button" class="secondary">Ready</button>
-          <button id="start-game-btn" type="button">Start Match</button>
-          <button id="rejoin-room-btn" type="button" class="secondary hidden">Rejoin Last Room</button>
-          <button id="start-guided-btn" type="button" class="secondary">Start Guided Tutorial</button>
-          <button id="open-tutorial-btn" type="button" class="secondary">How to Play</button>
+          <div class="start-actions-row">
+            <button id="create-room-btn" type="button">Create Room</button>
+            <button id="join-room-btn" type="button" class="secondary">Join Room</button>
+            <button id="rejoin-room-btn" type="button" class="secondary hidden">Rejoin Last Room</button>
+          </div>
+          <div class="start-actions-row muted-row">
+            <button id="start-guided-btn" type="button" class="secondary">Guided Tutorial</button>
+            <button id="open-tutorial-btn" type="button" class="secondary">How to Play</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="waiting-room" class="panel hidden">
+        <h2>Waiting Room</h2>
+        <p class="hint">Set your display name, ready up, and wait for owner to start.</p>
+        <div class="room-code-row">
+          <div id="waiting-room-code" class="room-code-display"></div>
+          <button id="copy-room-code-btn-lobby" type="button" class="secondary small-btn">Copy Code</button>
+        </div>
+        <label>Your display name:
+          <input id="waiting-player-name" type="text" value="Host" placeholder="Enter your display name">
+        </label>
+        <div class="start-actions">
+          <div class="start-actions-row">
+            <button id="update-name-btn" type="button" class="secondary">Update Name</button>
+            <button id="ready-btn" type="button" class="secondary">Ready</button>
+            <button id="start-game-btn" type="button">Start Match</button>
+            <button id="back-to-home-btn" type="button" class="secondary">Back</button>
+          </div>
         </div>
         <div class="panel lobby-status-panel">
           <h3>Room Status</h3>

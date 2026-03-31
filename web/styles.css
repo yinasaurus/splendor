@@ -650,8 +650,9 @@ button.secondary:hover:not(:disabled) {
 
 #start-screen .start-actions {
   margin-top: 14px;
-  gap: 10px;
-  flex-wrap: wrap;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 #start-screen .lobby-status-panel {
@@ -668,21 +669,60 @@ button.secondary:hover:not(:disabled) {
   letter-spacing: 0.02em;
 }
 
-#start-screen .start-actions button {
-  flex: 1 1 180px;
-  min-height: 42px;
+#start-screen .start-actions-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
+#start-screen .start-actions-row button {
+  min-height: 38px;
+  font-size: 0.82rem;
+  border-radius: 10px;
+  margin-top: 0;
+}
+
+#start-screen .start-actions-row.muted-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#start-screen #create-room-btn,
 #start-screen #start-game-btn {
   background: #f0b429;
   color: #17130b;
+  box-shadow: none;
 }
 
 #start-screen #join-room-btn,
-#start-screen #rejoin-room-btn {
-  background: #1f4fe0;
-  border: 1px solid rgba(99, 139, 255, 0.8);
-  color: #f3f7ff;
+#start-screen #rejoin-room-btn,
+#start-screen #ready-btn,
+#start-screen #start-guided-btn,
+#start-screen #open-tutorial-btn {
+  background: rgba(255, 193, 7, 0.08);
+  border: 1px solid rgba(255, 193, 7, 0.28);
+  color: #f3d98f;
+}
+
+#waiting-room {
+  max-width: 980px;
+  margin: 0 auto;
+  background: rgba(18, 23, 35, 0.95);
+}
+
+#start-screen .start-actions-row button:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  filter: brightness(1.04);
+}
+
+@media (max-width: 900px) {
+  #start-screen .start-actions-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #start-screen .start-actions-row.muted-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Overlay mode: bottom-centered and wider */

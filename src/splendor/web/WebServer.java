@@ -178,6 +178,7 @@ public class WebServer {
 		server.createContext("/api/room/create", new RoomCreateHandler());
 		server.createContext("/api/room/join", new RoomJoinHandler());
 		server.createContext("/api/room/ready", new RoomReadyHandler());
+		server.createContext("/api/room/rename", new RoomRenameHandler());
 		server.createContext("/api/room/start", new RoomStartHandler());
 
 		server.setExecutor(null);
@@ -509,6 +510,55 @@ public class WebServer {
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
 			resp.put("room", room);
+			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+		}
+	}
+
+	private static class RoomRenameHandler implements HttpHandler {
+		@Override
+		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
+			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+				return;
+			}
+			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
+			String oldName = extractStringField(body, "oldName", "");
+			String newName = extractStringField(body, "newName", "");
+			GameSession session = getOrCreateSession(room);
+
+			if (newName == null || newName.trim().isEmpty()) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("message", "New name cannot be empty.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			newName = newName.trim();
+			if (!oldName.equals(newName) && session.readyByPlayer.containsKey(newName)) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("message", "Name already used in this room.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+
+			boolean oldReady = false;
+			if (session.readyByPlayer.containsKey(oldName)) {
+				oldReady = Boolean.TRUE.equals(session.readyByPlayer.remove(oldName));
+			}
+			session.readyByPlayer.put(newName, oldReady);
+			if (session.ownerName.equals(oldName)) {
+				session.ownerName = newName;
+			}
+			addActionLog(session, oldName + " is now " + newName + ".");
+			Map<String, Object> resp = new HashMap<>();
+			resp.put("success", true);
+			resp.put("oldName", oldName);
+			resp.put("newName", newName);
 			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 		}
 	}
