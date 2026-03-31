@@ -105,12 +105,21 @@ public class WebServer {
 	}
 
 	public static void main(String[] args) throws IOException {
-		System.out.println("Starting Splendor Web Server on http://localhost:8080");
+		int port = 8080;
+		String envPort = System.getenv("PORT");
+		if (envPort != null && !envPort.trim().isEmpty()) {
+			try {
+				port = Integer.parseInt(envPort.trim());
+			} catch (NumberFormatException ignored) {
+				port = 8080;
+			}
+		}
+		System.out.println("Starting Splendor Web Server on http://localhost:" + port);
 
 		// Initialize default room.
 		getOrCreateSession(DEFAULT_ROOM);
 
-		HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+		HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
 
 		// Static files
 		server.createContext("/", new StaticFileHandler("web/index.html", "text/html; charset=utf-8"));
