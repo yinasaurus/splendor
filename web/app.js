@@ -23,11 +23,31 @@ const API_ROOM_START = `${API_BASE}/api/room/start`;
 const API_ROOM_RENAME = `${API_BASE}/api/room/rename`;
 let currentRoom = "Room A";
 const LAST_ROOM_KEY = "splendor.lastRoom";
-const LAST_NAME_KEY = "splendor.playerName";
 let playerViewOffset = 0;
-let currentPlayerName = "Host";
+let currentPlayerName = "";
 let currentReady = false;
 let currentOwner = "";
+
+async function readErrorMessage(res, fallback) {
+  let text = "";
+  try {
+    text = (await res.text()) || "";
+  } catch (_) {
+    return fallback;
+  }
+  if (!text.trim()) {
+    return fallback;
+  }
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && parsed.message) {
+      return String(parsed.message);
+    }
+  } catch (_) {
+    // Non-JSON response; return raw text below.
+  }
+  return text.trim();
+}
 
 async function fetchState() {
   const roomParam = encodeURIComponent(currentRoom || "Room A");
@@ -236,7 +256,7 @@ async function postCreateRoom(payload) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    throw new Error("Create room failed");
+    throw new Error(await readErrorMessage(res, "Create room failed"));
   }
   return res.json();
 }
@@ -248,7 +268,7 @@ async function postJoinRoom(payload) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    throw new Error("Join room failed");
+    throw new Error(await readErrorMessage(res, "Join room failed"));
   }
   return res.json();
 }
@@ -260,7 +280,7 @@ async function postReady(payload) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    throw new Error("Ready failed");
+    throw new Error(await readErrorMessage(res, "Ready failed"));
   }
   return res.json();
 }
@@ -272,7 +292,7 @@ async function postStartRoom(payload) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    throw new Error("Start room failed");
+    throw new Error(await readErrorMessage(res, "Start room failed"));
   }
   return res.json();
 }
@@ -284,7 +304,7 @@ async function postRename(payload) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    throw new Error("Rename failed");
+    throw new Error(await readErrorMessage(res, "Rename failed"));
   }
   return res.json();
 }
@@ -693,38 +713,6 @@ function renderLobbyStatus(state) {
   if (readyBtn) {
     readyBtn.textContent = currentReady ? "Unready" : "Ready";
   }
-
-  if (updateNameBtn) {
-    updateNameBtn.addEventListener("click", async () => {
-      const nextName = waitingPlayerNameInput && waitingPlayerNameInput.value.trim()
-        ? waitingPlayerNameInput.value.trim()
-        : "";
-      if (!nextName) {
-        showToast("Enter a valid name.", "error");
-        return;
-      }
-      try {
-        const resp = await postRename({ room: currentRoom, oldName: currentPlayerName, newName: nextName });
-        if (!resp.success) {
-          showToast(resp.message || "Could not rename.", "error");
-          return;
-        }
-        currentPlayerName = nextName;
-        window.localStorage.setItem(LAST_NAME_KEY, currentPlayerName);
-        if (playerNameInput) {
-          playerNameInput.value = currentPlayerName;
-        }
-        if (waitingPlayerNameInput) {
-          waitingPlayerNameInput.value = currentPlayerName;
-        }
-        const state = await fetchState();
-        renderLobbyStatus(state);
-        showToast(`Name updated to ${currentPlayerName}`);
-      } catch (_) {
-        showToast("Could not update name.", "error");
-      }
-    });
-  }
   if (startBtn) {
     const isOwner = currentPlayerName === currentOwner;
     startBtn.disabled = !isOwner || !lobby.canStart;
@@ -969,6 +957,13 @@ async function init() {
     if (videoPanel) videoPanel.classList.remove("hidden");
   }
 
+  function getEnteredName() {
+    if (!playerNameInput) {
+      return "";
+    }
+    return (playerNameInput.value || "").trim();
+  }
+
   function updateGuidedOverlay() {
     guidedStepLabel.textContent = `Step ${guidedIndex + 1} of ${guidedSteps.length}`;
     guidedStepText.textContent = guidedSteps[guidedIndex];
@@ -1042,7 +1037,12 @@ async function init() {
   if (createRoomBtn) {
     createRoomBtn.addEventListener("click", async () => {
       try {
-        currentPlayerName = playerNameInput && playerNameInput.value.trim() ? playerNameInput.value.trim() : "Host";
+        const enteredName = getEnteredName();
+        if (!enteredName) {
+          showToast("Please enter your name first.", "error");
+          return;
+        }
+        currentPlayerName = enteredName;
         const numPlayers = parseInt(numPlayersSelect.value, 10);
         const roomInput = roomNameInput && roomNameInput.value.trim() ? roomNameInput.value.trim() : "";
         const created = await postCreateRoom({
@@ -1055,7 +1055,6 @@ async function init() {
           p4Type: p4Type.value,
         });
         rememberRoom(created.room || roomInput || "Room A");
-        window.localStorage.setItem(LAST_NAME_KEY, currentPlayerName);
         if (roomNameInput) {
           roomNameInput.value = currentRoom;
         }
@@ -1063,8 +1062,10 @@ async function init() {
         showToast(`Room created: ${currentRoom}`);
         const state = await fetchState();
         renderLobbyStatus(state);
-      } catch (_) {
-        alert("Could not create room.");
+      } catch (e) {
+        const message = e && e.message ? e.message : "Could not create room.";
+        showToast(message, "error");
+        alert(message);
       }
     });
   }
@@ -1111,9 +1112,13 @@ async function init() {
   if (joinRoomBtn) {
     joinRoomBtn.addEventListener("click", async () => {
       try {
-        currentPlayerName = playerNameInput && playerNameInput.value.trim() ? playerNameInput.value.trim() : "Guest";
+        const enteredName = getEnteredName();
+        if (!enteredName) {
+          showToast("Please enter your name first.", "error");
+          return;
+        }
+        currentPlayerName = enteredName;
         rememberRoom(roomNameInput && roomNameInput.value.trim() ? roomNameInput.value.trim() : "Room A");
-        window.localStorage.setItem(LAST_NAME_KEY, currentPlayerName);
         const joined = await postJoinRoom({ room: currentRoom, name: currentPlayerName });
         if (!joined.success) {
           alert(joined.message || "Could not join room.");
@@ -1131,7 +1136,9 @@ async function init() {
         randomizePlayerView(state);
         showToast(`Joined game code: ${currentRoom}`);
       } catch (e) {
-        alert("Could not join room. Is the server running?");
+        const message = e && e.message ? e.message : "Could not join room.";
+        showToast(message, "error");
+        alert(message);
       }
     });
   }
@@ -1140,7 +1147,12 @@ async function init() {
     readyBtn.addEventListener("click", async () => {
       try {
         if (!currentPlayerName) {
-          currentPlayerName = playerNameInput && playerNameInput.value.trim() ? playerNameInput.value.trim() : "Guest";
+          const enteredName = getEnteredName();
+          if (!enteredName) {
+            showToast("Please enter your name first.", "error");
+            return;
+          }
+          currentPlayerName = enteredName;
         }
         const nextReady = !currentReady;
         await postReady({ room: currentRoom, name: currentPlayerName, ready: nextReady });
@@ -1149,6 +1161,37 @@ async function init() {
         showToast(nextReady ? "You are ready." : "You are not ready.");
       } catch (_) {
         alert("Could not update ready status.");
+      }
+    });
+  }
+
+  if (updateNameBtn) {
+    updateNameBtn.addEventListener("click", async () => {
+      const nextName = waitingPlayerNameInput && waitingPlayerNameInput.value.trim()
+        ? waitingPlayerNameInput.value.trim()
+        : "";
+      if (!nextName) {
+        showToast("Enter a valid name.", "error");
+        return;
+      }
+      try {
+        const resp = await postRename({ room: currentRoom, oldName: currentPlayerName, newName: nextName });
+        if (!resp.success) {
+          showToast(resp.message || "Could not rename.", "error");
+          return;
+        }
+        currentPlayerName = nextName;
+        if (playerNameInput) {
+          playerNameInput.value = currentPlayerName;
+        }
+        if (waitingPlayerNameInput) {
+          waitingPlayerNameInput.value = currentPlayerName;
+        }
+        const state = await fetchState();
+        renderLobbyStatus(state);
+        showToast(`Name updated to ${currentPlayerName}`);
+      } catch (e) {
+        showToast(e && e.message ? e.message : "Could not update name.", "error");
       }
     });
   }
@@ -1245,18 +1288,6 @@ async function init() {
   const remembered = getRememberedRoom();
   if (remembered && roomNameInput) {
     roomNameInput.value = remembered;
-  }
-  try {
-    const rememberedName = window.localStorage.getItem(LAST_NAME_KEY);
-    if (rememberedName && playerNameInput) {
-      playerNameInput.value = rememberedName;
-      currentPlayerName = rememberedName;
-      if (waitingPlayerNameInput) {
-        waitingPlayerNameInput.value = rememberedName;
-      }
-    }
-  } catch (_) {
-    // ignore storage errors
   }
   if (rejoinRoomBtn) {
     rejoinRoomBtn.classList.toggle("hidden", !remembered);
