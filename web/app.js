@@ -969,17 +969,16 @@ async function init() {
 
   function updateLobbyReadiness() {
     const roomSet = !roomNameInput || roomNameInput.value.trim().length > 0;
-    const nameSet = !playerNameInput || playerNameInput.value.trim().length > 0;
     startBtn.disabled = true;
-    startGuidedBtn.disabled = !nameSet;
+    startGuidedBtn.disabled = false;
     if (createRoomBtn) {
-      createRoomBtn.disabled = !nameSet;
+      createRoomBtn.disabled = false;
     }
     if (readyBtn) {
-      readyBtn.disabled = !nameSet || !currentRoom;
+      readyBtn.disabled = !currentRoom;
     }
     if (joinRoomBtn) {
-      joinRoomBtn.disabled = !roomSet || !nameSet;
+      joinRoomBtn.disabled = !roomSet;
     }
     if (rejoinRoomBtn) {
       rejoinRoomBtn.disabled = !roomSet;
