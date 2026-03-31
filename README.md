@@ -65,6 +65,20 @@ http://localhost:8080
 - **Rejoin Last Room** appears if a room was used before on this browser.
 - Multiple clients can join the same room name to share one game state.
 
+## Deploy (Vercel + Java Backend)
+
+Because the game server is stateful Java (rooms/sessions), deploy backend and frontend separately:
+
+1. Deploy Java backend (Render/Railway/Fly/etc.) and get a URL, for example:
+   - `https://your-splendor-api.onrender.com`
+2. In `web/config.js`, set:
+   - `window.__SPLENDOR_API_BASE__ = "https://your-splendor-api.onrender.com";`
+3. Deploy the `web/` folder to Vercel.
+   - Set Vercel project root directory to `web`
+   - `web/vercel.json` is included for root routing
+
+For local dev, keep `window.__SPLENDOR_API_BASE__ = ""` and run `run_web.bat` / `run_web.sh`.
+
 ## Notes
 
 - If you changed Java files, compile before running.

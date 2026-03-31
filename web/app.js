@@ -1,7 +1,21 @@
-const API_STATE = "/api/state";
-const API_ACTION = "/api/action";
-const API_NEW_GAME = "/api/newgame";
-const API_QUIT = "/api/quit";
+function resolveApiBase() {
+  const fromGlobal =
+    typeof window !== "undefined" && typeof window.__SPLENDOR_API_BASE__ === "string"
+      ? window.__SPLENDOR_API_BASE__
+      : "";
+  const raw = String(fromGlobal || "").trim();
+  if (!raw) {
+    // Empty base keeps local dev behavior (same-origin /api/*)
+    return "";
+  }
+  return raw.replace(/\/+$/, "");
+}
+
+const API_BASE = resolveApiBase();
+const API_STATE = `${API_BASE}/api/state`;
+const API_ACTION = `${API_BASE}/api/action`;
+const API_NEW_GAME = `${API_BASE}/api/newgame`;
+const API_QUIT = `${API_BASE}/api/quit`;
 let currentRoom = "Room A";
 const LAST_ROOM_KEY = "splendor.lastRoom";
 let playerViewOffset = 0;
@@ -28,6 +42,9 @@ const uiState = {
 
 let toastTimer = null;
 let latestState = null;
+let lastSeenTurnNumber = null;
+let lastSeenActionCount = 0;
+let suppressRealtimeToasts = true;
 
 const GEM_ICON_URI = {
   RUBY:
@@ -200,6 +217,8 @@ function renderState(state) {
   const currentPlayerData = (state.players || []).find((p) => p.name === state.currentPlayer) || null;
   const isHumanTurn = !!state.isHumanTurn;
   const currentReservedCount = currentPlayerData ? (currentPlayerData.reservedCount || 0) : 0;
+  const turnNo = Number.isFinite(state.turnNumber) ? state.turnNumber : 1;
+  const actions = Array.isArray(state.recentActions) ? state.recentActions : [];
 
   if (state.gameOver) {
     gameOver.classList.remove("hidden");
@@ -209,7 +228,6 @@ function renderState(state) {
     gameOver.classList.add("hidden");
   }
 
-  const turnNo = Number.isFinite(state.turnNumber) ? state.turnNumber : 1;
   turnInfo.textContent = `Turn ${turnNo} · Current Player: ${state.currentPlayer}${isHumanTurn ? " (Your turn)" : " (AI turn)"}`;
 
   // Gems on board
@@ -486,7 +504,6 @@ function renderState(state) {
   // Activity feed from backend (human + AI moves).
   if (activityLog) {
     activityLog.innerHTML = "";
-    const actions = Array.isArray(state.recentActions) ? state.recentActions : [];
     if (actions.length === 0) {
       const li = document.createElement("li");
       li.textContent = "No actions yet.";
@@ -512,6 +529,22 @@ function renderState(state) {
   if (reservedBtn) {
     reservedBtn.disabled = !isHumanTurn || currentReservedCount <= 0;
   }
+
+  // Realtime popups: new action and turn changes.
+  if (!suppressRealtimeToasts) {
+    if (actions.length > lastSeenActionCount) {
+      const latestAction = actions[actions.length - 1];
+      if (latestAction) {
+        showToast(latestAction);
+      }
+    }
+    if (lastSeenTurnNumber !== null && turnNo !== lastSeenTurnNumber) {
+      showToast(`Turn ${turnNo}: ${state.currentPlayer}'s turn`);
+    }
+  }
+  lastSeenActionCount = actions.length;
+  lastSeenTurnNumber = turnNo;
+  suppressRealtimeToasts = false;
 }
 
 function setupGemSelection() {
@@ -821,6 +854,9 @@ async function init() {
       setupOtherActions();
 
       const state = await fetchState();
+      suppressRealtimeToasts = true;
+      lastSeenActionCount = 0;
+      lastSeenTurnNumber = null;
       randomizePlayerView(state);
       renderState(state);
     } catch (e) {
@@ -856,6 +892,9 @@ async function init() {
       setupOtherActions();
 
       const state = await fetchState();
+      suppressRealtimeToasts = true;
+      lastSeenActionCount = 0;
+      lastSeenTurnNumber = null;
       randomizePlayerView(state);
       renderState(state);
       openGuided();
@@ -872,6 +911,9 @@ async function init() {
         closeGuided();
         tutorialPanel.classList.add("hidden");
         const state = await fetchState();
+        suppressRealtimeToasts = true;
+        lastSeenActionCount = 0;
+        lastSeenTurnNumber = null;
         randomizePlayerView(state);
         startScreen.classList.add("hidden");
         gameUi.classList.remove("hidden");
@@ -901,6 +943,9 @@ async function init() {
         closeGuided();
         tutorialPanel.classList.add("hidden");
         const state = await fetchState();
+        suppressRealtimeToasts = true;
+        lastSeenActionCount = 0;
+        lastSeenTurnNumber = null;
         randomizePlayerView(state);
         startScreen.classList.add("hidden");
         gameUi.classList.remove("hidden");
