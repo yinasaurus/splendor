@@ -14,22 +14,67 @@ Java console implementation of the **Splendor** board game with:
 - Java JDK 8 or higher
 - Terminal that supports ANSI colors (WSL / most Linux terminals / modern Windows terminals)
 
-### Linux / WSL / Mac
+### 1) Compile
+
+#### Linux / WSL / Mac
 ```bash
-chmod +x compile.sh run.sh test.sh   # first time only
-./compile.sh                         # compile main game
-./run.sh                             # run main game
+chmod +x compile.sh run.sh run_web.sh   # first time only
+./compile.sh
 ```
 
-### Windows
+#### Windows
 ```bat
 compile.bat
+```
+
+### 2) Run Command-Line Version
+
+#### Linux / WSL / Mac
+```bash
+./run.sh
+```
+
+#### Windows
+```bat
 run.bat
 ```
 
-### Automated AI Test (no user input)
+### 3) Run Web Version
+
+#### Linux / WSL / Mac
 ```bash
-./test.sh        # runs a full AI vs AI game
+./run_web.sh
+```
+
+#### Windows
+```bat
+run_web.bat
+```
+
+Then open:
+
+```text
+http://localhost:8080
+```
+
+## Web Lobby / Rooms
+
+- Enter a room name (default `Room A`) on the start screen.
+- **Start Game** creates/resets that room.
+- **Join Room** joins an existing room without resetting it.
+- **Rejoin Last Room** appears if a room was used before on this browser.
+- Multiple clients can join the same room name to share one game state.
+
+## Notes
+
+- If you changed Java files, compile before running.
+- If port `8080` is busy, stop the existing process first.
+- If the browser shows old UI, do a hard refresh (`Ctrl+F5`).
+
+### (Optional) Automated AI Test
+```bash
+# only if test script exists in your copy
+./test.sh
 ```
 
 ## How to Play (Controls)
