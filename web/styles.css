@@ -583,6 +583,87 @@ button.secondary:hover:not(:disabled) {
   width: auto;
 }
 
+/* --- Clean Lobby (start screen) --- */
+#start-screen {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 18px 20px 16px;
+  background: rgba(18, 23, 35, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#start-screen::before {
+  display: none; /* reduce visual noise on the lobby */
+}
+
+#start-screen h2 {
+  font-size: 1.35rem;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  margin-bottom: 6px;
+}
+
+#start-screen > .hint {
+  color: #aeb8d2;
+  margin-bottom: 12px;
+}
+
+#start-screen label {
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  color: #d8deef;
+}
+
+#start-screen input,
+#start-screen select {
+  margin-top: 6px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 12, 24, 0.96);
+}
+
+#start-screen .player-types {
+  margin-top: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+#start-screen .player-type-row {
+  background: rgba(8, 12, 24, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+#start-screen .hint.small {
+  margin-top: 4px;
+  color: #93a0c3;
+}
+
+#start-screen .start-actions {
+  margin-top: 14px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#start-screen .start-actions button {
+  flex: 1 1 180px;
+  min-height: 42px;
+}
+
+#start-screen #start-game-btn {
+  background: #f0b429;
+  color: #17130b;
+}
+
+#start-screen #join-room-btn,
+#start-screen #rejoin-room-btn {
+  background: #1f4fe0;
+  border: 1px solid rgba(99, 139, 255, 0.8);
+  color: #f3f7ff;
+}
+
 /* Overlay mode: bottom-centered and wider */
 .guided-overlay {
   position: fixed;
@@ -716,6 +797,10 @@ button.secondary:hover:not(:disabled) {
   }
 
   .actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #start-screen .player-types {
     grid-template-columns: 1fr;
   }
 
