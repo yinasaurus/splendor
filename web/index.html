@@ -35,7 +35,8 @@
               <option value="medium">AI (Medium)</option>
               <option value="hard">AI (Hard)</option>
             </select>
-            <label class="ready-toggle"><input id="player1-ready" type="checkbox" checked> Ready</label>
+            <button id="player1-ready-btn" type="button" class="ready-btn is-ready" data-ready="true">Ready</button>
+            <span id="player1-ready-status" class="ready-status is-ready">Ready</span>
           </div>
           <div class="player-type-row">
             <span>Player 2:</span>
@@ -45,7 +46,8 @@
               <option value="medium">AI (Medium)</option>
               <option value="hard">AI (Hard)</option>
             </select>
-            <label class="ready-toggle"><input id="player2-ready" type="checkbox"> Ready</label>
+            <button id="player2-ready-btn" type="button" class="ready-btn" data-ready="false">Not Ready</button>
+            <span id="player2-ready-status" class="ready-status">Not Ready</span>
           </div>
           <div class="player-type-row">
             <span>Player 3:</span>
@@ -55,7 +57,8 @@
               <option value="medium">AI (Medium)</option>
               <option value="hard">AI (Hard)</option>
             </select>
-            <label class="ready-toggle"><input id="player3-ready" type="checkbox"> Ready</label>
+            <button id="player3-ready-btn" type="button" class="ready-btn" data-ready="false">Not Ready</button>
+            <span id="player3-ready-status" class="ready-status">Not Ready</span>
           </div>
           <div class="player-type-row">
             <span>Player 4:</span>
@@ -65,7 +68,8 @@
               <option value="medium">AI (Medium)</option>
               <option value="hard">AI (Hard)</option>
             </select>
-            <label class="ready-toggle"><input id="player4-ready" type="checkbox"> Ready</label>
+            <button id="player4-ready-btn" type="button" class="ready-btn" data-ready="false">Not Ready</button>
+            <span id="player4-ready-status" class="ready-status">Not Ready</span>
           </div>
           <p class="hint small">Only the first N players are used. Active players must be marked Ready before starting.</p>
         </div>

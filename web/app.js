@@ -656,11 +656,17 @@ async function init() {
   const p2Row = p2Type.closest(".player-type-row");
   const p3Row = p3Type.closest(".player-type-row");
   const p4Row = p4Type.closest(".player-type-row");
-  const readyChecks = [
-    document.getElementById("player1-ready"),
-    document.getElementById("player2-ready"),
-    document.getElementById("player3-ready"),
-    document.getElementById("player4-ready"),
+  const readyButtons = [
+    document.getElementById("player1-ready-btn"),
+    document.getElementById("player2-ready-btn"),
+    document.getElementById("player3-ready-btn"),
+    document.getElementById("player4-ready-btn"),
+  ];
+  const readyStatusPills = [
+    document.getElementById("player1-ready-status"),
+    document.getElementById("player2-ready-status"),
+    document.getElementById("player3-ready-status"),
+    document.getElementById("player4-ready-status"),
   ];
   const tutorialPanel = document.getElementById("tutorial-panel");
   const openTutorialBtn = document.getElementById("open-tutorial-btn");
@@ -742,9 +748,28 @@ async function init() {
     updateLobbyReadiness();
   }
 
+  function setReadyState(idx, ready) {
+    const btn = readyButtons[idx];
+    const pill = readyStatusPills[idx];
+    if (!btn || !pill) {
+      return;
+    }
+    const isReady = !!ready;
+    btn.dataset.ready = isReady ? "true" : "false";
+    btn.textContent = isReady ? "Ready" : "Not Ready";
+    btn.classList.toggle("is-ready", isReady);
+    pill.textContent = isReady ? "Ready" : "Not Ready";
+    pill.classList.toggle("is-ready", isReady);
+  }
+
+  function isReady(idx) {
+    const btn = readyButtons[idx];
+    return !!btn && btn.dataset.ready === "true";
+  }
+
   function updateLobbyReadiness() {
     const n = parseInt(numPlayersSelect.value, 10);
-    const allActiveReady = readyChecks.slice(0, n).every((cb) => cb && cb.checked);
+    const allActiveReady = Array.from({ length: n }).every((_, idx) => isReady(idx));
     const roomSet = !roomNameInput || roomNameInput.value.trim().length > 0;
     const canStart = allActiveReady && roomSet;
     startBtn.disabled = !canStart;
@@ -976,7 +1001,16 @@ async function init() {
   });
 
   numPlayersSelect.addEventListener("change", updatePlayerRows);
-  readyChecks.forEach((cb) => cb && cb.addEventListener("change", updateLobbyReadiness));
+  readyButtons.forEach((btn, idx) => {
+    if (!btn) {
+      return;
+    }
+    btn.addEventListener("click", () => {
+      const nextReady = !(btn.dataset.ready === "true");
+      setReadyState(idx, nextReady);
+      updateLobbyReadiness();
+    });
+  });
   if (roomNameInput) {
     roomNameInput.addEventListener("input", updateLobbyReadiness);
   }
@@ -990,6 +1024,10 @@ async function init() {
     rejoinRoomBtn.classList.toggle("hidden", !remembered);
   }
   updatePlayerRows();
+  setReadyState(0, true);
+  setReadyState(1, false);
+  setReadyState(2, false);
+  setReadyState(3, false);
   updateLobbyReadiness();
 
   guidedPrevBtn.addEventListener("click", () => {

@@ -570,17 +570,42 @@ button.secondary:hover:not(:disabled) {
   display: none;
 }
 
-.ready-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.76rem;
-  color: #d9deef;
-  white-space: nowrap;
+.ready-btn {
+  margin-top: 0;
+  min-width: 100px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cfd6eb;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
-.ready-toggle input {
-  width: auto;
+.ready-btn.is-ready {
+  background: rgba(55, 179, 106, 0.22);
+  border-color: rgba(80, 219, 145, 0.65);
+  color: #dbffec;
+}
+
+.ready-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 86px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #e5e9f5;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.ready-status.is-ready {
+  color: #d9ffea;
+  background: rgba(55, 179, 106, 0.2);
+  border-color: rgba(80, 219, 145, 0.62);
 }
 
 /* --- Clean Lobby (start screen) --- */
