@@ -709,6 +709,13 @@ button.secondary:hover:not(:disabled) {
   background: rgba(18, 23, 35, 0.95);
 }
 
+#waiting-room .host-controls {
+  margin-top: 10px;
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
 #start-screen .start-actions-row button:hover:not(:disabled) {
   transform: none;
   box-shadow: none;

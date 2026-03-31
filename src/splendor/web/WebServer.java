@@ -50,6 +50,7 @@ public class WebServer {
 		int lobbyNumPlayers = 2;
 		String[] lobbyTypes = new String[] { "human", "human", "human", "human" };
 		Map<String, Boolean> readyByPlayer = new LinkedHashMap<>();
+		Map<String, String> aiByName = new LinkedHashMap<>();
 	}
 
 	private static void addActionLog(GameSession session, String text) {
@@ -127,6 +128,7 @@ public class WebServer {
 		};
 		session.readyByPlayer.clear();
 		session.readyByPlayer.put(session.ownerName, false);
+		session.aiByName.clear();
 		session.gameStarted = false;
 		session.actionLog.clear();
 		addActionLog(session, "Lobby created by " + session.ownerName + ".");
@@ -137,7 +139,7 @@ public class WebServer {
 			return false;
 		}
 		int joined = session.readyByPlayer.size();
-		if (joined < 1) {
+		if (joined != session.lobbyNumPlayers) {
 			return false;
 		}
 		for (Boolean ready : session.readyByPlayer.values()) {
@@ -179,6 +181,8 @@ public class WebServer {
 		server.createContext("/api/room/join", new RoomJoinHandler());
 		server.createContext("/api/room/ready", new RoomReadyHandler());
 		server.createContext("/api/room/rename", new RoomRenameHandler());
+		server.createContext("/api/room/addai", new RoomAddAiHandler());
+		server.createContext("/api/room/kick", new RoomKickHandler());
 		server.createContext("/api/room/start", new RoomStartHandler());
 
 		server.setExecutor(null);
@@ -429,10 +433,17 @@ public class WebServer {
 			name = name.trim();
 
 			GameSession session = getOrCreateSession(room);
-			if (!session.readyByPlayer.containsKey(name) && session.readyByPlayer.size() >= 4) {
+			if (!session.readyByPlayer.containsKey(name) && session.readyByPlayer.size() >= session.lobbyNumPlayers) {
 				Map<String, Object> resp = new HashMap<>();
 				resp.put("success", false);
-				resp.put("message", "Room is full (max 4).");
+				resp.put("message", "Room is full.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			if (session.aiByName.containsKey(name)) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("message", "Name conflicts with AI bot.");
 				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 				return;
 			}
@@ -500,16 +511,113 @@ public class WebServer {
 			if (!canStartLobby(session)) {
 				Map<String, Object> resp = new HashMap<>();
 				resp.put("success", false);
-				resp.put("message", "Everyone must be ready.");
+				resp.put("message", "Room must be full and everyone must be ready.");
 				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 				return;
 			}
-			startNewGame(session, session.lobbyNumPlayers, session.lobbyTypes);
+			String[] types = new String[] { "human", "human", "human", "human" };
+			int idx = 1;
+			for (String diff : session.aiByName.values()) {
+				if (idx >= session.lobbyNumPlayers) {
+					break;
+				}
+				types[idx] = diff;
+				idx++;
+			}
+			startNewGame(session, session.lobbyNumPlayers, types);
 			session.gameStarted = true;
 			addActionLog(session, "Match started by " + session.ownerName + ".");
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
 			resp.put("room", room);
+			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+		}
+	}
+
+	private static class RoomAddAiHandler implements HttpHandler {
+		@Override
+		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
+			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+				return;
+			}
+			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
+			String owner = extractStringField(body, "ownerName", "");
+			String difficulty = extractStringField(body, "difficulty", "easy").toLowerCase();
+			if (!difficulty.equals("easy") && !difficulty.equals("medium") && !difficulty.equals("hard")) {
+				difficulty = "easy";
+			}
+			GameSession session = getOrCreateSession(room);
+			Map<String, Object> resp = new HashMap<>();
+			if (!session.ownerName.equals(owner)) {
+				resp.put("success", false);
+				resp.put("message", "Only owner can add AI.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			if (session.readyByPlayer.size() >= session.lobbyNumPlayers) {
+				resp.put("success", false);
+				resp.put("message", "No free slots left.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			String aiName = "AI Bot " + (session.aiByName.size() + 1);
+			while (session.readyByPlayer.containsKey(aiName)) {
+				aiName = "AI Bot " + (session.aiByName.size() + 2);
+			}
+			session.aiByName.put(aiName, difficulty);
+			session.readyByPlayer.put(aiName, true);
+			addActionLog(session, aiName + " added (" + difficulty + ").");
+			resp.put("success", true);
+			resp.put("name", aiName);
+			resp.put("difficulty", difficulty);
+			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+		}
+	}
+
+	private static class RoomKickHandler implements HttpHandler {
+		@Override
+		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
+			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+				return;
+			}
+			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
+			String owner = extractStringField(body, "ownerName", "");
+			String target = extractStringField(body, "targetName", "");
+			GameSession session = getOrCreateSession(room);
+			Map<String, Object> resp = new HashMap<>();
+			if (!session.ownerName.equals(owner)) {
+				resp.put("success", false);
+				resp.put("message", "Only owner can kick.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			if (target == null || target.trim().isEmpty() || target.equals(session.ownerName)) {
+				resp.put("success", false);
+				resp.put("message", "Invalid kick target.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			if (!session.readyByPlayer.containsKey(target)) {
+				resp.put("success", false);
+				resp.put("message", "Player not found.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			session.readyByPlayer.remove(target);
+			session.aiByName.remove(target);
+			addActionLog(session, target + " was removed from lobby.");
+			resp.put("success", true);
+			resp.put("target", target);
 			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 		}
 	}
@@ -980,7 +1088,11 @@ public class WebServer {
 			firstLobbyPlayer = false;
 			sb.append("{");
 			sb.append("\"name\":\"").append(escape(e.getKey())).append("\",");
-			sb.append("\"ready\":").append(Boolean.TRUE.equals(e.getValue()));
+			sb.append("\"ready\":").append(Boolean.TRUE.equals(e.getValue())).append(",");
+			sb.append("\"isAi\":").append(session.aiByName.containsKey(e.getKey()));
+			if (session.aiByName.containsKey(e.getKey())) {
+				sb.append(",\"aiDifficulty\":\"").append(escape(session.aiByName.get(e.getKey()))).append("\"");
+			}
 			sb.append("}");
 		}
 		sb.append("]");

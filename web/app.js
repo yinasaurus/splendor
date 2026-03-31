@@ -20,7 +20,8 @@ const API_ROOM_CREATE = `${API_BASE}/api/room/create`;
 const API_ROOM_JOIN = `${API_BASE}/api/room/join`;
 const API_ROOM_READY = `${API_BASE}/api/room/ready`;
 const API_ROOM_START = `${API_BASE}/api/room/start`;
-const API_ROOM_RENAME = `${API_BASE}/api/room/rename`;
+const API_ROOM_ADDAI = `${API_BASE}/api/room/addai`;
+const API_ROOM_KICK = `${API_BASE}/api/room/kick`;
 let currentRoom = "Room A";
 const LAST_ROOM_KEY = "splendor.lastRoom";
 let playerViewOffset = 0;
@@ -297,14 +298,26 @@ async function postStartRoom(payload) {
   return res.json();
 }
 
-async function postRename(payload) {
-  const res = await fetch(API_ROOM_RENAME, {
+async function postAddAi(payload) {
+  const res = await fetch(API_ROOM_ADDAI, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    throw new Error(await readErrorMessage(res, "Rename failed"));
+    throw new Error(await readErrorMessage(res, "Add AI failed"));
+  }
+  return res.json();
+}
+
+async function postKick(payload) {
+  const res = await fetch(API_ROOM_KICK, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "Kick failed"));
   }
   return res.json();
 }
@@ -684,6 +697,8 @@ function renderLobbyStatus(state) {
   const playersEl = document.getElementById("lobby-players");
   const readyBtn = document.getElementById("ready-btn");
   const startBtn = document.getElementById("start-game-btn");
+  const waitingPlayerNameInput = document.getElementById("waiting-player-name");
+  const hostAiControls = document.getElementById("host-ai-controls");
   const roomCodeDisplay = document.getElementById("room-code-display");
   const waitingRoomCode = document.getElementById("waiting-room-code");
   const lobby = state && state.lobby ? state.lobby : null;
@@ -696,9 +711,36 @@ function renderLobbyStatus(state) {
   }
   if (playersEl) {
     playersEl.innerHTML = "";
+    const isOwner = currentPlayerName === currentOwner;
     (lobby.players || []).forEach((p) => {
       const li = document.createElement("li");
-      li.textContent = `${p.name} ${p.ready ? "✅ Ready" : "⏳ Not ready"}`;
+      const typeText = p.isAi ? `AI (${p.aiDifficulty || "easy"})` : "Human";
+      li.textContent = `${p.name} - ${typeText} - ${p.ready ? "✅ Ready" : "⏳ Not ready"}`;
+      if (isOwner && p.name !== currentOwner) {
+        const kickBtn = document.createElement("button");
+        kickBtn.type = "button";
+        kickBtn.className = "secondary small-btn";
+        kickBtn.textContent = "Kick";
+        kickBtn.addEventListener("click", async () => {
+          try {
+            const resp = await postKick({
+              room: currentRoom,
+              ownerName: currentPlayerName,
+              targetName: p.name,
+            });
+            if (!resp.success) {
+              showToast(resp.message || "Kick failed.", "error");
+              return;
+            }
+            const nextState = await fetchState();
+            renderLobbyStatus(nextState);
+          } catch (e) {
+            showToast(e && e.message ? e.message : "Kick failed.", "error");
+          }
+        });
+        li.appendChild(document.createTextNode(" "));
+        li.appendChild(kickBtn);
+      }
       playersEl.appendChild(li);
     });
   }
@@ -710,6 +752,12 @@ function renderLobbyStatus(state) {
   }
   const me = (lobby.players || []).find((p) => p.name === currentPlayerName);
   currentReady = !!(me && me.ready);
+  if (waitingPlayerNameInput) {
+    waitingPlayerNameInput.value = currentPlayerName || "";
+  }
+  if (hostAiControls) {
+    hostAiControls.classList.toggle("hidden", currentPlayerName !== currentOwner);
+  }
   if (readyBtn) {
     readyBtn.textContent = currentReady ? "Unready" : "Ready";
   }
@@ -816,7 +864,8 @@ async function init() {
   const gameUi = document.getElementById("game-ui");
   const videoPanel = document.querySelector(".video-panel");
   const startBtn = document.getElementById("start-game-btn");
-  const updateNameBtn = document.getElementById("update-name-btn");
+  const addAiBtn = document.getElementById("add-ai-btn");
+  const addAiDifficulty = document.getElementById("add-ai-difficulty");
   const backToHomeBtn = document.getElementById("back-to-home-btn");
   const createRoomBtn = document.getElementById("create-room-btn");
   const readyBtn = document.getElementById("ready-btn");
@@ -921,13 +970,13 @@ async function init() {
   function updateLobbyReadiness() {
     const roomSet = !roomNameInput || roomNameInput.value.trim().length > 0;
     const nameSet = !playerNameInput || playerNameInput.value.trim().length > 0;
-    startBtn.disabled = !nameSet;
-    startGuidedBtn.disabled = !roomSet;
+    startBtn.disabled = true;
+    startGuidedBtn.disabled = !nameSet;
     if (createRoomBtn) {
-      createRoomBtn.disabled = !roomSet || !nameSet;
+      createRoomBtn.disabled = !nameSet;
     }
     if (readyBtn) {
-      readyBtn.disabled = !nameSet;
+      readyBtn.disabled = !nameSet || !currentRoom;
     }
     if (joinRoomBtn) {
       joinRoomBtn.disabled = !roomSet || !nameSet;
@@ -955,6 +1004,13 @@ async function init() {
     startScreen.classList.remove("hidden");
     gameUi.classList.add("hidden");
     if (videoPanel) videoPanel.classList.remove("hidden");
+  }
+
+  function getEnteredName() {
+    if (!playerNameInput) {
+      return "";
+    }
+    return (playerNameInput.value || "").trim();
   }
 
   function getEnteredName() {
@@ -1044,7 +1100,7 @@ async function init() {
         }
         currentPlayerName = enteredName;
         const numPlayers = parseInt(numPlayersSelect.value, 10);
-        const roomInput = roomNameInput && roomNameInput.value.trim() ? roomNameInput.value.trim() : "";
+        const roomInput = "";
         const created = await postCreateRoom({
           room: roomInput,
           ownerName: currentPlayerName,
@@ -1165,33 +1221,24 @@ async function init() {
     });
   }
 
-  if (updateNameBtn) {
-    updateNameBtn.addEventListener("click", async () => {
-      const nextName = waitingPlayerNameInput && waitingPlayerNameInput.value.trim()
-        ? waitingPlayerNameInput.value.trim()
-        : "";
-      if (!nextName) {
-        showToast("Enter a valid name.", "error");
-        return;
-      }
+  if (addAiBtn) {
+    addAiBtn.addEventListener("click", async () => {
       try {
-        const resp = await postRename({ room: currentRoom, oldName: currentPlayerName, newName: nextName });
+        const difficulty = addAiDifficulty && addAiDifficulty.value ? addAiDifficulty.value : "easy";
+        const resp = await postAddAi({
+          room: currentRoom,
+          ownerName: currentPlayerName,
+          difficulty,
+        });
         if (!resp.success) {
-          showToast(resp.message || "Could not rename.", "error");
+          showToast(resp.message || "Could not add AI.", "error");
           return;
-        }
-        currentPlayerName = nextName;
-        if (playerNameInput) {
-          playerNameInput.value = currentPlayerName;
-        }
-        if (waitingPlayerNameInput) {
-          waitingPlayerNameInput.value = currentPlayerName;
         }
         const state = await fetchState();
         renderLobbyStatus(state);
-        showToast(`Name updated to ${currentPlayerName}`);
+        showToast(`Added ${resp.name} (${difficulty}).`);
       } catch (e) {
-        showToast(e && e.message ? e.message : "Could not update name.", "error");
+        showToast(e && e.message ? e.message : "Could not add AI.", "error");
       }
     });
   }

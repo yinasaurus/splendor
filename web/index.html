@@ -16,10 +16,11 @@
     <main>
       <section id="start-screen" class="panel">
         <h2>Lobby</h2>
-        <p class="hint">Create room, share code, let everyone ready up, then start.</p>
+        <p class="hint">Choose Create Room or Join Room.</p>
         <label>Your name:
           <input id="player-name" type="text" value="" placeholder="Enter your name">
         </label>
+        <div id="create-room-fields">
         <label>Number of players:
           <select id="start-num-players">
             <option value="2" selected>2 players</option>
@@ -27,10 +28,13 @@
             <option value="4">4 players</option>
           </select>
         </label>
+        </div>
+        <div id="join-room-fields">
         <label>Game Code:
           <input id="room-name" type="text" value="Room A" placeholder="Enter game code (e.g. SPLENDOR123)">
         </label>
         <p class="hint small">Host shares this code. Friends enter the same code to join the same match.</p>
+        </div>
         <div class="player-types">
           <div class="player-type-row">
             <span>Player 1:</span>
@@ -85,17 +89,26 @@
 
       <section id="waiting-room" class="panel hidden">
         <h2>Waiting Room</h2>
-        <p class="hint">Set your display name, ready up, and wait for owner to start.</p>
+        <p class="hint">Ready up and wait for host to start. Names are locked here.</p>
         <div class="room-code-row">
           <div id="waiting-room-code" class="room-code-display"></div>
           <button id="copy-room-code-btn-lobby" type="button" class="secondary small-btn">Copy Code</button>
         </div>
         <label>Your display name:
-          <input id="waiting-player-name" type="text" value="" placeholder="Enter your display name">
+          <input id="waiting-player-name" type="text" value="" readonly>
         </label>
+        <div id="host-ai-controls" class="host-controls hidden">
+          <label>Add AI difficulty:
+            <select id="add-ai-difficulty">
+              <option value="easy">Easy</option>
+              <option value="medium">Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </label>
+          <button id="add-ai-btn" type="button" class="secondary">Add AI</button>
+        </div>
         <div class="start-actions">
           <div class="start-actions-row">
-            <button id="update-name-btn" type="button" class="secondary">Update Name</button>
             <button id="ready-btn" type="button" class="secondary">Ready</button>
             <button id="start-game-btn" type="button">Start Match</button>
             <button id="back-to-home-btn" type="button" class="secondary">Back</button>
