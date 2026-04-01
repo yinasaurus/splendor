@@ -87,12 +87,43 @@ async function fetchState() {
   }
   const data = await res.json();
   if (data && data.success === false) {
-    throw new Error(data.message || "Failed to load state.");
+    const err = new Error(data.message || "Failed to load state.");
+    err.serverPayload = data;
+    throw err;
   }
   if (data && data.sessionMissing) {
-    throw new Error(data.message || "Session expired.");
+    const err = new Error(data.message || "Session expired.");
+    err.sessionMissing = true;
+    err.serverPayload = data;
+    throw err;
   }
   return data;
+}
+
+async function tryRecoverRoomConnection(inWaitingRoom, inGame) {
+  if (reconnectInFlight) return false;
+  if (!currentRoom || !currentPlayerName || (!inWaitingRoom && !inGame)) return false;
+  reconnectInFlight = true;
+  try {
+    const rememberedToken = getRememberedSeatToken(currentRoom, currentPlayerName);
+    if (rememberedToken) currentSessionToken = rememberedToken;
+    const joined = await postJoinRoom({
+      room: currentRoom,
+      name: currentPlayerName,
+      sessionToken: currentSessionToken || "",
+    });
+    if (!joined || !joined.success) return false;
+    if (joined.name && !samePlayerName(joined.name, currentPlayerName)) {
+      currentPlayerName = String(joined.name).trim();
+      rememberPlayerName(currentPlayerName);
+    }
+    rememberAutoRejoinIntent(currentRoom, currentPlayerName);
+    return true;
+  } catch (_) {
+    return false;
+  } finally {
+    reconnectInFlight = false;
+  }
 }
 
 let tutorialFlags = {
@@ -117,6 +148,7 @@ let lastAutoRejoinAt = 0;
 let lastRecoveryToastAt = 0;
 let suppressRemovedToastUntil = 0;
 let lastGemUiTurnNumber = null;
+let reconnectInFlight = false;
 const expandedBoughtByPlayer = new Set();
 
 const KNOWN_GEMS = new Set(["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"]);
@@ -2566,8 +2598,13 @@ async function init() {
       const now = Date.now();
       if (!tutorialFlags.active && inWaitingRoom && currentPlayerName && hasLobbyList && !inLobbyList && now - lastAutoRejoinAt > 7000) {
         lastAutoRejoinAt = now;
-        // If your name is no longer in the room list, treat it as removed/kicked.
-        // Do not auto-rejoin, otherwise a kicked player can silently re-enter.
+        // Transient desyncs happen on reconnect; try to reclaim the same seat once
+        // before treating this as a genuine removal.
+        const recovered = await tryRecoverRoomConnection(inWaitingRoom, inGame);
+        if (recovered) {
+          showToast("Reconnected to room.");
+          return;
+        }
         showToast("You were removed from this room.", "error");
         clearAutoRejoinIntent();
         clearRememberedSeatToken(currentRoom, currentPlayerName);
@@ -2589,6 +2626,19 @@ async function init() {
         }
       }
     } catch (_) {
+      const now = Date.now();
+      const shouldAttemptRecover =
+        !!(inWaitingRoom || inGame) &&
+        !!currentRoom &&
+        !!currentPlayerName &&
+        now - lastRecoveryToastAt > 3000;
+      if (shouldAttemptRecover) {
+        lastRecoveryToastAt = now;
+        const recovered = await tryRecoverRoomConnection(inWaitingRoom, inGame);
+        if (recovered) {
+          showToast("Reconnected to room.");
+        }
+      }
       // Ignore transient network errors; next tick will retry.
     } finally {
       liveSyncInFlight = false;
