@@ -165,6 +165,21 @@ function isGenericSeatName(name) {
   return typeof name === "string" && /^Player\s+\d+$/i.test(name.trim());
 }
 
+function samePlayerName(a, b) {
+  const x = String(a || "").trim().toLowerCase();
+  const y = String(b || "").trim().toLowerCase();
+  return x !== "" && y !== "" && x === y;
+}
+
+function resolveCanonicalLobbyName(state, rawName) {
+  const target = String(rawName || "").trim();
+  if (!target || !state || !state.lobby || !Array.isArray(state.lobby.players)) {
+    return target;
+  }
+  const match = state.lobby.players.find((p) => samePlayerName(p && p.name, target));
+  return match && match.name ? String(match.name) : target;
+}
+
 function devCardCostEntries(cost) {
   const c = cost || {};
   const ordered = DEV_CARD_COST_ORDER.filter((g) => Number(c[g]) > 0).map((g) => [g, Number(c[g])]);
@@ -1320,7 +1335,11 @@ function renderLobbyStatus(state) {
   if (waitingRoomCode) {
     waitingRoomCode.textContent = currentRoom;
   }
-  const me = (lobby.players || []).find((p) => p.name === currentPlayerName);
+  const me = (lobby.players || []).find((p) => samePlayerName(p && p.name, currentPlayerName));
+  if (me && me.name && me.name !== currentPlayerName) {
+    currentPlayerName = String(me.name);
+    rememberPlayerName(currentPlayerName);
+  }
   currentReady = !!(me && me.ready);
   if (waitingPlayerNameInput) {
     waitingPlayerNameInput.value = currentPlayerName || "";
@@ -1367,7 +1386,7 @@ function setupGemSelection() {
 
     const preview = document.createElement("div");
     preview.className = "take-gem-option__preview";
-    preview.innerHTML = `${gemPillMarkup(gem, gem, "stone")}<span class="take-gem-option__supply">Board: 0</span>`;
+    preview.innerHTML = `${gemSpriteMarkup(gem, "stone")}<span class="take-gem-option__supply">Board: 0</span>`;
 
     const controls = document.createElement("div");
     controls.className = "take-gem-option__controls";
@@ -1803,7 +1822,7 @@ async function init() {
           state &&
           state.lobby &&
           Array.isArray(state.lobby.players) &&
-          state.lobby.players.some((p) => p.name === currentPlayerName)
+          state.lobby.players.some((p) => samePlayerName(p && p.name, currentPlayerName))
         );
       const now = Date.now();
       if ((inWaitingRoom || inGame) && currentPlayerName && !inLobbyList && now - lastAutoRejoinAt > 7000) {
@@ -1815,6 +1834,8 @@ async function init() {
             showToast("Session recovered after idle restart.");
           }
           state = await fetchState();
+          currentPlayerName = resolveCanonicalLobbyName(state, currentPlayerName);
+          rememberPlayerName(currentPlayerName);
         } catch (_) {
           // Ignore and retry later; prevents UI from being stuck after backend idles/restarts.
         }
@@ -2207,13 +2228,17 @@ async function init() {
       }
     }
     const state = await fetchState();
+    currentPlayerName = resolveCanonicalLobbyName(state, currentPlayerName);
+    if (currentPlayerName) {
+      rememberPlayerName(currentPlayerName);
+    }
     renderLobbyStatus(state);
     const inRoom =
       currentPlayerName &&
       state &&
       state.lobby &&
       Array.isArray(state.lobby.players) &&
-      state.lobby.players.some((p) => p.name === currentPlayerName);
+      state.lobby.players.some((p) => samePlayerName(p && p.name, currentPlayerName));
     if (inRoom) {
       if (state.lobby.gameStarted) {
         enterGameUiFromState(state, true);

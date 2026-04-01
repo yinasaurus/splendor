@@ -169,10 +169,10 @@ main {
 
 @media (min-width: 1024px) {
   .gameplay-layout {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+    gap: 18px;
+    align-items: start;
   }
 
   /* One page scroll (body); avoids nested scrollbars on board + sidebar. */
@@ -183,7 +183,9 @@ main {
   }
 
   .gameplay-side-col {
-    position: static;
+    position: sticky;
+    top: 7rem;
+    align-self: start;
     overflow: visible;
     padding-right: 0;
   }
@@ -2619,16 +2621,16 @@ button.secondary:focus-visible {
   }
 }
 
-/* Board order: actions (gems) under cards, then players, then assists. */
-.gameplay-side-col .actions {
+/* Board order: recommended on the right, then gems/actions, then players. */
+.gameplay-side-col .assist-panel {
   order: 1;
 }
 
-.gameplay-side-col .players {
+.gameplay-side-col .actions {
   order: 2;
 }
 
-.gameplay-side-col .assist-panel {
+.gameplay-side-col .players {
   order: 3;
 }
 
