@@ -1012,14 +1012,14 @@ function renderState(state) {
     const levelCol = ul.closest(".level-col");
     const levelHeading = levelCol ? levelCol.querySelector("h3") : null;
     if (levelHeading) {
-      const baseLabel = `TIER ${lvl}`;
+      const baseLabel = `LEVEL ${lvl}`;
       const deckLeft =
         state &&
         state.deckRemaining &&
         Number.isFinite(Number(state.deckRemaining[lvl]))
           ? Number(state.deckRemaining[lvl])
           : cards.length;
-      levelHeading.innerHTML = `<span class="tier-label">${baseLabel}</span><span class="tier-count">${deckLeft}</span>`;
+      levelHeading.textContent = `${baseLabel} · ${deckLeft} left`;
     }
     cards.forEach((card, index) => {
       const li = document.createElement("li");

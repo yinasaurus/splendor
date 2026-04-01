@@ -799,29 +799,50 @@ main {
 
 .noble-card {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: block;
   flex: 0 0 auto;
-  width: 112px;
-  padding: 6px;
-  background: linear-gradient(165deg, rgba(40, 48, 76, 0.98), rgba(28, 36, 60, 0.98));
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  font-size: 0.66rem;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  width: 108px;
+  min-height: 150px;
+  aspect-ratio: 5 / 7;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(6, 8, 14, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.noble-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .noble-card__portrait {
-  width: 100%;
-  min-width: 0;
-  height: 138px;
-  border-radius: 8px;
+  position: absolute;
+  inset: 0;
   border: none;
   background-color: rgba(8, 10, 16, 0.85);
-  background-size: contain;
+  background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
+}
+
+.noble-card__portrait::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.4) 0%, transparent 34%, transparent 58%, rgba(0, 0, 0, 0.72) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0.2) 0%, transparent 42%);
 }
 
 .noble-card__portrait--hidden {
@@ -829,10 +850,19 @@ main {
 }
 
 .noble-card__body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
+  padding: 6px 6px 5px;
+  background: linear-gradient(to top, rgba(8, 10, 16, 0.96), rgba(8, 10, 16, 0.74));
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(1px);
 }
 
 .noble-card__head {
@@ -840,10 +870,12 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  font-weight: 600;
+  font-weight: 700;
   color: #e8eaf0;
-  line-height: 1.25;
-  font-size: 0.62rem;
+  line-height: 1.2;
+  font-size: 0.56rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .noble-card__title {
@@ -854,16 +886,24 @@ main {
 }
 
 .noble-card__pts {
-  flex: 0 0 auto;
-  min-width: 28px;
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  z-index: 3;
+  min-width: 1ch;
   text-align: center;
-  font-weight: 800;
-  color: #fff4d6;
-  background: linear-gradient(180deg, #ffcf4d 0%, var(--accent) 45%, #b3740a 100%);
-  border: 1px solid rgba(255, 233, 180, 0.45);
-  border-radius: 999px;
-  padding: 1px 6px;
-  font-size: 0.58rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  color: #ffffff;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font-size: clamp(1.7rem, 4.8vw, 2.2rem);
+  line-height: 1;
+  text-shadow:
+    0 0 12px rgba(0, 0, 0, 0.85),
+    0 2px 4px rgba(0, 0, 0, 0.9);
 }
 
 .noble-card__reqs {
@@ -872,9 +912,14 @@ main {
 }
 
 .noble-card__reqs .pill {
-  padding: 2px 4px;
-  font-size: 0.54rem;
+  padding: 2px 3px;
+  font-size: 0.5rem;
   border-radius: 8px;
+  background: rgba(0, 0, 0, 0.42);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .noble-card__reqs .gem-pill-content {
@@ -885,7 +930,9 @@ main {
 }
 
 .noble-card__reqs .gem-sprite--stone {
-  --gw: 0.72rem;
+  --gw: 0.62rem;
+  --d: 0.62rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
 }
 
 .nobles-list::-webkit-scrollbar {
@@ -944,9 +991,9 @@ main {
 
 .level-col {
   display: grid;
-  grid-template-columns: 86px minmax(0, 1fr);
+  grid-template-columns: 1fr;
   align-items: start;
-  gap: 12px;
+  gap: 10px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 12px;
@@ -960,37 +1007,13 @@ main {
 }
 
 .level-col h3 {
-  margin: 0;
-  min-height: 100%;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(72, 86, 124, 0.58);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  padding: 10px 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  margin: 2px 0 4px 0;
   font-family: var(--font-ui);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #aebad8;
-}
-
-.tier-label {
-  display: block;
-}
-
-.tier-count {
-  display: block;
-  font-size: 2rem;
-  line-height: 1;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: #d3def7;
+  color: #b8c0d4;
 }
 
 .players {
@@ -1701,14 +1724,12 @@ main {
   left: 8px;
   bottom: 8px;
   z-index: 2;
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 4px;
-  max-width: calc(100% - 52px);
-  max-height: none;
-  overflow: visible;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  width: 52px;
+  max-height: calc(100% - 44px);
+  overflow: hidden;
   padding-right: 2px;
   scrollbar-width: none;
 }
@@ -1719,15 +1740,15 @@ main {
 
 .dev-card__cost {
   flex-shrink: 0;
-  width: 31px;
-  min-height: 44px;
-  padding: 4px 2px 5px;
-  border-radius: 11px;
+  width: 24px;
+  min-height: 28px;
+  padding: 2px 1px 3px;
+  border-radius: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 1px;
   font-weight: 800;
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
@@ -1740,13 +1761,13 @@ main {
 
 .dev-card__cost .gem-sprite--stone,
 .dev-card__cost .gem-sprite--chip {
-  --gw: 0.95rem;
-  --d: 0.95rem;
+  --gw: 0.66rem;
+  --d: 0.66rem;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
 }
 
 .dev-card__cost-num {
-  font-size: 0.72rem;
+  font-size: 0.58rem;
   line-height: 1;
   font-weight: 800;
   min-width: 1.25ch;
