@@ -864,8 +864,8 @@ public class WebServer {
 						int totalAfterTake = p.getTotalGemCount();
 						if (totalAfterTake > maxGems) {
 							int needDiscard = totalAfterTake - maxGems;
-							int declaredDiscard = gemsToDiscard.values().stream().mapToInt(Integer::intValue).sum();
-							if (declaredDiscard != needDiscard) {
+							int discardCount = gemsToDiscard.values().stream().mapToInt(Integer::intValue).sum();
+							if (discardCount != needDiscard) {
 								success = false;
 								message = "Must discard exactly " + needDiscard + " gem(s).";
 							} else {
