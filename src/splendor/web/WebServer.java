@@ -205,6 +205,37 @@ public class WebServer {
 		return name.trim().matches("Player\\s+\\d+");
 	}
 
+	private static List<String> lobbySeatNames(GameSession session, int limit) {
+		List<String> out = new ArrayList<>();
+		if (session == null || limit <= 0) {
+			return out;
+		}
+		for (String name : session.readyByPlayer.keySet()) {
+			if (out.size() >= limit) {
+				break;
+			}
+			out.add(name);
+		}
+		return out;
+	}
+
+	private static String displayNameForSeat(GameSession session, int seatIndex, Player p, List<String> lobbyNames) {
+		if (p == null) {
+			return "";
+		}
+		String original = p.getName();
+		if (!isGenericSeatName(original)) {
+			return original;
+		}
+		if (seatIndex >= 0 && seatIndex < lobbyNames.size()) {
+			String mapped = lobbyNames.get(seatIndex);
+			if (mapped != null && !mapped.trim().isEmpty()) {
+				return mapped.trim();
+			}
+		}
+		return original;
+	}
+
 	private static void ensureLobbyOwner(GameSession session, String preferredName) {
 		if (session == null) {
 			return;
@@ -1301,17 +1332,22 @@ public class WebServer {
 		GameBoard board = session.controller.getBoard();
 		Player current = session.controller.getCurrentPlayer();
 		ensureLobbyOwner(session, null);
+		List<Player> players = session.controller.getPlayers();
+		List<String> lobbyNames = lobbySeatNames(session, players.size());
+		int currentIdx = players.indexOf(current);
+		String currentDisplayName = displayNameForSeat(session, currentIdx, current, lobbyNames);
 		String viewer = viewerName == null ? "" : viewerName.trim();
 		boolean isMyTurn = current.isHuman()
 			&& !viewer.isEmpty()
 			&& (current.getName().equals(viewer)
+				|| currentDisplayName.equals(viewer)
 				|| (isGenericSeatName(current.getName()) && session.readyByPlayer.containsKey(viewer)));
 		if (session.forcedAiByName.contains(current.getName()) && current.getName().equals(viewer)) {
 			isMyTurn = false;
 		}
 
 		sb.append("{");
-		sb.append("\"currentPlayer\":\"").append(escape(current.getName())).append("\",");
+		sb.append("\"currentPlayer\":\"").append(escape(currentDisplayName)).append("\",");
 		sb.append("\"turnNumber\":").append(session.turnNumber).append(",");
 		int totalPlayers = session.controller.getPlayers().size();
 		int roundNumber = Math.max(1, ((session.turnNumber - 1) / Math.max(1, totalPlayers)) + 1);
@@ -1327,19 +1363,19 @@ public class WebServer {
 
 		// Players
 		sb.append("\"players\":[");
-		List<Player> players = session.controller.getPlayers();
 		for (int i = 0; i < players.size(); i++) {
 			Player p = players.get(i);
+			String displayName = displayNameForSeat(session, i, p, lobbyNames);
 			if (i > 0) {
 				sb.append(",");
 			}
 			sb.append("{");
-			sb.append("\"name\":\"").append(escape(p.getName())).append("\",");
+			sb.append("\"name\":\"").append(escape(displayName)).append("\",");
 			sb.append("\"human\":").append(p.isHuman()).append(",");
-			long seenMs = session.lastSeenByPlayer.getOrDefault(p.getName(), System.currentTimeMillis());
+			long seenMs = session.lastSeenByPlayer.getOrDefault(displayName, System.currentTimeMillis());
 			long afkSeconds = Math.max(0L, (System.currentTimeMillis() - seenMs) / 1000L);
 			sb.append("\"afkSeconds\":").append(afkSeconds).append(",");
-			sb.append("\"forcedAi\":").append(session.forcedAiByName.contains(p.getName())).append(",");
+			sb.append("\"forcedAi\":").append(session.forcedAiByName.contains(displayName)).append(",");
 			sb.append("\"prestige\":").append(p.getPrestigePoints()).append(",");
 			sb.append("\"purchasedCards\":").append(p.getPurchasedCards().size()).append(",");
 			sb.append("\"gems\":{");

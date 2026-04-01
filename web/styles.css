@@ -1330,27 +1330,15 @@ main {
 
 /* —— Development cards (Splendor-style face) —— */
 .dev-card-list {
-  display: flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(232, 163, 23, 0.35) rgba(0, 0, 0, 0.15);
-}
-
-.dev-card-list::-webkit-scrollbar {
-  height: 7px;
-}
-
-.dev-card-list::-webkit-scrollbar-thumb {
-  background: rgba(232, 163, 23, 0.35);
-  border-radius: 999px;
+  overflow: visible;
+  padding-bottom: 0;
 }
 
 .dev-card-list .dev-card {
-  flex: 0 0 124px;
+  flex: 1 1 auto;
 }
 
 .dev-card {
@@ -1359,7 +1347,8 @@ main {
   padding: 0;
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: stretch;
   border-radius: 12px;
   overflow: hidden;
   background: rgba(6, 8, 14, 0.92);
@@ -1383,10 +1372,11 @@ main {
 
 .dev-card__face {
   position: relative;
-  flex: 1;
-  min-height: 148px;
+  flex: 0 0 112px;
+  width: 112px;
+  min-height: 156px;
   aspect-ratio: 5 / 7;
-  border-radius: 10px 10px 0 0;
+  border-radius: 10px 0 0 10px;
   overflow: hidden;
 }
 
@@ -1591,27 +1581,26 @@ main {
 }
 
 .dev-card__chrome {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 3;
+  position: static;
+  z-index: auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 8px 8px 10px;
-  background: linear-gradient(to top, rgba(6, 8, 12, 0.96), rgba(6, 8, 12, 0.72) 60%, rgba(6, 8, 12, 0));
-  border-top: none;
-  opacity: 0;
-  transform: translateY(8px);
-  pointer-events: none;
-  transition: opacity 0.16s ease, transform 0.16s ease;
+  justify-content: center;
+  padding: 8px 8px;
+  background: rgba(10, 12, 18, 0.9);
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition: none;
 }
 
 .dev-card__actions {
   display: flex;
+  flex-direction: column;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .dev-card__actions button {
@@ -1619,8 +1608,8 @@ main {
   padding: 5px 10px;
   font-size: 0.76rem;
   border-radius: 6px;
-  flex: 1 1 auto;
-  min-width: 64px;
+  width: 100%;
+  min-width: 92px;
 }
 
 .dev-card__actions .card-buy-btn:disabled,
@@ -1640,13 +1629,6 @@ main {
 
 .dev-card__actions .card-buy-btn:not(:disabled):hover {
   filter: brightness(1.06);
-}
-
-.dev-card:hover .dev-card__chrome,
-.dev-card:focus-within .dev-card__chrome {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
 }
 
 .dev-card--locked .dev-card__face {
@@ -2565,10 +2547,12 @@ button.secondary:focus-visible {
   }
 
   .dev-card-list {
-    gap: 8px;
+    gap: 7px;
   }
 
   .dev-card__face {
+    flex-basis: 102px;
+    width: 102px;
     min-height: 140px;
   }
 
@@ -2594,8 +2578,26 @@ button.secondary:focus-visible {
     gap: 7px;
   }
 
-  .dev-card-list .dev-card {
-    flex-basis: 112px;
+  .dev-card {
+    border-radius: 10px;
+  }
+
+  .dev-card__face {
+    flex-basis: 92px;
+    width: 92px;
+    min-height: 126px;
+    border-radius: 8px 0 0 8px;
+  }
+
+  .dev-card__chrome {
+    padding: 6px;
+    gap: 5px;
+  }
+
+  .dev-card__actions button {
+    min-width: 78px;
+    padding: 4px 8px;
+    font-size: 0.72rem;
   }
 
   .dev-card__face {
