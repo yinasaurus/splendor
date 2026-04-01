@@ -8,6 +8,12 @@ Java console implementation of the **Splendor** board game with:
 - Full core rules: gems, development cards (L1–L3), nobles, winning & tie-breakers
 - Optional tutorial and in-game `!help` popup
 
+### Demo Highlights
+- Real-time lobby + in-game updates (ready status, turns, action feed)
+- Room join by game code with player-name persistence
+- AFK-to-AI host control with automatic player control recovery on return
+- Web UI quality-of-life features: recommended steps, rulebook modal, visible costs/counts
+
 ## How to Run
 
 ### Prerequisites
@@ -77,6 +83,41 @@ Because the game server is stateful Java (rooms/sessions), deploy backend and fr
    - `web/vercel.json` is included for root routing
 
 For local dev, keep `window.__SPLENDOR_API_BASE__ = ""` and run `run_web.bat` / `run_web.sh`.
+
+## Technical Architecture (Short)
+
+- **Backend**: Java HTTP server in `src/splendor/web/WebServer.java` provides REST endpoints (`/api/state`, `/api/action`, room/lobby endpoints) and owns authoritative game state.
+- **Core engine**: Rules and transitions are enforced server-side (`GameController`, `GameRules`), so both web and CLI use the same game logic.
+- **Frontend**: Vanilla JS app in `web/app.js` renders state snapshots, sends player actions, and performs periodic live sync.
+- **AI**: Strategy-pattern AI (`EasyAIStrategy`, `MediumAIStrategy`, `HardAIStrategy`) used by both console and web paths.
+
+## Known Limitations
+
+- UI live updates use short-interval polling (not websocket push), so updates are near-real-time rather than instant.
+- Browser-based end-to-end UI tests are currently manual; automated checks focus on API/regression smoke behavior.
+- Long backend idle/restart windows can require one auto-rejoin cycle before full lobby/game state appears stable.
+
+## Automated Regression Smoke Test (API)
+
+Run local web server first:
+
+```bat
+run_web.bat
+```
+
+In a second terminal, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\api-regression-smoke.ps1
+```
+
+Optional deployed backend check:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\api-regression-smoke.ps1 -BaseUrl "https://your-backend-url"
+```
+
+This script validates: create/join/ready/start/state/action flow and confirms recent action feed updates.
 
 ## Notes
 
@@ -198,3 +239,7 @@ Priority order:
 - `data/*.csv` – Card and noble data
 
 For a full architectural description, see `PROJECT_SUMMARY.md`.
+
+## Quick QA Before Submission
+
+Use `DEMO_CHECKLIST.md` for final regression + demo walkthrough.

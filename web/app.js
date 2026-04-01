@@ -161,6 +161,10 @@ function gemDisplayName(gemEnum) {
   }
 }
 
+function isGenericSeatName(name) {
+  return typeof name === "string" && /^Player\s+\d+$/i.test(name.trim());
+}
+
 function devCardCostEntries(cost) {
   const c = cost || {};
   const ordered = DEV_CARD_COST_ORDER.filter((g) => Number(c[g]) > 0).map((g) => [g, Number(c[g])]);
@@ -621,7 +625,21 @@ function renderState(state) {
   const players = document.getElementById("players");
   const recommendedSteps = document.getElementById("recommended-steps");
   const activityLog = document.getElementById("activity-log");
-  const currentPlayerData = (state.players || []).find((p) => p.name === state.currentPlayer) || null;
+  const lobbyNames = state && state.lobby && Array.isArray(state.lobby.players)
+    ? state.lobby.players.map((p) => String(p.name || "").trim()).filter((n) => n.length > 0)
+    : [];
+  const displayPlayers = (state.players || []).map((p, idx) => {
+    const raw = p && p.name != null ? String(p.name) : "";
+    const mapped = isGenericSeatName(raw) && idx < lobbyNames.length ? lobbyNames[idx] : raw;
+    return { ...p, name: mapped || raw };
+  });
+  const currentRawName = state && state.currentPlayer != null ? String(state.currentPlayer) : "";
+  const currentIdx = (state.players || []).findIndex((p) => String((p && p.name) || "") === currentRawName);
+  const currentDisplayName =
+    currentIdx >= 0 && currentIdx < displayPlayers.length
+      ? String(displayPlayers[currentIdx].name || currentRawName)
+      : currentRawName;
+  const currentPlayerData = displayPlayers.find((p) => p.name === currentDisplayName) || null;
   const isMyTurn = !!(state.isMyTurn != null ? state.isMyTurn : state.isHumanTurn);
   const isAiTurn = state.isHumanTurn === false;
   const currentReservedCount = currentPlayerData ? (currentPlayerData.reservedCount || 0) : 0;
@@ -665,7 +683,7 @@ function renderState(state) {
     gameOverWrap.classList.add("hidden");
   }
 
-  let turnLine = `Round ${roundNo} · Turn ${turnNo} · Current Player: ${state.currentPlayer}`;
+  let turnLine = `Round ${roundNo} · Turn ${turnNo} · Current Player: ${currentDisplayName}`;
   if (isAiTurn) {
     turnLine += " (AI turn)";
   } else if (isMyTurn) {
@@ -748,6 +766,12 @@ function renderState(state) {
     const ul = document.getElementById(`level-${lvl}`);
     ul.innerHTML = "";
     const cards = state.levels?.[lvl] || [];
+    const levelCol = ul.closest(".level-col");
+    const levelHeading = levelCol ? levelCol.querySelector("h3") : null;
+    if (levelHeading) {
+      const baseLabel = `LEVEL ${lvl}`;
+      levelHeading.textContent = `${baseLabel} · ${cards.length} left`;
+    }
     cards.forEach((card, index) => {
       const li = document.createElement("li");
       li.className = `dev-card dev-card--level-${lvl}`;
@@ -828,6 +852,7 @@ function renderState(state) {
       buyBtn.textContent = "Buy";
       buyBtn.disabled = !isMyTurn || !card.affordable;
       const canBuy = isMyTurn && !!card.affordable;
+      buyBtn.title = canBuy ? "Buy this card" : !isMyTurn ? "Not your turn" : "Not affordable yet";
       if (isMyTurn && card.affordable) {
         buyBtn.classList.add("card-buy-btn--affordable");
       }
@@ -837,8 +862,10 @@ function renderState(state) {
       reserveBtn.textContent = "Reserve";
       reserveBtn.disabled = !isMyTurn || currentReservedCount >= 3;
       const canReserve = isMyTurn && currentReservedCount < 3;
+      reserveBtn.title = canReserve ? "Reserve this card" : !isMyTurn ? "Not your turn" : "Reserve full (3/3)";
       if (!canBuy && !canReserve) {
         li.classList.add("dev-card--locked");
+        li.title = !isMyTurn ? "This card is locked: not your turn." : "This card is locked: cannot buy or reserve right now.";
       }
 
       buyBtn.addEventListener("click", async (e) => {
@@ -920,7 +947,7 @@ function renderState(state) {
     orderedPlayers.forEach((p) => {
       const card = document.createElement("div");
       card.className = "player-card";
-      if (p.name === state.currentPlayer) {
+      if (p.name === currentDisplayName) {
         card.classList.add("current");
       }
       const name = document.createElement("div");
@@ -1134,7 +1161,7 @@ function renderState(state) {
           buyR.type = "button";
           buyR.className = "reserved-mini__buy card-buy-btn";
           buyR.textContent = "Buy reserved";
-          const isYou = p.name === state.currentPlayer;
+          const isYou = p.name === currentDisplayName;
           const canBuyReserved = isMyTurn && isYou && p.human && !!rc.affordable;
           buyR.disabled = !canBuyReserved;
           buyR.title = canBuyReserved
@@ -1227,7 +1254,7 @@ function renderState(state) {
       }
     }
     if (lastSeenTurnNumber !== null && turnNo !== lastSeenTurnNumber) {
-      showToast(`Turn ${turnNo}: ${state.currentPlayer}'s turn`);
+      showToast(`Turn ${turnNo}: ${currentDisplayName}'s turn`);
     }
   }
   lastSeenActionCount = actions.length;

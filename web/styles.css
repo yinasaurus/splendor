@@ -868,15 +868,16 @@ main {
 
 .levels-row {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+  align-items: start;
 }
 
 .level-col {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
+  grid-template-columns: 1fr;
   align-items: start;
-  gap: 10px;
+  gap: 8px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 12px;
@@ -890,7 +891,7 @@ main {
 }
 
 .level-col h3 {
-  margin: 2px 0 0 0;
+  margin: 2px 0 4px 0;
   font-family: var(--font-ui);
   font-size: 0.78rem;
   font-weight: 700;
@@ -1330,15 +1331,26 @@ main {
 
 /* —— Development cards (Splendor-style face) —— */
 .dev-card-list {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
-  overflow: visible;
-  padding-bottom: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.dev-card-list::-webkit-scrollbar {
+  height: 8px;
+}
+
+.dev-card-list::-webkit-scrollbar-thumb {
+  background: rgba(232, 163, 23, 0.4);
+  border-radius: 999px;
 }
 
 .dev-card-list .dev-card {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
 }
 
 .dev-card {
@@ -1346,9 +1358,7 @@ main {
   margin: 0;
   padding: 0;
   position: relative;
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
+  display: block;
   border-radius: 12px;
   overflow: hidden;
   background: rgba(6, 8, 14, 0.92);
@@ -1372,11 +1382,10 @@ main {
 
 .dev-card__face {
   position: relative;
-  flex: 0 0 112px;
   width: 112px;
   min-height: 156px;
   aspect-ratio: 5 / 7;
-  border-radius: 10px 0 0 10px;
+  border-radius: 10px;
   overflow: hidden;
 }
 
@@ -1581,42 +1590,57 @@ main {
 }
 
 .dev-card__chrome {
-  position: static;
-  z-index: auto;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   gap: 6px;
   justify-content: center;
-  padding: 8px 8px;
-  background: rgba(10, 12, 18, 0.9);
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 8px 6px 6px;
+  background: linear-gradient(to top, rgba(6, 8, 14, 0.92), rgba(6, 8, 14, 0.74));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.dev-card:hover .dev-card__chrome,
+.dev-card:focus-within .dev-card__chrome {
   opacity: 1;
-  transform: none;
+  transform: translateY(0);
   pointer-events: auto;
-  transition: none;
 }
 
 .dev-card__actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 6px;
   flex-wrap: nowrap;
 }
 
 .dev-card__actions button {
   margin-top: 0;
-  padding: 5px 10px;
-  font-size: 0.76rem;
+  padding: 4px 8px;
+  font-size: 0.72rem;
   border-radius: 6px;
-  width: 100%;
-  min-width: 92px;
+  width: 50%;
+  min-width: 0;
+}
+
+.dev-card__actions button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 214, 102, 0.8);
 }
 
 .dev-card__actions .card-buy-btn:disabled,
 .dev-card__actions button.card-buy-btn:disabled {
-  opacity: 0.38;
+  opacity: 0.28;
   cursor: not-allowed;
-  filter: grayscale(0.35);
+  filter: grayscale(0.5) brightness(0.75);
   box-shadow: none;
 }
 
@@ -1624,7 +1648,35 @@ main {
 .dev-card__actions button.card-buy-btn:disabled:hover {
   transform: none;
   box-shadow: none;
-  opacity: 0.38;
+  opacity: 0.28;
+}
+
+.dev-card__actions button.secondary:disabled {
+  opacity: 0.3;
+  filter: grayscale(0.55) brightness(0.76);
+  box-shadow: none;
+}
+
+.dev-card__actions button.secondary:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.dev-card--locked .dev-card__face::after {
+  content: "Locked";
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 4;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  border-radius: 999px;
+  color: #d9dde9;
+  background: rgba(4, 6, 10, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
 .dev-card__actions .card-buy-btn:not(:disabled):hover {
@@ -1654,7 +1706,7 @@ main {
 @media (hover: none) {
   .dev-card__chrome {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
     pointer-events: auto;
   }
 
@@ -2516,6 +2568,10 @@ button.secondary:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  .levels-row {
+    grid-template-columns: 1fr;
+  }
+
   .level-col {
     grid-template-columns: 1fr;
     gap: 8px;
@@ -2586,7 +2642,7 @@ button.secondary:focus-visible {
     flex-basis: 92px;
     width: 92px;
     min-height: 126px;
-    border-radius: 8px 0 0 8px;
+    border-radius: 8px;
   }
 
   .dev-card__chrome {
@@ -2595,7 +2651,7 @@ button.secondary:focus-visible {
   }
 
   .dev-card__actions button {
-    min-width: 78px;
+    min-width: 0;
     padding: 4px 8px;
     font-size: 0.72rem;
   }
@@ -2639,7 +2695,7 @@ button.secondary:focus-visible {
   }
 
   .dev-card__actions {
-    flex-direction: column;
+    flex-direction: row;
   }
 
   .dev-card__actions button {
@@ -2702,13 +2758,13 @@ button.secondary:focus-visible {
 
   .players-row {
     gap: 8px;
-    overflow-x: visible;
-    flex-direction: column;
+    overflow-x: auto;
+    flex-direction: row;
   }
 
   .player-card {
-    min-width: 0;
-    width: 100%;
+    min-width: 190px;
+    width: auto;
     padding: 8px 10px;
   }
 
