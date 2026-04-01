@@ -2142,8 +2142,12 @@ async function init() {
   updateLobbyReadiness();
   startLiveSync();
   const pathRoom = roomFromUrlPath();
+  const rememberedRoom = getRememberedRoom();
   if (pathRoom) {
     rememberRoom(pathRoom);
+  } else if (rememberedRoom) {
+    // Refresh fallback: restore last known room when URL has no room segment.
+    rememberRoom(rememberedRoom);
   }
   const rememberedName = getRememberedPlayerName();
   if (rememberedName) {
@@ -2154,7 +2158,8 @@ async function init() {
   }
   updateLobbyReadiness();
   try {
-    if (pathRoom && currentPlayerName) {
+    const shouldTryAutoJoin = !!currentPlayerName && !!(pathRoom || rememberedRoom);
+    if (shouldTryAutoJoin) {
       try {
         await postJoinRoom({ room: currentRoom, name: currentPlayerName });
       } catch (_) {
@@ -2175,9 +2180,9 @@ async function init() {
       } else {
         showWaitingRoom();
       }
-    } else if (pathRoom) {
+    } else if (pathRoom || rememberedRoom) {
       showHome(false);
-      showToast(`Room code from link: ${pathRoom}. Enter your name, then Join Room.`);
+      showToast(`Could not auto-rejoin ${currentRoom}. Enter your name, then Join Room.`, "error");
     } else {
       showHome(false);
     }

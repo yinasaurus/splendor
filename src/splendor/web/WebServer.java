@@ -97,6 +97,27 @@ public class WebServer {
 		}
 	}
 
+	private static String canonicalizeLobbyName(GameSession session, String rawName) {
+		if (rawName == null) {
+			return "";
+		}
+		String name = rawName.trim();
+		if (name.isEmpty() || session == null) {
+			return name;
+		}
+		for (String existing : session.readyByPlayer.keySet()) {
+			if (existing != null && existing.equalsIgnoreCase(name)) {
+				return existing;
+			}
+		}
+		for (String existingAi : session.aiByName.keySet()) {
+			if (existingAi != null && existingAi.equalsIgnoreCase(name)) {
+				return existingAi;
+			}
+		}
+		return name;
+	}
+
 	private static String cleanRoomName(String room) {
 		if (room == null) {
 			return DEFAULT_ROOM;
@@ -551,7 +572,7 @@ public class WebServer {
 
 			String room = getRoomFromQuery(exchange);
 			GameSession session = getOrCreateSession(room);
-			String viewerName = getQueryParam(exchange, "name");
+			String viewerName = canonicalizeLobbyName(session, getQueryParam(exchange, "name"));
 			markPlayerSeen(session, viewerName);
 			String json = buildGameStateJson(session, room, viewerName);
 			sendResponse(exchange, 200, json, "application/json; charset=utf-8");
@@ -634,9 +655,9 @@ public class WebServer {
 			if (name == null || name.trim().isEmpty()) {
 				name = "Guest";
 			}
-			name = name.trim();
 
 			GameSession session = getOrCreateSession(room);
+			name = canonicalizeLobbyName(session, name);
 			if (!session.readyByPlayer.containsKey(name) && session.readyByPlayer.size() >= session.lobbyNumPlayers) {
 				// Room-code join should not be blocked by the original selected count.
 				// Expand capacity up to the game maximum (4 seats).
@@ -651,7 +672,14 @@ public class WebServer {
 				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 				return;
 			}
-			if (session.aiByName.containsKey(name)) {
+			boolean conflictsWithAi = false;
+			for (String aiName : session.aiByName.keySet()) {
+				if (aiName != null && aiName.equalsIgnoreCase(name)) {
+					conflictsWithAi = true;
+					break;
+				}
+			}
+			if (conflictsWithAi) {
 				Map<String, Object> resp = new HashMap<>();
 				resp.put("success", false);
 				resp.put("message", "Name conflicts with AI bot.");
@@ -686,6 +714,7 @@ public class WebServer {
 			String name = extractStringField(body, "name", "Guest");
 			boolean ready = extractBooleanField(body, "ready", false);
 			GameSession session = getOrCreateSession(room);
+			name = canonicalizeLobbyName(session, name);
 			if (!session.readyByPlayer.containsKey(name)) {
 				session.readyByPlayer.put(name, false);
 			}
@@ -716,6 +745,7 @@ public class WebServer {
 			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
 			String owner = extractStringField(body, "ownerName", "");
 			GameSession session = getOrCreateSession(room);
+			owner = canonicalizeLobbyName(session, owner);
 			ensureLobbyOwner(session, owner);
 			if (!session.ownerName.equals(owner)) {
 				Map<String, Object> resp = new HashMap<>();
@@ -976,7 +1006,7 @@ public class WebServer {
 		if (requesterName == null) {
 			requesterName = "";
 		}
-		requesterName = requesterName.trim();
+		requesterName = canonicalizeLobbyName(session, requesterName);
 		if (requesterName.isEmpty()) {
 			response.put("success", false);
 			response.put("message", "Missing player identity.");
