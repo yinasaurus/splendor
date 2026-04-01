@@ -172,6 +172,13 @@ public class WebServer {
 		return true;
 	}
 
+	private static boolean isGenericSeatName(String name) {
+		if (name == null) {
+			return false;
+		}
+		return name.trim().matches("Player\\s+\\d+");
+	}
+
 	private static void ensureLobbyOwner(GameSession session, String preferredName) {
 		if (session == null) {
 			return;
@@ -857,7 +864,10 @@ public class WebServer {
 			response.put("gameOver", session.controller.isGameOver());
 			return response;
 		}
-		if (!actor.equals(requesterName)) {
+		boolean genericSeatFallback = !actor.equals(requesterName)
+			&& isGenericSeatName(actor)
+			&& session.readyByPlayer.containsKey(requesterName);
+		if (!actor.equals(requesterName) && !genericSeatFallback) {
 			response.put("success", false);
 			response.put("message", "Not your turn.");
 			response.put("gameOver", session.controller.isGameOver());
@@ -1012,8 +1022,8 @@ public class WebServer {
 				success = session.controller.reserveCard(level, index);
 				message = success ? "Card reserved." : "Cannot reserve this card.";
 				if (success) {
-					actionSummary = actor + " reserved card ID " + card.getCardId()
-						+ " (L" + card.getLevel() + ", +" + card.getBonusGem().getAbbreviation() + ").";
+					actionSummary = actor + " reserved a Level " + card.getLevel()
+						+ " card (+" + card.getPrestigePoints() + " prestige, +" + card.getBonusGem().getAbbreviation() + " bonus).";
 				}
 			}
 		} else if (lower.contains("\"type\"") && lower.contains("purchasevisible")) {
@@ -1034,8 +1044,8 @@ public class WebServer {
 					success = session.controller.purchaseVisibleCard(level, index);
 					message = success ? "Card purchased." : "Cannot purchase this card.";
 					if (success) {
-						actionSummary = actor + " bought card ID " + card.getCardId()
-							+ " (L" + card.getLevel() + ", +" + card.getBonusGem().getAbbreviation() + ").";
+						actionSummary = actor + " bought a Level " + card.getLevel()
+							+ " card (+" + card.getPrestigePoints() + " prestige, +" + card.getBonusGem().getAbbreviation() + " bonus).";
 					}
 				}
 			}
@@ -1056,8 +1066,8 @@ public class WebServer {
 					success = session.controller.purchaseReservedCard(index);
 					message = success ? "Reserved card purchased." : "Cannot purchase this reserved card.";
 					if (success) {
-						actionSummary = actor + " bought reserved card ID " + card.getCardId()
-							+ " (L" + card.getLevel() + ", +" + card.getBonusGem().getAbbreviation() + ").";
+						actionSummary = actor + " bought a reserved Level " + card.getLevel()
+							+ " card (+" + card.getPrestigePoints() + " prestige, +" + card.getBonusGem().getAbbreviation() + " bonus).";
 					}
 				}
 			}
@@ -1181,7 +1191,10 @@ public class WebServer {
 		Player current = session.controller.getCurrentPlayer();
 		ensureLobbyOwner(session, null);
 		String viewer = viewerName == null ? "" : viewerName.trim();
-		boolean isMyTurn = current.isHuman() && !viewer.isEmpty() && current.getName().equals(viewer);
+		boolean isMyTurn = current.isHuman()
+			&& !viewer.isEmpty()
+			&& (current.getName().equals(viewer)
+				|| (isGenericSeatName(current.getName()) && session.readyByPlayer.containsKey(viewer)));
 
 		sb.append("{");
 		sb.append("\"currentPlayer\":\"").append(escape(current.getName())).append("\",");

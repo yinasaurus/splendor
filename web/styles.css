@@ -1315,8 +1315,8 @@ main {
 
 /* —— Development cards (Splendor-style face) —— */
 .dev-card-list {
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 10px;
 }
 
 .dev-card {
@@ -1350,7 +1350,7 @@ main {
 .dev-card__face {
   position: relative;
   flex: 1;
-  min-height: 168px;
+  min-height: 148px;
   aspect-ratio: 5 / 7;
   border-radius: 10px 10px 0 0;
   overflow: hidden;
@@ -1488,8 +1488,8 @@ main {
 
 .dev-card__cost {
   flex-shrink: 0;
-  width: 34px;
-  min-height: 48px;
+  width: 31px;
+  min-height: 44px;
   padding: 4px 2px 5px;
   border-radius: 11px;
   display: flex;
@@ -1509,13 +1509,13 @@ main {
 
 .dev-card__cost .gem-sprite--stone,
 .dev-card__cost .gem-sprite--chip {
-  --gw: 1.05rem;
-  --d: 1.05rem;
+  --gw: 0.95rem;
+  --d: 0.95rem;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
 }
 
 .dev-card__cost-num {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   line-height: 1;
   font-weight: 800;
 }
@@ -2530,12 +2530,12 @@ button.secondary:focus-visible {
   }
 
   .dev-card-list {
-    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 9px;
   }
 
   .dev-card__face {
-    min-height: 152px;
+    min-height: 140px;
   }
 
   .dev-card__bonus {
@@ -2557,12 +2557,12 @@ button.secondary:focus-visible {
   }
 
   .dev-card-list {
-    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
     gap: 8px;
   }
 
   .dev-card__face {
-    min-height: 140px;
+    min-height: 128px;
     aspect-ratio: 5 / 7;
   }
 
