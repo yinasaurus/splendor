@@ -2114,7 +2114,16 @@ main {
 }
 
 .dev-card__actions .card-buy-btn:not(:disabled):hover {
-  filter: brightness(1.06);
+  filter: none;
+  background: rgba(78, 124, 210, 0.34);
+  border-color: rgba(126, 167, 242, 0.72);
+  color: #eef4ff;
+}
+
+.dev-card__actions .card-buy-btn {
+  background: rgba(30, 44, 74, 0.92);
+  border-color: rgba(118, 148, 204, 0.56);
+  color: #e6eeff;
 }
 
 .dev-card__actions button.secondary {
@@ -2137,7 +2146,7 @@ main {
 /* Affordable buy stays quiet until you hover the card or the button (desktop). */
 .dev-card__actions .card-buy-btn.card-buy-btn--affordable {
   opacity: 0.9;
-  filter: grayscale(0.05) brightness(0.98);
+  filter: none;
   box-shadow: none;
 }
 
