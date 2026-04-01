@@ -84,6 +84,9 @@ async function fetchState() {
     throw new Error("Failed to load state");
   }
   const data = await res.json();
+  if (data && data.success === false) {
+    throw new Error(data.message || "Failed to load state.");
+  }
   if (data && data.sessionMissing) {
     throw new Error(data.message || "Session expired.");
   }
@@ -894,7 +897,7 @@ function renderState(state) {
     turnLine += " (Other player's turn)";
   }
   if (state.endgameFinalRound) {
-    turnLine += " · Final round: each player takes one more turn";
+    turnLine += " · Final round: remaining players in this round take their last turn";
   }
   turnInfo.textContent = turnLine;
   if (roomCodeDisplay) {
@@ -1994,7 +1997,10 @@ async function init() {
   const copyRoomCodeBtn = document.getElementById("copy-room-code-btn");
   const copyRoomCodeLobbyBtn = document.getElementById("copy-room-code-btn-lobby");
   const startGuidedBtn = document.getElementById("start-guided-btn");
-  const numPlayersSelect = document.getElementById("start-num-players");
+  const createRoomDialog = document.getElementById("create-room-dialog");
+  const createNumPlayersInput = document.getElementById("create-num-players-input");
+  const createDialogCancel = document.getElementById("create-dialog-cancel");
+  const createDialogConfirm = document.getElementById("create-dialog-confirm");
   const joinRoomDialog = document.getElementById("join-room-dialog");
   const joinRoomCodeInput = document.getElementById("join-room-code-input");
   const joinDialogCancel = document.getElementById("join-dialog-cancel");
@@ -2148,6 +2154,69 @@ async function init() {
     joinRoomDialog?.classList.add("hidden");
   }
 
+  function openCreateRoomDialog() {
+    if (!createRoomDialog || !createNumPlayersInput) {
+      return;
+    }
+    createRoomDialog.classList.remove("hidden");
+    createNumPlayersInput.focus();
+  }
+
+  function closeCreateRoomDialog() {
+    createRoomDialog?.classList.add("hidden");
+  }
+
+  async function submitCreateRoomFromDialog() {
+    try {
+      currentPlayerName = ensureCurrentPlayerName("Host");
+      const numPlayers = parseInt(createNumPlayersInput ? createNumPlayersInput.value : "2", 10) || 2;
+      const roomInput = "";
+      let created = await postCreateRoom({
+        room: roomInput,
+        ownerName: currentPlayerName,
+        numPlayers,
+        p1Type: "human",
+        p2Type: "human",
+        p3Type: "human",
+        p4Type: "human",
+      });
+      if (!created.success && created.requiresForceReset) {
+        const ok = window.confirm(
+          created.message || "An active match exists. Reset room and create a new lobby?"
+        );
+        if (!ok) {
+          return;
+        }
+        created = await postCreateRoom({
+          room: created.room || roomInput,
+          ownerName: currentPlayerName,
+          numPlayers,
+          p1Type: "human",
+          p2Type: "human",
+          p3Type: "human",
+          p4Type: "human",
+          forceReset: true,
+        });
+      }
+      if (!created.success) {
+        throw new Error(created.message || "Could not create room.");
+      }
+      closeCreateRoomDialog();
+      rememberRoom(created.room || roomInput || "Room A");
+      syncRoomToBrowserUrl(currentRoom);
+      updateLobbyReadiness();
+      showWaitingRoom();
+      startLiveSync();
+      showToast(`Room created: ${currentRoom}`);
+      const state = await fetchState();
+      renderLobbyStatus(state);
+    } catch (e) {
+      const message = e && e.message ? e.message : "Could not create room.";
+      showToast(message, "error");
+      alert(message);
+    }
+  }
+
   async function submitJoinFromDialog() {
     const code = joinRoomCodeInput ? String(joinRoomCodeInput.value || "").trim() : "";
     if (!code) {
@@ -2237,16 +2306,16 @@ async function init() {
     liveSyncInFlight = true;
     try {
       let state = await fetchState();
+      const hasLobbyList =
+        !!(state && state.lobby && Array.isArray(state.lobby.players));
       const inLobbyList =
         !!(
           currentPlayerName &&
-          state &&
-          state.lobby &&
-          Array.isArray(state.lobby.players) &&
+          hasLobbyList &&
           state.lobby.players.some((p) => samePlayerName(p && p.name, currentPlayerName))
         );
       const now = Date.now();
-      if ((inWaitingRoom || inGame) && currentPlayerName && !inLobbyList && now - lastAutoRejoinAt > 7000) {
+      if ((inWaitingRoom || inGame) && currentPlayerName && hasLobbyList && !inLobbyList && now - lastAutoRejoinAt > 7000) {
         lastAutoRejoinAt = now;
         // If your name is no longer in the room list, treat it as removed/kicked.
         // Do not auto-rejoin, otherwise a kicked player can silently re-enter.
@@ -2406,54 +2475,8 @@ async function init() {
   }
 
   if (createRoomBtn) {
-    createRoomBtn.addEventListener("click", async () => {
-      try {
-        currentPlayerName = ensureCurrentPlayerName("Host");
-        const numPlayers = parseInt(numPlayersSelect.value, 10);
-        const roomInput = "";
-        let created = await postCreateRoom({
-          room: roomInput,
-          ownerName: currentPlayerName,
-          numPlayers,
-          p1Type: "human",
-          p2Type: "human",
-          p3Type: "human",
-          p4Type: "human",
-        });
-        if (!created.success && created.requiresForceReset) {
-          const ok = window.confirm(
-            created.message || "An active match exists. Reset room and create a new lobby?"
-          );
-          if (!ok) {
-            return;
-          }
-          created = await postCreateRoom({
-            room: created.room || roomInput,
-            ownerName: currentPlayerName,
-            numPlayers,
-            p1Type: "human",
-            p2Type: "human",
-            p3Type: "human",
-            p4Type: "human",
-            forceReset: true,
-          });
-        }
-        if (!created.success) {
-          throw new Error(created.message || "Could not create room.");
-        }
-        rememberRoom(created.room || roomInput || "Room A");
-        syncRoomToBrowserUrl(currentRoom);
-        updateLobbyReadiness();
-        showWaitingRoom();
-        startLiveSync();
-        showToast(`Room created: ${currentRoom}`);
-        const state = await fetchState();
-        renderLobbyStatus(state);
-      } catch (e) {
-        const message = e && e.message ? e.message : "Could not create room.";
-        showToast(message, "error");
-        alert(message);
-      }
+    createRoomBtn.addEventListener("click", () => {
+      openCreateRoomDialog();
     });
   }
 
@@ -2503,6 +2526,12 @@ async function init() {
   if (joinDialogConfirm) {
     joinDialogConfirm.addEventListener("click", () => submitJoinFromDialog());
   }
+  if (createDialogCancel) {
+    createDialogCancel.addEventListener("click", () => closeCreateRoomDialog());
+  }
+  if (createDialogConfirm) {
+    createDialogConfirm.addEventListener("click", () => submitCreateRoomFromDialog());
+  }
   if (joinRoomDialog) {
     joinRoomDialog.addEventListener("click", (e) => {
       if (e.target === joinRoomDialog) {
@@ -2518,9 +2547,28 @@ async function init() {
       }
     });
   }
+  if (createRoomDialog) {
+    createRoomDialog.addEventListener("click", (e) => {
+      if (e.target === createRoomDialog) {
+        closeCreateRoomDialog();
+      }
+    });
+  }
+  if (createNumPlayersInput) {
+    createNumPlayersInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submitCreateRoomFromDialog();
+      }
+    });
+  }
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && joinRoomDialog && !joinRoomDialog.classList.contains("hidden")) {
       closeJoinRoomDialog();
+      return;
+    }
+    if (e.key === "Escape" && createRoomDialog && !createRoomDialog.classList.contains("hidden")) {
+      closeCreateRoomDialog();
     }
   });
 
@@ -2624,7 +2672,6 @@ async function init() {
     }
   });
 
-  numPlayersSelect.addEventListener("change", updateLobbyReadiness);
   if (playerNameInput) {
     const remembered = getRememberedPlayerName();
     if (remembered && !playerNameInput.value.trim()) {

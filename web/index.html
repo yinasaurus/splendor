@@ -31,16 +31,6 @@
         <label>Your name:
           <input id="player-name" type="text" value="" placeholder="Enter your name">
         </label>
-        <div id="create-room-fields">
-        <label>Number of players:
-          <select id="start-num-players">
-            <option value="2" selected>2 players</option>
-            <option value="3">3 players</option>
-            <option value="4">4 players</option>
-          </select>
-        </label>
-        <p class="hint small">Add AI bots and difficulty from the waiting room. Only the first N seats are used for the game.</p>
-        </div>
         <div class="start-actions">
           <div class="start-actions-row">
             <button id="create-room-btn" type="button">Create Room</button>
@@ -63,6 +53,24 @@
           <div class="modal-actions">
             <button id="join-dialog-cancel" type="button" class="secondary">Cancel</button>
             <button id="join-dialog-confirm" type="button">Join</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="create-room-dialog" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="create-dialog-title">
+        <div class="modal-panel">
+          <h3 id="create-dialog-title">Create a room</h3>
+          <p class="hint small">Choose player count. You can add AI bots and difficulty in the waiting room.</p>
+          <label class="modal-field">Number of players
+            <select id="create-num-players-input">
+              <option value="2" selected>2 players</option>
+              <option value="3">3 players</option>
+              <option value="4">4 players</option>
+            </select>
+          </label>
+          <div class="modal-actions">
+            <button id="create-dialog-cancel" type="button" class="secondary">Cancel</button>
+            <button id="create-dialog-confirm" type="button">Create Room</button>
           </div>
         </div>
       </div>
@@ -256,7 +264,7 @@
       <div id="rulebook-body" class="rulebook-body">
         <section class="rulebook-section" id="rb-goal">
           <h3>Goal</h3>
-          <p>Reach <strong>15 prestige</strong> (default) first — but when someone does, everyone else still gets <strong>one last turn</strong>. Highest score wins; ties go to whoever bought <em>fewer</em> development cards.</p>
+          <p>Reach <strong>15 prestige</strong> (default). If someone hits it, finish only the <strong>current round</strong> so remaining players who have not taken their turn yet get one final turn. Then game ends; ties go to whoever bought <em>fewer</em> development cards.</p>
         </section>
         <section class="rulebook-section" id="rb-turn">
           <h3>Your turn — pick exactly one</h3>

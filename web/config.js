@@ -69,14 +69,10 @@ window.__SPLENDOR_NOBLE_ART_FILENAME__ = function (noble) {
   if (!Number.isFinite(id) || id <= 0) {
     return null;
   }
-  if (id === 1) {
-    return "noble1.jpg";
+  if (id >= 1 && id <= 10) {
+    return `noble${id}.jpg`;
   }
-  if (id === 2) {
-    return "noble2.jpg";
-  }
-  // Reuse your shared fallback image for the remaining nobles.
-  return "rest of the nobles.jpg";
+  return "noble1.jpg";
 };
 // Optional explicit mapping (overrides filename function when present):
 // window.__SPLENDOR_NOBLE_ART_BY_ID__ = { 1: "media/noble1.jpg", 2: "media/noble2.jpg" };
