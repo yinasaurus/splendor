@@ -77,7 +77,7 @@ async function readErrorMessage(res, fallback) {
   return text.trim();
 }
 
-async function fetchState() {
+async function fetchState(allowRecover = true) {
   const roomParam = encodeURIComponent(currentRoom || "Room A");
   const nameParam = encodeURIComponent(currentPlayerName || "");
   const tokenParam = encodeURIComponent(currentSessionToken || "");
@@ -92,6 +92,24 @@ async function fetchState() {
     throw err;
   }
   if (data && data.sessionMissing) {
+    if (allowRecover && currentRoom && currentPlayerName) {
+      try {
+        const remembered = getRememberedSeatToken(currentRoom, currentPlayerName);
+        if (remembered) {
+          currentSessionToken = remembered;
+        }
+        const joined = await postJoinRoom({
+          room: currentRoom,
+          name: currentPlayerName,
+          sessionToken: currentSessionToken || "",
+        });
+        if (joined && joined.success) {
+          return await fetchState(false);
+        }
+      } catch (_) {
+        // fall through to error
+      }
+    }
     const err = new Error(data.message || "Session expired.");
     err.sessionMissing = true;
     err.serverPayload = data;
@@ -2087,7 +2105,9 @@ function setupGemSelection() {
         renderState(state);
       } catch (syncErr) {
         const text = syncErr && syncErr.message ? syncErr.message : "Action sent, syncing state...";
-        showToast(text, "error");
+        if (!/session expired/i.test(String(text))) {
+          showToast(text, "error");
+        }
       }
     } catch (e) {
       const text = e && e.message ? e.message : "Error sending action.";

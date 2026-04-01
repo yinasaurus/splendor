@@ -72,6 +72,7 @@ public class WebServer {
 		Map<String, Long> lastSeenByPlayer = new HashMap<>();
 		Set<String> forcedAiByName = new HashSet<>();
 		Map<String, String> forcedAiDifficultyByName = new HashMap<>();
+		Set<String> kickedNames = new HashSet<>();
 	}
 
 	private static void addActionLog(GameSession session, String text) {
@@ -416,6 +417,7 @@ public class WebServer {
 		session.lastSeenByPlayer.clear();
 		session.lastSeenByPlayer.put(session.ownerName, System.currentTimeMillis());
 		session.aiByName.clear();
+		session.kickedNames.clear();
 		session.forcedAiByName.clear();
 		session.forcedAiDifficultyByName.clear();
 		session.gameStarted = false;
@@ -965,6 +967,14 @@ public class WebServer {
 				return;
 			}
 			name = canonicalizeLobbyName(session, name);
+			String nameKey = String(name == null ? "" : name).trim().toLowerCase();
+			if (!nameKey.isEmpty() && session.kickedNames.contains(nameKey)) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("message", "You were removed by the host.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			if (!session.readyByPlayer.containsKey(name) && session.readyByPlayer.size() >= session.lobbyNumPlayers) {
 				// Room-code join should not be blocked by the original selected count.
 				// Expand capacity up to the game maximum (4 seats).
@@ -1313,6 +1323,7 @@ public class WebServer {
 			session.readyByPlayer.remove(target);
 			session.aiByName.remove(target);
 			session.seatTokenByPlayer.remove(target);
+			session.kickedNames.add(target.trim().toLowerCase());
 			addActionLog(session, target + " was removed from lobby.");
 			saveSnapshots();
 			resp.put("success", true);
