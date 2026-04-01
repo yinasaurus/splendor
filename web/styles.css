@@ -801,26 +801,26 @@ main {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   flex: 0 0 auto;
-  width: 118px;
-  padding: 8px;
-  background: linear-gradient(155deg, rgba(62, 72, 108, 0.96), rgba(48, 58, 90, 0.98));
-  border-radius: 12px;
-  border: 1px solid rgba(232, 163, 23, 0.24);
-  font-size: 0.7rem;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  width: 112px;
+  padding: 6px;
+  background: linear-gradient(165deg, rgba(40, 48, 76, 0.98), rgba(28, 36, 60, 0.98));
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 0.66rem;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .noble-card__portrait {
   width: 100%;
   min-width: 0;
-  height: 148px;
-  border-radius: 10px;
+  height: 138px;
+  border-radius: 8px;
   border: none;
   background-color: rgba(8, 10, 16, 0.85);
-  background-size: cover;
-  background-position: center 35%;
+  background-size: contain;
+  background-position: center center;
   background-repeat: no-repeat;
 }
 
@@ -843,7 +843,7 @@ main {
   font-weight: 600;
   color: #e8eaf0;
   line-height: 1.25;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
 }
 
 .noble-card__title {
@@ -855,7 +855,7 @@ main {
 
 .noble-card__pts {
   flex: 0 0 auto;
-  min-width: 30px;
+  min-width: 28px;
   text-align: center;
   font-weight: 800;
   color: #fff4d6;
@@ -863,7 +863,7 @@ main {
   border: 1px solid rgba(255, 233, 180, 0.45);
   border-radius: 999px;
   padding: 1px 6px;
-  font-size: 0.62rem;
+  font-size: 0.58rem;
 }
 
 .noble-card__reqs {
@@ -872,9 +872,9 @@ main {
 }
 
 .noble-card__reqs .pill {
-  padding: 3px 5px;
-  font-size: 0.58rem;
-  border-radius: 10px;
+  padding: 2px 4px;
+  font-size: 0.54rem;
+  border-radius: 8px;
 }
 
 .noble-card__reqs .gem-pill-content {
@@ -885,7 +885,7 @@ main {
 }
 
 .noble-card__reqs .gem-sprite--stone {
-  --gw: 0.82rem;
+  --gw: 0.72rem;
 }
 
 .nobles-list::-webkit-scrollbar {
@@ -1257,6 +1257,13 @@ main {
 
 .take-gem-option--readonly {
   opacity: 0.88;
+}
+
+/* Keep Onyx take-row surface consistent with the other take rows. */
+.take-gem-option.gem-ONYX {
+  background: rgba(16, 18, 26, 0.92);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #eef1f8;
 }
 
 .take-gem-option__controls {
@@ -1660,12 +1667,13 @@ main {
   bottom: 8px;
   z-index: 2;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-start;
-  gap: 5px;
-  max-height: calc(100% - 56px);
-  overflow: hidden;
-  flex-wrap: nowrap;
+  gap: 4px;
+  max-width: calc(100% - 52px);
+  max-height: none;
+  overflow: visible;
+  flex-wrap: wrap;
   padding-right: 2px;
   scrollbar-width: none;
 }

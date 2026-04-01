@@ -65,16 +65,16 @@ window.__SPLENDOR_DEV_CARD_ART_FILENAME__ = function (globalIdx) {
 // Example files: media/noble1.jpg, media/noble2.jpg, ...
 window.__SPLENDOR_NOBLE_ART_BASE__ = "media";
 window.__SPLENDOR_NOBLE_ART_BY_ID__ = {
-  1: "media/noble1.jpg?v=3",
-  2: "media/noble2.jpg?v=3",
-  3: "media/noble3.jpg?v=3",
-  4: "media/noble4.jpg?v=3",
-  5: "media/noble5.jpg?v=3",
-  6: "media/noble6.jpg?v=3",
-  7: "media/noble7.jpg?v=3",
-  8: "media/noble8.jpg?v=3",
-  9: "media/noble9.jpg?v=3",
-  10: "media/noble10.jpg?v=3",
+  1: "media/noble1.jpg?v=4",
+  2: "media/noble2.jpg?v=4",
+  3: "media/noble3.jpg?v=4",
+  4: "media/noble4.jpg?v=4",
+  5: "media/noble5.jpg?v=4",
+  6: "media/noble6.jpg?v=4",
+  7: "media/noble7.jpg?v=4",
+  8: "media/noble8.jpg?v=4",
+  9: "media/noble9.jpg?v=4",
+  10: "media/noble10.jpg?v=4",
 };
 // Optional explicit mapping (overrides filename function when present):
 // window.__SPLENDOR_NOBLE_ART_BY_ID__ = { 1: "media/noble1.jpg", 2: "media/noble2.jpg" };

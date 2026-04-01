@@ -263,49 +263,58 @@
       </nav>
       <div id="rulebook-body" class="rulebook-body">
         <section class="rulebook-section" id="rb-goal">
-          <h3>Goal</h3>
-          <p>Reach <strong>15 prestige</strong> (default). If someone hits it, finish only the <strong>current round</strong> so remaining players who have not taken their turn yet get one final turn. Then game ends; ties go to whoever bought <em>fewer</em> development cards.</p>
+          <h3>🏆 The Goal: 15 Prestige Points</h3>
+          <p>The game enters its <strong>Final Round</strong> as soon as any player reaches <strong>15 Prestige Points</strong>.</p>
+          <ul>
+            <li><strong>Fair Play:</strong> The round continues until everyone has had an equal number of turns.</li>
+            <li><strong>The Winner:</strong> The player with the highest score wins.</li>
+            <li><strong>Tie-Breaker:</strong> If scores are tied, the player who purchased fewer development cards wins.</li>
+          </ul>
         </section>
         <section class="rulebook-section" id="rb-turn">
-          <h3>Your turn — pick exactly one</h3>
+          <h3>🕹️ Your Turn (Choose ONE Action)</h3>
           <ol class="rulebook-steps">
             <li>
-              <strong>Take 3 gem tokens of different colors</strong>
+              <strong>Take 3 Different Gems</strong>
               <ul>
-                <li>Pick exactly one token from each of 3 different colors.</li>
-                <li>Max <strong>10 gems</strong> in hand after the action.</li>
+                <li>Pick 3 gems of different colors (excluding Gold).</li>
+                <li>Your inventory cannot exceed 10 gems (including Gold) at end of turn.</li>
+                <li>If you have more than 10 gems, you must return tokens until you have 10.</li>
               </ul>
             </li>
             <li>
-              <strong>Take 2 gem tokens of the same color</strong>
+              <strong>Take 2 Identical Gems</strong>
               <ul>
-                <li>This is only allowed if there are at least <strong>4 tokens</strong> of that color available before you take.</li>
-                <li>Max <strong>10 gems</strong> in hand after the action.</li>
+                <li>Pick 2 gems of the same color.</li>
+                <li>Requirement: only available if there are <strong>4 or more</strong> gems of that color left in the stack.</li>
               </ul>
             </li>
             <li>
-              <strong>Reserve 1 development card and take 1 gold token (joker)</strong>
+              <strong>Reserve a Card (+1 Gold)</strong>
               <ul>
-                <li>Reserve from the face-up board (max 3 reserved cards).</li>
-                <li>If gold is available, take 1 gold token. Gold can be used as a <strong>joker</strong> when paying for a card.</li>
+                <li>Choose a card from the market (or top of a deck) to your private Reserved hand (max 3).</li>
+                <li>You gain 1 Gold Token (acts as a Wild/Joker).</li>
+                <li>The market slot is immediately replenished from the deck.</li>
+                <li>If no gold is left, you can still reserve but you do not gain gold.</li>
               </ul>
             </li>
             <li>
-              <strong>Purchase 1 development card</strong>
+              <strong>Purchase a Card</strong>
               <ul>
-                <li>Buy one face-up development card from the table, or one of your previously reserved cards.</li>
-                <li>Pay with gems in hand plus permanent bonuses from cards you already bought. Gold can be used as a joker for missing colors.</li>
+                <li>Buy from the market or from your reserved hand.</li>
+                <li>The market slot is immediately replenished.</li>
               </ul>
             </li>
           </ol>
         </section>
         <section class="rulebook-section" id="rb-cards">
-          <h3>Cards &amp; bonuses</h3>
+          <h3>💎 The Power of Bonuses (Discounts)</h3>
           <ul>
-            <li><strong>Level 1</strong> — cheap, often 0 points, builds discounts.</li>
-            <li><strong>Level 2</strong> — medium cost, often 1–2 prestige.</li>
-            <li><strong>Level 3</strong> — expensive, big prestige.</li>
-            <li>Each card’s <strong>bonus color</strong> is a permanent discount on future buys of that gem color.</li>
+            <li>Every card you buy stays in your engine and provides a permanent bonus.</li>
+            <li><strong>Automatic Discount:</strong> each bonus icon counts as 1 gem of that color for future purchases.</li>
+            <li><strong>Free Buys:</strong> if your bonuses match/exceed a card cost, you can purchase without spending tokens.</li>
+            <li><strong>Stacking:</strong> bonuses and tokens combine.</li>
+            <li><strong>Example:</strong> cost is 3 Blue and you have 2 Blue bonuses, so you only need 1 Blue token.</li>
           </ul>
         </section>
         <section class="rulebook-section" id="rb-ui">
@@ -340,9 +349,13 @@
           </div>
         </section>
         <section class="rulebook-section" id="rb-nobles">
-          <h3>Nobles</h3>
-          <p>At the <strong>end</strong> of your turn, if your bonuses match a noble, they visit automatically and grant extra prestige. You never pay gems for them.</p>
-          <p class="rulebook-note">Noble names here are just labels (e.g. “Noble 1”). What matters is the gem requirements and prestige shown on the tile.</p>
+          <h3>👑 Noble Visitors</h3>
+          <p>Nobles are worth 3 points each and appear at the top of the screen.</p>
+          <ul>
+            <li><strong>Automatic Check:</strong> the game checks Noble visits at the end of every turn.</li>
+            <li><strong>Requirements:</strong> you must have the required number of permanent card bonuses (not tokens).</li>
+            <li><strong>Choosing a Noble:</strong> if you qualify for more than one, you choose which one to receive.</li>
+          </ul>
         </section>
         <section class="rulebook-section" id="rb-win">
           <h3>End of game</h3>

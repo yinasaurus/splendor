@@ -799,19 +799,19 @@ const guidedSteps = [
 
   "Status bar (top)\n\nHere you see whose turn it is and whether the game has ended. When it is your turn, the Actions section below is yours to use.",
 
-  "Board Gems\n\nThese chips are the supply. Take either (1) 3 different colors, or (2) 2 of the same color only if at least 4 of that color are available. Gold is not taken via normal gem-taking.",
+  "Board Gems\n\nChoose ONE: (1) take 3 different gems, or (2) take 2 identical gems if 4+ of that color remain. Inventory cannot exceed 10 gems (including gold); if above 10, discard down to 10.",
 
   "Take Gems\n\nOpen the Take Gems row, pick a legal combination, then press \"Confirm Take Gems\". Try it once so you have tokens to spend later.\n\nTip: you cannot hold more than 10 gems total.",
 
-  "Reserve a card\n\nUse a card's \"Reserve\" button (under each visible card).\n\n• Max 3 reserved cards.\n• Gain 1 gold token (joker) if available.\n• Buy it later with \"Buy reserved\" on your player panel.\n\nReserve helps you lock a card before others take it.",
+  "Reserve a card (+1 Gold)\n\nUse \"Reserve\" on a market card to move it to your reserved hand (max 3). If gold is available, gain 1 gold token (wild/joker). Market slots refill from the deck.",
 
   "Development cards — Level 1\n\nEach card shows its cost and a bonus gem color. After you buy a card, that color becomes a permanent discount on future purchases.",
 
-  "Purchase a card\n\nUse a card's \"Buy\" button (or click the card) when it is affordable. You can buy from face-up cards or your reserved cards. Pay with gems in hand plus permanent bonuses; gold can be used as a joker for missing colors.",
+  "Purchase a card\n\nBuy from market or reserved hand. Bonuses are permanent discounts and stack with tokens. Gold acts as a wild/joker for missing colors.",
 
   "Players panel\n\nWatch bonuses (permanent discounts), gems in hand, reserved cards, and prestige. Bonuses stack and make expensive cards easier over time.",
 
-  "Nobles\n\nNobles award free prestige if your bonuses match their requirements—they count bonuses, not loose gems. Plan your buys towards a noble when it fits your strategy.",
+  "Nobles\n\nNobles are checked automatically at end of turn. Requirements use permanent bonuses (not loose gems). Nobles grant free prestige points.",
 
   "Winning the game\n\nWhen someone reaches 15 prestige (default), the round finishes so everyone gets the same number of turns, then the highest score wins. Ties go to the player who bought fewer development cards.",
 
@@ -1974,12 +1974,16 @@ async function postPurchaseReserved(index) {
     msg.className = "message " + (result.success ? "ok" : "error");
     if (result.success) {
       showToast("Reserved card purchased.");
+    } else {
+      showToast(result.message || "Could not buy reserved card.", "error");
     }
     const state = await fetchState();
     renderState(state);
   } catch (e) {
-    msg.textContent = "Error purchasing reserved card.";
+    const text = e && e.message ? e.message : "Error purchasing reserved card.";
+    msg.textContent = text;
     msg.className = "message error";
+    showToast(text, "error");
   }
 }
 
