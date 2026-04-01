@@ -2314,6 +2314,13 @@ async function init() {
     liveSyncInFlight = true;
     try {
       let state = await fetchState();
+      if (currentPlayerName) {
+        const canonical = resolveCanonicalLobbyName(state, currentPlayerName);
+        if (canonical && canonical !== currentPlayerName) {
+          currentPlayerName = canonical;
+          rememberPlayerName(currentPlayerName);
+        }
+      }
       const hasLobbyList =
         !!(state && state.lobby && Array.isArray(state.lobby.players));
       const inLobbyList =
@@ -2323,7 +2330,7 @@ async function init() {
           state.lobby.players.some((p) => samePlayerName(p && p.name, currentPlayerName))
         );
       const now = Date.now();
-      if (!tutorialFlags.active && (inWaitingRoom || inGame) && currentPlayerName && hasLobbyList && !inLobbyList && now - lastAutoRejoinAt > 7000) {
+      if (!tutorialFlags.active && inWaitingRoom && currentPlayerName && hasLobbyList && !inLobbyList && now - lastAutoRejoinAt > 7000) {
         lastAutoRejoinAt = now;
         // If your name is no longer in the room list, treat it as removed/kicked.
         // Do not auto-rejoin, otherwise a kicked player can silently re-enter.

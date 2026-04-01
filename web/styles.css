@@ -784,6 +784,10 @@ main {
   grid-column: 1 / -1;
 }
 
+.board > .actions {
+  grid-column: 1 / -1;
+}
+
 .nobles-list {
   display: flex;
   flex-direction: row;
@@ -797,26 +801,26 @@ main {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   flex: 0 0 auto;
-  width: 210px;
-  padding: 10px;
+  width: 118px;
+  padding: 8px;
   background: linear-gradient(155deg, rgba(62, 72, 108, 0.96), rgba(48, 58, 90, 0.98));
-  border-radius: 18px;
+  border-radius: 12px;
   border: 1px solid rgba(232, 163, 23, 0.24);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .noble-card__portrait {
   width: 100%;
   min-width: 0;
-  height: 120px;
-  border-radius: 12px;
+  height: 148px;
+  border-radius: 10px;
   border: none;
   background-color: rgba(8, 10, 16, 0.85);
   background-size: cover;
-  background-position: center;
+  background-position: center 35%;
   background-repeat: no-repeat;
 }
 
@@ -835,11 +839,11 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   font-weight: 600;
   color: #e8eaf0;
   line-height: 1.25;
-  font-size: 0.72rem;
+  font-size: 0.65rem;
 }
 
 .noble-card__title {
@@ -851,15 +855,15 @@ main {
 
 .noble-card__pts {
   flex: 0 0 auto;
-  min-width: 34px;
+  min-width: 30px;
   text-align: center;
   font-weight: 800;
   color: #fff4d6;
   background: linear-gradient(180deg, #ffcf4d 0%, var(--accent) 45%, #b3740a 100%);
   border: 1px solid rgba(255, 233, 180, 0.45);
   border-radius: 999px;
-  padding: 2px 6px;
-  font-size: 0.68rem;
+  padding: 1px 6px;
+  font-size: 0.62rem;
 }
 
 .noble-card__reqs {
@@ -868,8 +872,8 @@ main {
 }
 
 .noble-card__reqs .pill {
-  padding: 4px 7px;
-  font-size: 0.62rem;
+  padding: 3px 5px;
+  font-size: 0.58rem;
   border-radius: 10px;
 }
 
@@ -881,7 +885,7 @@ main {
 }
 
 .noble-card__reqs .gem-sprite--stone {
-  --gw: 0.98rem;
+  --gw: 0.82rem;
 }
 
 .nobles-list::-webkit-scrollbar {
@@ -1372,8 +1376,8 @@ main {
 }
 
 /* Give black/onyx gems a lighter pill so the icon is visible. */
-.pill:has(.gem-sprite--ONYX),
-.pill:has(.gem-dot--ONYX) {
+.pill:not(.take-gem-option):has(.gem-sprite--ONYX),
+.pill:not(.take-gem-option):has(.gem-dot--ONYX) {
   background: rgba(68, 76, 94, 0.96);
   border-color: rgba(255, 255, 255, 0.32);
 }
