@@ -176,6 +176,18 @@ let latestState = null;
 let lastSeenTurnNumber = null;
 let lastSeenActionCount = 0;
 let lastChatRenderDigest = "";
+/** Latest chat message timestamp (ms) treated as "read" while panel is open or after you send. */
+let chatLastSeenLatestT = 0;
+let gameChatCollapsed = false;
+/** Max chat line `t` we already showed a “new message” toast for (collapsed panel). */
+let lastChatToastNotifyT = 0;
+const GAME_CHAT_UI_LINE_CAP = 50;
+
+try {
+  gameChatCollapsed = window.localStorage.getItem("splendor.gameChatCollapsed") === "1";
+} catch (_) {
+  gameChatCollapsed = false;
+}
 /** Dedupes "someone hit 15 prestige" toasts (by opponent names). */
 let prestigeOthersAlertSig = "";
 let suppressRealtimeToasts = true;
@@ -586,6 +598,8 @@ function rememberRoom(room) {
   if (safeRoom !== currentRoom) {
     lastChatRenderDigest = "";
     prestigeOthersAlertSig = "";
+    chatLastSeenLatestT = 0;
+    lastChatToastNotifyT = 0;
   }
   currentRoom = safeRoom;
   currentSessionToken = getRememberedSeatToken(currentRoom, currentPlayerName);
@@ -923,40 +937,143 @@ async function postGameChat(message) {
   return res.json();
 }
 
+function chatLatestTimestamp(lines) {
+  if (!Array.isArray(lines) || lines.length === 0) {
+    return 0;
+  }
+  let max = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const t = Number(lines[i] && lines[i].t);
+    if (Number.isFinite(t) && t > max) {
+      max = t;
+    }
+  }
+  return max;
+}
+
+function refreshChatUnreadBadge(lines) {
+  const badge = document.getElementById("game-chat-unread-badge");
+  const panel = document.querySelector(".game-chat-panel");
+  if (!badge || !panel) {
+    return;
+  }
+  const list = Array.isArray(lines) ? lines : [];
+  const latestT = chatLatestTimestamp(list);
+  if (!gameChatCollapsed || latestT <= chatLastSeenLatestT) {
+    badge.classList.add("hidden");
+    badge.textContent = "";
+    panel.classList.remove("game-chat-panel--unread");
+    return;
+  }
+  const unread = list.filter(
+    (l) =>
+      (Number(l && l.t) || 0) > chatLastSeenLatestT && !samePlayerName(l && l.from, currentPlayerName)
+  );
+  if (unread.length === 0) {
+    badge.classList.add("hidden");
+    badge.textContent = "";
+    panel.classList.remove("game-chat-panel--unread");
+    return;
+  }
+  badge.classList.remove("hidden");
+  badge.textContent = unread.length > 9 ? "9+" : String(unread.length);
+  panel.classList.add("game-chat-panel--unread");
+  const newestT = Math.max(
+    ...unread.map((l) => (Number.isFinite(Number(l && l.t)) ? Number(l.t) : 0))
+  );
+  if (newestT > lastChatToastNotifyT) {
+    lastChatToastNotifyT = newestT;
+    const lastLine = unread.reduce((a, b) =>
+      (Number(a && a.t) || 0) >= (Number(b && b.t) || 0) ? a : b
+    );
+    const from = String((lastLine && lastLine.from) || "?");
+    const preview = String((lastLine && lastLine.text) || "").slice(0, 44);
+    showToast(
+      `New chat · ${from}${preview ? `: ${preview}` : ""}${preview.length >= 44 ? "…" : ""}`,
+      "ok"
+    );
+  }
+}
+
+function syncGameChatPanelUi() {
+  const panel = document.querySelector(".game-chat-panel");
+  const body = document.getElementById("game-chat-body");
+  const toggle = document.getElementById("game-chat-toggle");
+  if (!panel || !body || !toggle) {
+    return;
+  }
+  panel.classList.toggle("game-chat-panel--collapsed", gameChatCollapsed);
+  body.classList.toggle("hidden", gameChatCollapsed);
+  toggle.setAttribute("aria-expanded", gameChatCollapsed ? "false" : "true");
+  toggle.textContent = gameChatCollapsed ? "Show" : "Hide";
+}
+
+function syncGameChatCharCount() {
+  const input = document.getElementById("game-chat-input");
+  const label = document.getElementById("game-chat-char-count");
+  if (!input || !label) {
+    return;
+  }
+  const n = String(input.value || "").length;
+  label.textContent = `${n} / 400`;
+  label.classList.toggle("game-chat-char-count--warn", n > 360);
+}
+
+function markGameChatRead(lines) {
+  const list = Array.isArray(lines) ? lines : [];
+  chatLastSeenLatestT = chatLatestTimestamp(list);
+  refreshChatUnreadBadge(list);
+}
+
 function updateGameChat(state) {
   const box = document.getElementById("game-chat-messages");
   if (!box) {
     return;
   }
-  const lines = state && Array.isArray(state.chat) ? state.chat : [];
-  const digest = `${lines.length}^${lines.map((l) => `${l.t}|${l.from}|${l.text}`).join("^")}`;
+  const full = state && Array.isArray(state.chat) ? state.chat : [];
+  const digest = `${full.length}^${full.map((l) => `${l.t}|${l.from}|${l.text}`).join("^")}`;
   if (digest === lastChatRenderDigest) {
+    refreshChatUnreadBadge(full);
     return;
   }
   lastChatRenderDigest = digest;
+  const lines = full.slice(-GAME_CHAT_UI_LINE_CAP);
+  syncGameChatPanelUi();
   box.innerHTML = "";
-  if (lines.length === 0) {
+  if (full.length === 0) {
     const empty = document.createElement("p");
     empty.className = "game-chat-empty hint small";
     empty.style.margin = "0";
     empty.textContent = "No messages yet.";
     box.appendChild(empty);
-    return;
+  } else {
+    if (full.length > GAME_CHAT_UI_LINE_CAP) {
+      const capNote = document.createElement("p");
+      capNote.className = "game-chat-cap-note hint small";
+      capNote.style.margin = "0 0 0.35rem";
+      capNote.textContent = `Showing last ${GAME_CHAT_UI_LINE_CAP} messages (${full.length} on server).`;
+      box.appendChild(capNote);
+    }
+    lines.forEach((line) => {
+      const row = document.createElement("div");
+      row.className = "game-chat-line";
+      const who = document.createElement("span");
+      who.className = "game-chat-from";
+      who.textContent = `${String(line.from || "?")}: `;
+      const txt = document.createElement("span");
+      txt.className = "game-chat-text";
+      txt.textContent = String(line.text || "");
+      row.appendChild(who);
+      row.appendChild(txt);
+      box.appendChild(row);
+    });
+    box.scrollTop = box.scrollHeight;
   }
-  lines.forEach((line) => {
-    const row = document.createElement("div");
-    row.className = "game-chat-line";
-    const who = document.createElement("span");
-    who.className = "game-chat-from";
-    who.textContent = `${String(line.from || "?")}: `;
-    const txt = document.createElement("span");
-    txt.className = "game-chat-text";
-    txt.textContent = String(line.text || "");
-    row.appendChild(who);
-    row.appendChild(txt);
-    box.appendChild(row);
-  });
-  box.scrollTop = box.scrollHeight;
+  if (!gameChatCollapsed) {
+    markGameChatRead(full);
+  } else {
+    refreshChatUnreadBadge(full);
+  }
 }
 
 async function postNewGame(payload) {
@@ -1703,8 +1820,7 @@ function renderState(state) {
         bonusesRow.appendChild(pill);
       });
       const extra = document.createElement("div");
-      extra.style.fontSize = "0.78rem";
-      extra.style.marginTop = "3px";
+      extra.className = "player-card__footer";
       const boughtCount = Number.isFinite(Number(p.purchasedCards))
         ? Number(p.purchasedCards)
         : Array.isArray(p.boughtCards)
@@ -3283,7 +3399,7 @@ async function init() {
     if (liveSyncTimer != null) {
       return;
     }
-    liveSyncTimer = window.setInterval(runLiveSyncTick, 1500);
+    liveSyncTimer = window.setInterval(runLiveSyncTick, 550);
   }
 
   function stopLiveSync() {
@@ -3480,6 +3596,28 @@ async function init() {
 
   const gameChatInput = document.getElementById("game-chat-input");
   const gameChatSend = document.getElementById("game-chat-send");
+  const gameChatToggle = document.getElementById("game-chat-toggle");
+  syncGameChatPanelUi();
+  syncGameChatCharCount();
+  if (gameChatToggle) {
+    gameChatToggle.addEventListener("click", () => {
+      gameChatCollapsed = !gameChatCollapsed;
+      try {
+        window.localStorage.setItem("splendor.gameChatCollapsed", gameChatCollapsed ? "1" : "0");
+      } catch (_) {
+        /* ignore */
+      }
+      syncGameChatPanelUi();
+      if (!gameChatCollapsed && latestState) {
+        const list = Array.isArray(latestState.chat) ? latestState.chat : [];
+        markGameChatRead(list);
+        lastChatRenderDigest = "";
+        updateGameChat(latestState);
+      } else if (latestState) {
+        refreshChatUnreadBadge(Array.isArray(latestState.chat) ? latestState.chat : []);
+      }
+    });
+  }
   let gameChatSending = false;
   async function trySendGameChat() {
     if (!gameChatInput || gameChatSending) {
@@ -3500,6 +3638,7 @@ async function init() {
         return;
       }
       gameChatInput.value = "";
+      syncGameChatCharCount();
       const st = await fetchState();
       renderState(st);
     } catch (_) {
@@ -3517,6 +3656,7 @@ async function init() {
     });
   }
   if (gameChatInput) {
+    gameChatInput.addEventListener("input", () => syncGameChatCharCount());
     gameChatInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();

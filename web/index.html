@@ -255,11 +255,27 @@
           </section>
 
           <section class="panel game-chat-panel" aria-label="Table chat">
-            <h2>Table chat</h2>
-            <div id="game-chat-messages" class="game-chat-messages" role="log" aria-live="polite"></div>
-            <div class="game-chat-compose">
-              <input id="game-chat-input" type="text" maxlength="400" placeholder="Say something..." autocomplete="off" />
-              <button id="game-chat-send" type="button" class="secondary small-btn">Send</button>
+            <div class="section-title-row game-chat-head">
+              <h2>Table chat</h2>
+              <div class="game-chat-head-actions">
+                <span id="game-chat-unread-badge" class="game-chat-unread-badge hidden" aria-live="polite" title="Unread messages"></span>
+                <button id="game-chat-toggle" type="button" class="secondary small-btn" aria-expanded="true">
+                  Hide
+                </button>
+              </div>
+            </div>
+            <div id="game-chat-body" class="game-chat-body">
+              <p class="hint small game-chat-limit-hint">
+                Up to <strong>400</strong> characters per message. The server stores the <strong>last 80</strong>; this view shows the <strong>last 50</strong>.
+              </p>
+              <div id="game-chat-messages" class="game-chat-messages" role="log" aria-live="polite"></div>
+              <div class="game-chat-compose">
+                <div class="game-chat-compose-field">
+                  <input id="game-chat-input" type="text" maxlength="400" placeholder="Say something..." autocomplete="off" />
+                  <span id="game-chat-char-count" class="game-chat-char-count">0 / 400</span>
+                </div>
+                <button id="game-chat-send" type="button" class="secondary small-btn">Send</button>
+              </div>
             </div>
           </section>
 
