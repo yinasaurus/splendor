@@ -150,6 +150,7 @@ let suppressRemovedToastUntil = 0;
 let lastGemUiTurnNumber = null;
 let reconnectInFlight = false;
 let consecutiveLobbyMissingTicks = 0;
+let actionRequestInFlight = false;
 const expandedBoughtByPlayer = new Set();
 
 const KNOWN_GEMS = new Set(["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"]);
@@ -751,31 +752,39 @@ async function copyRoomCodeToClipboard() {
 }
 
 async function postAction(payload) {
-  const withRoom = { ...payload, room: currentRoom, name: currentPlayerName, sessionToken: currentSessionToken };
-  const res = await fetch(API_ACTION, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(withRoom),
-  });
-  if (!res.ok) {
-    throw new Error("Action failed");
+  if (actionRequestInFlight) {
+    return { success: false, message: "Action in progress. Please wait a moment." };
   }
-  const result = await res.json();
-
-  // Very simple tutorial tracking: record when the player has
-  // successfully taken gems or bought any card.
-  if (tutorialFlags.active && result && result.success) {
-    if (payload.type === "takeGems") {
-      tutorialFlags.tookGemsOnce = true;
-    } else if (
-      payload.type === "purchaseVisible" ||
-      payload.type === "purchaseReserved"
-    ) {
-      tutorialFlags.boughtLevel1Once = true;
+  actionRequestInFlight = true;
+  try {
+    const withRoom = { ...payload, room: currentRoom, name: currentPlayerName, sessionToken: currentSessionToken };
+    const res = await fetch(API_ACTION, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(withRoom),
+    });
+    if (!res.ok) {
+      throw new Error("Action failed");
     }
-  }
+    const result = await res.json();
 
-  return result;
+    // Very simple tutorial tracking: record when the player has
+    // successfully taken gems or bought any card.
+    if (tutorialFlags.active && result && result.success) {
+      if (payload.type === "takeGems") {
+        tutorialFlags.tookGemsOnce = true;
+      } else if (
+        payload.type === "purchaseVisible" ||
+        payload.type === "purchaseReserved"
+      ) {
+        tutorialFlags.boughtLevel1Once = true;
+      }
+    }
+
+    return result;
+  } finally {
+    actionRequestInFlight = false;
+  }
 }
 
 async function postNewGame(payload) {
@@ -1133,7 +1142,7 @@ function renderState(state) {
     deckBtn.className = "level-deck-btn";
     deckBtn.innerHTML = `<span class="level-deck-btn__stack" aria-hidden="true"></span><span class="level-deck-btn__meta">L${lvl} · ${deckLeft} left</span>`;
     deckBtn.title = `Reserve top Level ${lvl} card`;
-    deckBtn.disabled = !isMyTurn || currentReservedCount >= 3 || deckLeft <= 0;
+    deckBtn.disabled = actionRequestInFlight || !isMyTurn || currentReservedCount >= 3 || deckLeft <= 0;
     deckBtn.onclick = async (e) => {
       e.stopPropagation();
       if (deckBtn.disabled) {
@@ -1222,7 +1231,7 @@ function renderState(state) {
       buyBtn.type = "button";
       buyBtn.className = "card-buy-btn";
       buyBtn.textContent = "Buy";
-      buyBtn.disabled = !isMyTurn || !card.affordable;
+      buyBtn.disabled = actionRequestInFlight || !isMyTurn || !card.affordable;
       const canBuy = isMyTurn && !!card.affordable;
       if (isMyTurn && card.affordable) {
         buyBtn.classList.add("card-buy-btn--affordable");
@@ -1231,7 +1240,7 @@ function renderState(state) {
       reserveBtn.type = "button";
       reserveBtn.className = "secondary";
       reserveBtn.textContent = "Reserve";
-      reserveBtn.disabled = !isMyTurn || currentReservedCount >= 3;
+      reserveBtn.disabled = actionRequestInFlight || !isMyTurn || currentReservedCount >= 3;
       const canReserve = isMyTurn && currentReservedCount < 3;
 
       buyBtn.addEventListener("click", async (e) => {
@@ -1564,7 +1573,7 @@ function renderState(state) {
           buyR.textContent = "Buy reserved";
           const isYou = samePlayerName(p.name, currentPlayerName);
           const canBuyReserved = isMyTurn && isYou && p.human && !!rc.affordable;
-          buyR.disabled = !canBuyReserved;
+          buyR.disabled = actionRequestInFlight || !canBuyReserved;
           buyR.title = canBuyReserved
             ? "Buy this reserved card"
             : isYou
@@ -2637,9 +2646,12 @@ async function init() {
           showToast("Reconnected to room.");
           return;
         }
-        showToast("Connection issue: could not rejoin automatically. Use Join Room with your code.", "error");
-        // Keep identity/token so manual rejoin can recover the same match.
-        showWaitingRoom();
+        showToast("You were removed from this room.", "error");
+        clearAutoRejoinIntent();
+        clearRememberedSeatToken(currentRoom, currentPlayerName);
+        currentSessionToken = "";
+        stopLiveSync();
+        showHome(false);
         return;
       }
       if (inWaitingRoom) {
