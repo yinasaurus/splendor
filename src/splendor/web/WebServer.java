@@ -6,6 +6,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -135,11 +136,18 @@ public class WebServer {
 	}
 
 	private static boolean canStartLobby(GameSession session) {
+		// Everyone currently in the lobby (humans + AI) must be ready,
+		// but we no longer require that the room be exactly full. This
+		// allows the host to start with fewer players than originally
+		// selected as long as there are at least two seats filled.
 		if (session.readyByPlayer.isEmpty()) {
 			return false;
 		}
 		int joined = session.readyByPlayer.size();
-		if (joined != session.lobbyNumPlayers) {
+		if (joined < 2) {
+			return false;
+		}
+		if (joined > session.lobbyNumPlayers) {
 			return false;
 		}
 		for (Boolean ready : session.readyByPlayer.values()) {
@@ -171,6 +179,8 @@ public class WebServer {
 		server.createContext("/", new StaticFileHandler("web/index.html", "text/html; charset=utf-8"));
 		server.createContext("/styles.css", new StaticFileHandler("web/styles.css", "text/css; charset=utf-8"));
 		server.createContext("/app.js", new StaticFileHandler("web/app.js", "application/javascript; charset=utf-8"));
+		server.createContext("/config.js", new StaticFileHandler("web/config.js", "application/javascript; charset=utf-8"));
+		server.createContext("/media/", new MediaDirectoryHandler());
 
 		// API endpoints
 		server.createContext("/api/state", new StateHandler());
@@ -195,6 +205,10 @@ public class WebServer {
 	 * @param numPlayers number of players (2-4)
 	 */
 	private static void startNewGame(GameSession session, int numPlayers, String[] types) {
+		startNewGame(session, numPlayers, types, null);
+	}
+
+	private static void startNewGame(GameSession session, int numPlayers, String[] types, List<String> customNames) {
 		if (numPlayers < 2) {
 			numPlayers = 2;
 		} else if (numPlayers > 4) {
@@ -208,7 +222,10 @@ public class WebServer {
 		List<String> playerNames = new java.util.ArrayList<>();
 		List<Boolean> playerTypes = new java.util.ArrayList<>();
 		for (int i = 0; i < numPlayers; i++) {
-			playerNames.add("Player " + (i + 1));
+			String fallback = "Player " + (i + 1);
+			String custom = (customNames != null && i < customNames.size()) ? customNames.get(i) : null;
+			String resolved = (custom == null || custom.trim().isEmpty()) ? fallback : custom.trim();
+			playerNames.add(resolved);
 			String t = types[i] == null ? "human" : types[i].toLowerCase();
 			boolean isHuman = !(t.equals("easy") || t.equals("medium") || t.equals("hard"));
 			playerTypes.add(isHuman);
@@ -251,7 +268,7 @@ public class WebServer {
 				return;
 			}
 
-			java.nio.file.Path path = Paths.get(filePath);
+			Path path = Paths.get(filePath);
 			if (!Files.exists(path)) {
 				sendResponse(exchange, 404, "Not Found", "text/plain; charset=utf-8");
 				return;
@@ -264,6 +281,74 @@ public class WebServer {
 			try (OutputStream os = exchange.getResponseBody()) {
 				os.write(bytes);
 			}
+		}
+	}
+
+	/**
+	 * Serves files under {@code web/media/} at {@code /media/...} (chips/gems sprites, card art, etc.).
+	 */
+	private static class MediaDirectoryHandler implements HttpHandler {
+		private static final Path MEDIA_ROOT = Paths.get("web", "media").toAbsolutePath().normalize();
+
+		@Override
+		public void handle(HttpExchange exchange) throws IOException {
+			if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+				return;
+			}
+			String rawPath = exchange.getRequestURI().getPath();
+			if (rawPath == null || !rawPath.startsWith("/media/")) {
+				sendResponse(exchange, 404, "Not Found", "text/plain; charset=utf-8");
+				return;
+			}
+			String relative = rawPath.substring("/media/".length()).replace('\\', '/');
+			if (relative.isEmpty() || relative.startsWith("/")) {
+				sendResponse(exchange, 403, "Forbidden", "text/plain; charset=utf-8");
+				return;
+			}
+			Path file = MEDIA_ROOT;
+			for (String segment : relative.split("/")) {
+				if (segment.isEmpty() || ".".equals(segment)) {
+					continue;
+				}
+				if ("..".equals(segment)) {
+					sendResponse(exchange, 403, "Forbidden", "text/plain; charset=utf-8");
+					return;
+				}
+				file = file.resolve(segment);
+			}
+			file = file.normalize();
+			if (!file.startsWith(MEDIA_ROOT) || !Files.isRegularFile(file)) {
+				sendResponse(exchange, 404, "Not Found", "text/plain; charset=utf-8");
+				return;
+			}
+			byte[] bytes = Files.readAllBytes(file);
+			Headers headers = exchange.getResponseHeaders();
+			headers.set("Content-Type", contentTypeForMediaFile(relative));
+			exchange.sendResponseHeaders(200, bytes.length);
+			try (OutputStream os = exchange.getResponseBody()) {
+				os.write(bytes);
+			}
+		}
+
+		private static String contentTypeForMediaFile(String name) {
+			String lower = name.toLowerCase();
+			if (lower.endsWith(".png")) {
+				return "image/png";
+			}
+			if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+				return "image/jpeg";
+			}
+			if (lower.endsWith(".gif")) {
+				return "image/gif";
+			}
+			if (lower.endsWith(".webp")) {
+				return "image/webp";
+			}
+			if (lower.endsWith(".svg")) {
+				return "image/svg+xml";
+			}
+			return "application/octet-stream";
 		}
 	}
 
@@ -515,16 +600,28 @@ public class WebServer {
 				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 				return;
 			}
-			String[] types = new String[] { "human", "human", "human", "human" };
-			int idx = 1;
-			for (String diff : session.aiByName.values()) {
-				if (idx >= session.lobbyNumPlayers) {
-					break;
-				}
-				types[idx] = diff;
-				idx++;
+			List<String> lobbyOrder = new ArrayList<>(session.readyByPlayer.keySet());
+			if (lobbyOrder.size() > session.lobbyNumPlayers) {
+				lobbyOrder = new ArrayList<>(lobbyOrder.subList(0, session.lobbyNumPlayers));
 			}
-			startNewGame(session, session.lobbyNumPlayers, types);
+			if (lobbyOrder.size() < 2) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("message", "Need at least two players to start.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+
+			int actualPlayers = Math.min(session.lobbyNumPlayers, lobbyOrder.size());
+			String[] types = new String[] { "human", "human", "human", "human" };
+			for (int i = 0; i < actualPlayers; i++) {
+				String name = lobbyOrder.get(i);
+				String aiDifficulty = session.aiByName.get(name);
+				types[i] = (aiDifficulty == null || aiDifficulty.trim().isEmpty()) ? "human" : aiDifficulty.trim().toLowerCase();
+			}
+
+			startNewGame(session, actualPlayers, types, lobbyOrder);
+			session.lobbyNumPlayers = actualPlayers;
 			session.gameStarted = true;
 			addActionLog(session, "Match started by " + session.ownerName + ".");
 			Map<String, Object> resp = new HashMap<>();
@@ -690,6 +787,7 @@ public class WebServer {
 		if (lower.contains("\"type\"") && lower.contains("takegems")) {
 			// Extract gems array e.g. "gems":["R","E","S"]
 			Map<GemType, Integer> gemsToTake = new HashMap<>();
+			Map<GemType, Integer> gemsToDiscard = new HashMap<>();
 			int idx = lower.indexOf("\"gems\"");
 			if (idx >= 0) {
 				int start = body.indexOf("[", idx);
@@ -708,11 +806,51 @@ public class WebServer {
 					}
 				}
 			}
+			int discardIdx = lower.indexOf("\"discard\"");
+			if (discardIdx >= 0) {
+				int dStart = body.indexOf("[", discardIdx);
+				int dEnd = body.indexOf("]", dStart);
+				if (dStart >= 0 && dEnd > dStart) {
+					String inner = body.substring(dStart + 1, dEnd);
+					String[] parts = inner.split(",");
+					for (String part : parts) {
+						String trimmed = part.replace("\"", "").trim().toUpperCase();
+						if (!trimmed.isEmpty()) {
+							GemType type = GemType.fromAbbreviation(trimmed);
+							if (type != null) {
+								gemsToDiscard.put(type, gemsToDiscard.getOrDefault(type, 0) + 1);
+							}
+						}
+					}
+				}
+			}
 			if (!gemsToTake.isEmpty()) {
+				Map<GemType, Integer> validationPlayerGems = session.controller.getCurrentPlayer().getGems();
+				int declaredDiscard = gemsToDiscard.values().stream().mapToInt(Integer::intValue).sum();
+				if (declaredDiscard > 0) {
+					int target = Math.max(0,
+						session.controller.getCurrentPlayer().getTotalGemCount() - declaredDiscard);
+					int running = validationPlayerGems.values().stream().mapToInt(Integer::intValue).sum();
+					if (running > target) {
+						for (GemType t : GemType.values()) {
+							if (running <= target) {
+								break;
+							}
+							int have = validationPlayerGems.getOrDefault(t, 0);
+							if (have <= 0) {
+								continue;
+							}
+							int cut = Math.min(have, running - target);
+							validationPlayerGems.put(t, have - cut);
+							running -= cut;
+						}
+					}
+				}
+
 				GameRules.ValidationResult vr = session.controller.getRules().validateTakeGems(
 					gemsToTake,
 					session.controller.getBoard().getAvailableGems(),
-					session.controller.getCurrentPlayer().getGems()
+					validationPlayerGems
 				);
 				if (!vr.isValid()) {
 					success = false;
@@ -721,6 +859,38 @@ public class WebServer {
 					success = session.controller.takeGems(gemsToTake);
 					message = success ? "Gems taken." : "Could not take gems.";
 					if (success) {
+						Player p = session.controller.getCurrentPlayer();
+						int maxGems = session.controller.getConfig().getMaxGemsPerPlayer();
+						int totalAfterTake = p.getTotalGemCount();
+						if (totalAfterTake > maxGems) {
+							int needDiscard = totalAfterTake - maxGems;
+							int declaredDiscard = gemsToDiscard.values().stream().mapToInt(Integer::intValue).sum();
+							if (declaredDiscard != needDiscard) {
+								success = false;
+								message = "Must discard exactly " + needDiscard + " gem(s).";
+							} else {
+								Map<GemType, Integer> currentGems = p.getGems();
+								boolean canDiscard = true;
+								for (Map.Entry<GemType, Integer> e : gemsToDiscard.entrySet()) {
+									if (e.getValue() <= 0) {
+										continue;
+									}
+									if (currentGems.getOrDefault(e.getKey(), 0) < e.getValue()) {
+										canDiscard = false;
+										break;
+									}
+								}
+								if (!canDiscard) {
+									success = false;
+									message = "Invalid discard selection.";
+								} else {
+									p.removeGems(gemsToDiscard);
+									session.controller.getBoard().addGems(gemsToDiscard);
+								}
+							}
+						}
+					}
+					if (success) {
 						StringBuilder taken = new StringBuilder();
 						for (Map.Entry<GemType, Integer> e : gemsToTake.entrySet()) {
 							if (taken.length() > 0) {
@@ -728,7 +898,18 @@ public class WebServer {
 							}
 							taken.append(e.getKey().getAbbreviation()).append("x").append(e.getValue());
 						}
-						actionSummary = actor + " took gems: " + taken + ".";
+						StringBuilder discarded = new StringBuilder();
+						for (Map.Entry<GemType, Integer> e : gemsToDiscard.entrySet()) {
+							if (e.getValue() <= 0) {
+								continue;
+							}
+							if (discarded.length() > 0) {
+								discarded.append(", ");
+							}
+							discarded.append(e.getKey().getAbbreviation()).append("x").append(e.getValue());
+						}
+						actionSummary = actor + " took gems: " + taken
+							+ (discarded.length() > 0 ? " (discarded " + discarded + ")." : ".");
 					}
 				}
 			} else {
@@ -746,10 +927,12 @@ public class WebServer {
 				success = false;
 				message = "Invalid card index for this level.";
 			} else {
+				Card card = visible.get(index);
 				success = session.controller.reserveCard(level, index);
 				message = success ? "Card reserved." : "Cannot reserve this card.";
 				if (success) {
-					actionSummary = actor + " reserved a card (L" + level + " #" + index + ").";
+					actionSummary = actor + " reserved card ID " + card.getCardId()
+						+ " (L" + card.getLevel() + ", +" + card.getBonusGem().getAbbreviation() + ").";
 				}
 			}
 		} else if (lower.contains("\"type\"") && lower.contains("purchasevisible")) {
@@ -770,7 +953,8 @@ public class WebServer {
 					success = session.controller.purchaseVisibleCard(level, index);
 					message = success ? "Card purchased." : "Cannot purchase this card.";
 					if (success) {
-						actionSummary = actor + " purchased a visible card (L" + level + " #" + index + ").";
+						actionSummary = actor + " bought card ID " + card.getCardId()
+							+ " (L" + card.getLevel() + ", +" + card.getBonusGem().getAbbreviation() + ").";
 					}
 				}
 			}
@@ -791,7 +975,8 @@ public class WebServer {
 					success = session.controller.purchaseReservedCard(index);
 					message = success ? "Reserved card purchased." : "Cannot purchase this reserved card.";
 					if (success) {
-						actionSummary = actor + " purchased reserved card #" + index + ".";
+						actionSummary = actor + " bought reserved card ID " + card.getCardId()
+							+ " (L" + card.getLevel() + ", +" + card.getBonusGem().getAbbreviation() + ").";
 					}
 				}
 			}
@@ -917,6 +1102,9 @@ public class WebServer {
 		sb.append("{");
 		sb.append("\"currentPlayer\":\"").append(escape(current.getName())).append("\",");
 		sb.append("\"turnNumber\":").append(session.turnNumber).append(",");
+		int totalPlayers = session.controller.getPlayers().size();
+		int roundNumber = Math.max(1, ((session.turnNumber - 1) / Math.max(1, totalPlayers)) + 1);
+		sb.append("\"roundNumber\":").append(roundNumber).append(",");
 		sb.append("\"isHumanTurn\":").append(current.isHuman()).append(",");
 		sb.append("\"endgameFinalRound\":").append(session.controller.isEndgamePending()).append(",");
 		sb.append("\"gameOver\":").append(session.controller.isGameOver()).append(",");
@@ -1141,6 +1329,16 @@ public class WebServer {
 				sb.append(",");
 			}
 			sb.append("\"").append(escape(session.actionLog.get(i))).append("\"");
+		}
+		sb.append("]");
+		List<Noble> claimable = session.controller.getRules().getVisitableNobles(board.getAvailableNobles(), current);
+		sb.append(",");
+		sb.append("\"claimableNobles\":[");
+		for (int i = 0; i < claimable.size(); i++) {
+			if (i > 0) {
+				sb.append(",");
+			}
+			sb.append("\"").append(escape(claimable.get(i).getName())).append("\"");
 		}
 		sb.append("]");
 		sb.append(",");

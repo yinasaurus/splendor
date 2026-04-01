@@ -17,7 +17,7 @@ const API_BASE = resolveApiBase();
   if (typeof document === "undefined" || typeof window === "undefined") {
     return;
   }
-  /* Default: web/media chip + gem sprites. Set __SPLENDOR_USE_CSS_GEMS__ = true for CSS spheres only. */
+  /* Default: point sprite vars at web/media. Set __SPLENDOR_USE_CSS_GEMS__ = true to skip (stylesheet defaults only). */
   if (window.__SPLENDOR_USE_CSS_GEMS__ === true) {
     return;
   }
@@ -97,9 +97,17 @@ let lastSeenActionCount = 0;
 let suppressRealtimeToasts = true;
 
 const KNOWN_GEMS = new Set(["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"]);
+const GEM_ABBR_TO_NAME = {
+  R: "RUBY",
+  E: "EMERALD",
+  S: "SAPPHIRE",
+  D: "DIAMOND",
+  O: "ONYX",
+  G: "GOLD",
+};
 
 /**
- * CSS “gem” dots (no raster edges). If __SPLENDOR_USE_IMAGE_SPRITES__ is true, use legacy sprites via gemSpriteLegacyMarkup.
+ * CSS gem tokens (flat shapes; not spheres). If __SPLENDOR_USE_IMAGE_SPRITES__ is true, use bitmap sprites via gemSpriteLegacyMarkup.
  */
 function gemDotMarkup(gem) {
   const raw = gem && String(gem);
@@ -173,6 +181,24 @@ function splendorHexanomeDevCardFilename(globalIndex) {
 }
 
 /**
+ * When set, maps a global art index to a filename under {@link window.__SPLENDOR_DEV_CARD_ART_BASE__}.
+ * Example: cycle 12 custom faces — {@code (i) => `splendor-${((i - 1) % 12) + 1}.jpg`}.
+ */
+function resolveDevCardArtFilename(globalIdx) {
+  if (typeof window !== "undefined" && typeof window.__SPLENDOR_DEV_CARD_ART_FILENAME__ === "function") {
+    try {
+      const name = window.__SPLENDOR_DEV_CARD_ART_FILENAME__(globalIdx);
+      if (name != null && String(name).trim() !== "") {
+        return String(name).trim().replace(/^\/+/, "");
+      }
+    } catch (_) {
+      /* use default */
+    }
+  }
+  return splendorHexanomeDevCardFilename(globalIdx);
+}
+
+/**
  * Maps our loader ids (level*1000 + rowInLevel) to a global art index 1–90 like standard Splendor (40 + 30 + 20).
  * Override with window.__SPLENDOR_DEV_CARD_ART_INDEX__(level, cardId, seqInLevel) if your CSV order differs.
  */
@@ -208,7 +234,7 @@ function resolveDevCardArtImageUrl(level, card) {
   if (!Number.isFinite(globalIdx) || globalIdx < 1) {
     globalIdx = 1;
   }
-  const file = splendorHexanomeDevCardFilename(globalIdx);
+  const file = resolveDevCardArtFilename(globalIdx);
   return `${base}/${file}`;
 }
 
@@ -540,6 +566,7 @@ function renderState(state) {
   const isHumanTurn = !!state.isHumanTurn;
   const currentReservedCount = currentPlayerData ? (currentPlayerData.reservedCount || 0) : 0;
   const turnNo = Number.isFinite(state.turnNumber) ? state.turnNumber : 1;
+  const roundNo = Number.isFinite(state.roundNumber) ? state.roundNumber : 1;
   const actions = Array.isArray(state.recentActions) ? state.recentActions : [];
 
   if (state.gameOver && gameOverWrap && gameOverBanner && leaderboardEl) {
@@ -578,7 +605,7 @@ function renderState(state) {
     gameOverWrap.classList.add("hidden");
   }
 
-  let turnLine = `Turn ${turnNo} · Current Player: ${state.currentPlayer}${isHumanTurn ? " (Your turn)" : " (AI turn)"}`;
+  let turnLine = `Round ${roundNo} · Turn ${turnNo} · Current Player: ${state.currentPlayer}${isHumanTurn ? " (Your turn)" : " (AI turn)"}`;
   if (state.endgameFinalRound) {
     turnLine += " · Final round: each player takes one more turn";
   }
@@ -933,6 +960,16 @@ function renderState(state) {
           cap.className = "reserved-mini__cap";
           cap.textContent = `L${rc.level} · ${rc.bonusAbbr || ""}`;
           mini.appendChild(cap);
+          const costBadges = document.createElement("div");
+          costBadges.className = "pill-row reserved-mini__costs";
+          devCardCostEntries(rc.cost || {}).forEach(([gem, count]) => {
+            const pill = document.createElement("div");
+            pill.className = `pill gem-${gem}`;
+            pill.innerHTML = gemPillMarkup(gem, `${count}`, "stone");
+            pill.title = `${count} ${gemDisplayName(gem)}`;
+            costBadges.appendChild(pill);
+          });
+          mini.appendChild(costBadges);
           const buyR = document.createElement("button");
           buyR.type = "button";
           buyR.className = "reserved-mini__buy card-buy-btn";
@@ -984,6 +1021,9 @@ function renderState(state) {
       }
       if (currentReservedCount > 0) {
         suggestions.push("Check 'Purchase Reserved' if one of your reserved cards is now affordable.");
+      }
+      if (Array.isArray(state.claimableNobles) && state.claimableNobles.length > 0) {
+        suggestions.push("You qualify for a noble now; it will visit automatically at end of your turn.");
       }
       suggestions.push("Plan toward nobles by building bonus colors, not loose gems.");
     }
@@ -1118,30 +1158,80 @@ function setupGemSelection() {
   const selected = new Map(); // gem -> count
 
   const gemTypes = ["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX"];
+  const countByGem = new Map();
+
+  function setGemCount(gem, next) {
+    const value = Math.max(0, Math.min(2, Number(next) || 0));
+    if (value === 0) {
+      selected.delete(gem);
+    } else {
+      selected.set(gem, value);
+    }
+    const countEl = countByGem.get(gem);
+    if (countEl) {
+      countEl.textContent = String(value);
+    }
+  }
+
   gemTypes.forEach((gem) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = `pill gem-${gem} take-gem-option`;
-    btn.setAttribute("aria-label", `Toggle ${gem} for taking gems`);
-    btn.innerHTML = gemPillMarkup(gem, gem, "chip");
-    btn.addEventListener("click", () => {
+    const row = document.createElement("div");
+    row.className = `pill gem-${gem} take-gem-option`;
+
+    const preview = document.createElement("div");
+    preview.className = "take-gem-option__preview";
+    preview.innerHTML = gemPillMarkup(gem, gem, "chip");
+
+    const controls = document.createElement("div");
+    controls.className = "take-gem-option__controls";
+
+    const minusBtn = document.createElement("button");
+    minusBtn.type = "button";
+    minusBtn.className = "secondary small-btn take-gem-option__btn";
+    minusBtn.textContent = "−";
+    minusBtn.setAttribute("aria-label", `Decrease ${gem} gems`);
+    minusBtn.addEventListener("click", () => {
       const current = selected.get(gem) || 0;
-      if (current === 0) {
-        selected.set(gem, 1);
-        btn.style.outline = "2px solid #fff";
-      } else if (current === 1) {
-        selected.set(gem, 2);
-        btn.style.outline = "2px solid #ff9800";
-      } else {
-        selected.delete(gem);
-        btn.style.outline = "none";
-      }
+      setGemCount(gem, current - 1);
     });
-    container.appendChild(btn);
+
+    const count = document.createElement("span");
+    count.className = "take-gem-option__count";
+    count.textContent = "0";
+    countByGem.set(gem, count);
+
+    const plusBtn = document.createElement("button");
+    plusBtn.type = "button";
+    plusBtn.className = "secondary small-btn take-gem-option__btn";
+    plusBtn.textContent = "+";
+    plusBtn.setAttribute("aria-label", `Increase ${gem} gems`);
+    plusBtn.addEventListener("click", () => {
+      const current = selected.get(gem) || 0;
+      setGemCount(gem, current + 1);
+    });
+
+    controls.appendChild(minusBtn);
+    controls.appendChild(count);
+    controls.appendChild(plusBtn);
+    row.appendChild(preview);
+    row.appendChild(controls);
+    container.appendChild(row);
   });
 
   const btnConfirm = document.getElementById("take-gems-btn");
   const messageEl = document.getElementById("action-message");
+
+  function parseDiscardInput(raw, needed) {
+    const text = String(raw || "").toUpperCase();
+    const tokens = text.split(/[^A-Z]+/).filter(Boolean);
+    const out = [];
+    for (const token of tokens) {
+      const ch = token.charAt(0);
+      if (GEM_ABBR_TO_NAME[ch]) {
+        out.push(ch);
+      }
+    }
+    return out.length === needed ? out : null;
+  }
 
   btnConfirm.addEventListener("click", async () => {
     const gems = [];
@@ -1156,16 +1246,38 @@ function setupGemSelection() {
       return;
     }
     try {
-      const result = await postAction({ type: "takeGems", gems });
+      const myPlayer =
+        latestState && Array.isArray(latestState.players)
+          ? latestState.players.find((p) => p.name === latestState.currentPlayer)
+          : null;
+      const currentTotal = myPlayer && myPlayer.gems ? Object.values(myPlayer.gems).reduce((s, n) => s + Number(n || 0), 0) : 0;
+      const overflow = Math.max(0, currentTotal + gems.length - 10);
+      let discard = [];
+      if (overflow > 0) {
+        const reply = window.prompt(
+          `You must discard ${overflow} gem(s). Type letters separated by spaces/commas (R E S D O G).`,
+          ""
+        );
+        if (reply == null) {
+          messageEl.textContent = "Take gems cancelled.";
+          messageEl.className = "message error";
+          return;
+        }
+        const parsed = parseDiscardInput(reply, overflow);
+        if (!parsed) {
+          messageEl.textContent = `Invalid discard input. Enter exactly ${overflow} gem letter(s).`;
+          messageEl.className = "message error";
+          return;
+        }
+        discard = parsed;
+      }
+      const result = await postAction({ type: "takeGems", gems, discard });
       messageEl.textContent = result.message || (result.success ? "Action done." : "Action failed.");
       messageEl.className = "message " + (result.success ? "ok" : "error");
       const state = await fetchState();
       renderState(state);
       // Clear previous selection to avoid accidental repeated submits.
-      selected.clear();
-      container.querySelectorAll("button").forEach((b) => {
-        b.style.outline = "none";
-      });
+      gemTypes.forEach((gem) => setGemCount(gem, 0));
     } catch (e) {
       messageEl.textContent = "Error sending action.";
       messageEl.className = "message error";
@@ -1238,6 +1350,8 @@ async function init() {
   const guidedExitBtn = document.getElementById("guided-exit-btn");
   const guidedSizeSmBtn = document.getElementById("guided-size-sm");
   const guidedSizeLgBtn = document.getElementById("guided-size-lg");
+  let liveSyncTimer = null;
+  let liveSyncInFlight = false;
 
   let guidedIndex = 0;
   let guidedSize = "md";
@@ -1378,6 +1492,7 @@ async function init() {
       closeGuided();
       closeRulebook();
       showWaitingRoom();
+      startLiveSync();
       const state = await fetchState();
       renderLobbyStatus(state);
       suppressRealtimeToasts = true;
@@ -1405,12 +1520,80 @@ async function init() {
     }
   }
 
+  function showGameUi() {
+    startScreen.classList.add("hidden");
+    waitingRoom.classList.add("hidden");
+    gameUi.classList.remove("hidden");
+    if (videoPanel) videoPanel.classList.add("hidden");
+  }
+
+  function enterGameUiFromState(state, resetPerspective) {
+    setupGemSelection();
+    setupOtherActions();
+    if (resetPerspective) {
+      suppressRealtimeToasts = true;
+      lastSeenActionCount = 0;
+      lastSeenTurnNumber = null;
+      randomizePlayerView(state);
+    }
+    showGameUi();
+    renderState(state);
+  }
+
+  async function runLiveSyncTick() {
+    if (liveSyncInFlight) {
+      return;
+    }
+    const onHomeScreen =
+      !startScreen.classList.contains("hidden") &&
+      waitingRoom.classList.contains("hidden") &&
+      gameUi.classList.contains("hidden");
+    if (onHomeScreen) {
+      return;
+    }
+    liveSyncInFlight = true;
+    try {
+      const state = await fetchState();
+      const inWaitingRoom = !waitingRoom.classList.contains("hidden");
+      const inGame = !gameUi.classList.contains("hidden");
+      if (inWaitingRoom) {
+        renderLobbyStatus(state);
+        if (state && state.lobby && state.lobby.gameStarted) {
+          enterGameUiFromState(state, true);
+          showToast("Match started.");
+        }
+      } else if (inGame) {
+        renderState(state);
+      }
+    } catch (_) {
+      // Ignore transient network errors; next tick will retry.
+    } finally {
+      liveSyncInFlight = false;
+    }
+  }
+
+  function startLiveSync() {
+    if (liveSyncTimer != null) {
+      return;
+    }
+    liveSyncTimer = window.setInterval(runLiveSyncTick, 1500);
+  }
+
+  function stopLiveSync() {
+    if (liveSyncTimer == null) {
+      return;
+    }
+    window.clearInterval(liveSyncTimer);
+    liveSyncTimer = null;
+  }
+
   function showHome(resetLobbyRoom) {
     waitingRoom.classList.add("hidden");
     startScreen.classList.remove("hidden");
     gameUi.classList.add("hidden");
     if (videoPanel) videoPanel.classList.remove("hidden");
     if (resetLobbyRoom) {
+      stopLiveSync();
       clearRoomFromBrowserUrl();
       rememberRoom("Room A");
       updateLobbyReadiness();
@@ -1518,6 +1701,7 @@ async function init() {
         syncRoomToBrowserUrl(currentRoom);
         updateLobbyReadiness();
         showWaitingRoom();
+        startLiveSync();
         showToast(`Room created: ${currentRoom}`);
         const state = await fetchState();
         renderLobbyStatus(state);
@@ -1656,17 +1840,7 @@ async function init() {
       closeGuided();
       closeRulebook();
       const state = await fetchState();
-      suppressRealtimeToasts = true;
-      lastSeenActionCount = 0;
-      lastSeenTurnNumber = null;
-      randomizePlayerView(state);
-      startScreen.classList.add("hidden");
-      waitingRoom.classList.add("hidden");
-      gameUi.classList.remove("hidden");
-      if (videoPanel) videoPanel.classList.add("hidden");
-      setupGemSelection();
-      setupOtherActions();
-      renderState(state);
+      enterGameUiFromState(state, true);
       showToast("Match started.");
     } catch (_) {
       alert("Could not start match.");
@@ -1723,6 +1897,7 @@ async function init() {
 
   // Initial state
   updateLobbyReadiness();
+  startLiveSync();
   const pathRoom = roomFromUrlPath();
   if (pathRoom) {
     rememberRoom(pathRoom);
