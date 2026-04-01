@@ -2,14 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Splendor Web</title>
   <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="app">
-    <header>
-      <h1>Splendor</h1>
+    <header class="app-header">
+      <div class="app-header__brand">
+        <p class="eyebrow">Renaissance merchants</p>
+        <h1>Splendor</h1>
+      </div>
       <p class="subtitle">Browser UI powered by your Java game engine</p>
     </header>
 
@@ -154,7 +161,7 @@
       <section id="tutorial-panel" class="panel hidden">
         <div class="tutorial-header">
           <h2>How to Play Splendor</h2>
-          <button id="close-tutorial-btn" type="button">Close</button>
+          <button id="close-tutorial-btn" type="button" class="secondary">Close</button>
         </div>
         <div class="tutorial-body">
           <p><strong>Goal</strong>: Be the first player to reach the required prestige points (default 15) to win.</p>
