@@ -1224,7 +1224,7 @@ function setupGemSelection() {
   const container = document.getElementById("take-gems-options");
   const selected = new Map(); // gem -> count
 
-  const gemTypes = ["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX"];
+  const gemTypes = ["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"];
   const countByGem = new Map();
 
   function setGemCount(gem, next) {
@@ -1251,6 +1251,17 @@ function setupGemSelection() {
 
     const controls = document.createElement("div");
     controls.className = "take-gem-option__controls";
+
+    if (gem === "GOLD") {
+      const lock = document.createElement("span");
+      lock.className = "take-gem-option__locked";
+      lock.textContent = "Reserve to gain";
+      controls.appendChild(lock);
+      row.appendChild(preview);
+      row.appendChild(controls);
+      container.appendChild(row);
+      return;
+    }
 
     const minusBtn = document.createElement("button");
     minusBtn.type = "button";
@@ -2025,10 +2036,13 @@ async function init() {
         showWaitingRoom();
       }
     } else if (pathRoom) {
+      showHome(false);
       showToast(`Room code from link: ${pathRoom}. Enter your name, then Join Room.`);
+    } else {
+      showHome(false);
     }
   } catch (_) {
-    // ignore initial fetch failure
+    showHome(false);
   }
 
   guidedPrevBtn.addEventListener("click", () => {

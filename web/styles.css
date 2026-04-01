@@ -1082,6 +1082,13 @@ main {
   letter-spacing: 0.01em;
 }
 
+.take-gem-option__locked {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #d5b56f;
+  opacity: 0.9;
+}
+
 .take-gem-option__controls {
   display: inline-flex;
   align-items: center;
