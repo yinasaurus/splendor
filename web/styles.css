@@ -1050,7 +1050,8 @@ main {
 }
 
 .level-col h3 {
-  margin: 2px 0 4px 0;
+  display: none;
+  margin: 0;
   font-family: var(--font-ui);
   font-size: 0.78rem;
   font-weight: 700;
@@ -1060,9 +1061,7 @@ main {
 }
 
 .level-head-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: none;
 }
 
 .level-head-row h3 {
@@ -1071,8 +1070,8 @@ main {
 
 .level-deck-btn {
   margin-top: 0;
-  width: 66px;
-  min-height: 88px;
+  width: 84px;
+  min-height: 130px;
   padding: 8px 6px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -1092,16 +1091,27 @@ main {
   justify-content: space-between;
   gap: 6px;
   color: #d7deef;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.level-deck-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.26);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .level-deck-btn__stack {
   position: relative;
-  width: 34px;
-  height: 44px;
+  width: 50px;
+  height: 70px;
   border-radius: 6px;
   background: linear-gradient(165deg, rgba(58, 70, 108, 0.88), rgba(30, 38, 64, 0.92));
   border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .level-deck-btn__stack::before,
@@ -1112,24 +1122,33 @@ main {
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: linear-gradient(165deg, rgba(44, 54, 86, 0.85), rgba(24, 30, 52, 0.9));
-  z-index: -1;
+  z-index: 0;
 }
 
 .level-deck-btn__stack::before {
-  transform: translate(4px, -4px);
+  transform: translate(2px, -2px);
+  opacity: 0.65;
 }
 
 .level-deck-btn__stack::after {
-  transform: translate(8px, -8px);
+  transform: translate(4px, -4px);
+  opacity: 0.45;
 }
 
 .level-deck-btn__meta {
-  font-size: 0.58rem;
+  font-size: 0.66rem;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.03em;
   text-align: center;
   color: #c8d1e7;
+}
+
+.dev-deck-slot {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 auto;
 }
 
 .players {
@@ -1937,7 +1956,7 @@ main {
   align-items: center;
   justify-content: center;
   padding: 8px;
-  background: linear-gradient(to bottom, rgba(8, 10, 16, 0.08) 0%, rgba(8, 10, 16, 0.3) 46%, rgba(8, 10, 16, 0.08) 100%);
+  background: linear-gradient(to bottom, rgba(8, 10, 16, 0.22) 0%, rgba(8, 10, 16, 0.52) 46%, rgba(8, 10, 16, 0.24) 100%);
   backdrop-filter: blur(1px);
   opacity: 0;
   transform: translateY(8px);
@@ -2034,16 +2053,16 @@ main {
 }
 
 .dev-card__actions button.secondary {
-  background: rgba(20, 24, 36, 0.92);
-  color: #ffe7a8;
-  border: 1px solid rgba(232, 163, 23, 0.45);
+  background: rgba(16, 20, 32, 0.95);
+  color: #e8d8aa;
+  border: 1px solid rgba(184, 140, 54, 0.5);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .dev-card__actions button.secondary:hover:not(:disabled) {
-  background: rgba(232, 163, 23, 0.2);
-  border-color: rgba(232, 163, 23, 0.68);
-  color: #fff2ca;
+  background: rgba(122, 92, 34, 0.3);
+  border-color: rgba(184, 140, 54, 0.72);
+  color: #f0e0b6;
 }
 
 .dev-card--locked .dev-card__face {

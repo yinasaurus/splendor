@@ -1062,43 +1062,35 @@ function renderState(state) {
     const cards = state.levels?.[lvl] || [];
     const levelCol = ul.closest(".level-col");
     const levelHeading = levelCol ? levelCol.querySelector("h3") : null;
-    let levelHeadRow = levelCol ? levelCol.querySelector(".level-head-row") : null;
-    if (levelCol && levelHeading && !levelHeadRow) {
-      levelHeadRow = document.createElement("div");
-      levelHeadRow.className = "level-head-row";
-      levelCol.insertBefore(levelHeadRow, levelHeading);
-      levelHeadRow.appendChild(levelHeading);
-    }
+    const deckLeft =
+      state &&
+      state.deckRemaining &&
+      Number.isFinite(Number(state.deckRemaining[lvl]))
+        ? Number(state.deckRemaining[lvl])
+        : cards.length;
     if (levelHeading) {
-      const baseLabel = `LEVEL ${lvl}`;
-      const deckLeft =
-        state &&
-        state.deckRemaining &&
-        Number.isFinite(Number(state.deckRemaining[lvl]))
-          ? Number(state.deckRemaining[lvl])
-          : cards.length;
-      levelHeading.textContent = `${baseLabel} · ${deckLeft} left`;
-
-      if (levelHeadRow) {
-        let deckBtn = levelHeadRow.querySelector(".level-deck-btn");
-        if (!deckBtn) {
-          deckBtn = document.createElement("button");
-          deckBtn.type = "button";
-          deckBtn.className = "level-deck-btn";
-          levelHeadRow.insertBefore(deckBtn, levelHeading);
-        }
-        deckBtn.innerHTML = `<span class="level-deck-btn__stack" aria-hidden="true"></span><span class="level-deck-btn__meta">L${lvl} · ${deckLeft} left</span>`;
-        deckBtn.title = `Reserve top Level ${lvl} card`;
-        deckBtn.disabled = !isMyTurn || currentReservedCount >= 3 || deckLeft <= 0;
-        deckBtn.onclick = async (e) => {
-          e.stopPropagation();
-          if (deckBtn.disabled) {
-            return;
-          }
-          await postReserveTop(lvl);
-        };
-      }
+      levelHeading.textContent = "";
+      levelHeading.setAttribute("aria-hidden", "true");
     }
+
+    const deckLi = document.createElement("li");
+    deckLi.className = "dev-deck-slot";
+    const deckBtn = document.createElement("button");
+    deckBtn.type = "button";
+    deckBtn.className = "level-deck-btn";
+    deckBtn.innerHTML = `<span class="level-deck-btn__stack" aria-hidden="true"></span><span class="level-deck-btn__meta">L${lvl} · ${deckLeft} left</span>`;
+    deckBtn.title = `Reserve top Level ${lvl} card`;
+    deckBtn.disabled = !isMyTurn || currentReservedCount >= 3 || deckLeft <= 0;
+    deckBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (deckBtn.disabled) {
+        return;
+      }
+      await postReserveTop(lvl);
+    };
+    deckLi.appendChild(deckBtn);
+    ul.appendChild(deckLi);
+
     cards.forEach((card, index) => {
       const li = document.createElement("li");
       li.className = `dev-card dev-card--level-${lvl}`;
