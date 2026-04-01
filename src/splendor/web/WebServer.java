@@ -1367,6 +1367,7 @@ public class WebServer {
 			return response;
 		}
 		String actionSummary = null;
+		Noble nobleBeforeAction = currentPlayer.getVisitedNoble();
 
 		if ("takegems".equals(actionType)) {
 			// Extract gems array e.g. "gems":["R","E","S"]
@@ -1589,6 +1590,14 @@ public class WebServer {
 			if (actionSummary != null) {
 				addActionLog(session, actionSummary);
 			}
+			Noble nobleAfterAction = currentPlayer.getVisitedNoble();
+			if (nobleAfterAction != null && nobleAfterAction != nobleBeforeAction) {
+				addActionLog(
+					session,
+					actor + " claimed Noble " + nobleAfterAction.getNobleId() + " ("
+						+ nobleAfterAction.getName() + ") for +" + nobleAfterAction.getPrestigePoints() + " prestige."
+				);
+			}
 			advanceTurnsAfterHuman(session);
 		}
 
@@ -1698,8 +1707,17 @@ public class WebServer {
 				break;
 			}
 			// Let AI take its move. AI strategies always choose legal moves.
+			Noble nobleBeforeAi = current.getVisitedNoble();
 			String aiAction = ai.makeMove(session.controller);
 			addActionLog(session, current.getName() + ": " + (aiAction == null ? "took a turn." : aiAction));
+			Noble nobleAfterAi = current.getVisitedNoble();
+			if (nobleAfterAi != null && nobleAfterAi != nobleBeforeAi) {
+				addActionLog(
+					session,
+					current.getName() + " claimed Noble " + nobleAfterAi.getNobleId() + " ("
+						+ nobleAfterAi.getName() + ") for +" + nobleAfterAi.getPrestigePoints() + " prestige."
+				);
+			}
 			if (session.controller.isGameOver()) {
 				break;
 			}

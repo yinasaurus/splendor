@@ -105,6 +105,7 @@ const uiState = {
   gemUiInitialized: false,
   actionUiBound: false,
   syncTakeGemUi: null,
+  resetTakeGemUiSelection: null,
 };
 
 let toastTimer = null;
@@ -115,6 +116,7 @@ let suppressRealtimeToasts = true;
 let lastAutoRejoinAt = 0;
 let lastRecoveryToastAt = 0;
 let suppressRemovedToastUntil = 0;
+let lastGemUiTurnNumber = null;
 const expandedBoughtByPlayer = new Set();
 
 const KNOWN_GEMS = new Set(["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"]);
@@ -899,6 +901,7 @@ const guidedSteps = [
 function renderState(state) {
   const boardColEl = document.querySelector(".gameplay-board-col");
   const sideColEl = document.querySelector(".gameplay-side-col");
+  const gameUiRoot = document.getElementById("game-ui");
   const boardScrollTop = boardColEl ? boardColEl.scrollTop : null;
   const sideScrollTop = sideColEl ? sideColEl.scrollTop : null;
   latestState = state;
@@ -941,15 +944,25 @@ function renderState(state) {
   const isAiTurn = state.isHumanTurn === false;
   const currentReservedCount = currentPlayerData ? (currentPlayerData.reservedCount || 0) : 0;
   const turnNo = Number.isFinite(state.turnNumber) ? state.turnNumber : 1;
+  if (
+    typeof uiState.resetTakeGemUiSelection === "function" &&
+    (lastGemUiTurnNumber === null || lastGemUiTurnNumber !== turnNo || !isMyTurn)
+  ) {
+    uiState.resetTakeGemUiSelection();
+  }
+  lastGemUiTurnNumber = turnNo;
   const roundNo = Number.isFinite(state.roundNumber) ? state.roundNumber : 1;
   const actions = Array.isArray(state.recentActions) ? state.recentActions : [];
 
   const winnerDisplay = replaceGenericSeatNames(state.winner || "Unknown", lobbyNames);
   if (state.gameOver && gameOverWrap && gameOverBanner && leaderboardEl) {
+    if (gameUiRoot) {
+      gameUiRoot.classList.add("game-over-mode");
+    }
     gameOverWrap.classList.remove("hidden");
     gameOverBanner.textContent = `Game over — ${winnerDisplay} wins`;
     if (gameOverHint) {
-      gameOverHint.textContent = "Ties: higher prestige wins; if tied, fewer purchased development cards wins.";
+      gameOverHint.textContent = "Tie-breaker: if prestige is tied, the player with fewer purchased development cards wins.";
     }
     leaderboardEl.innerHTML = "";
     const playersRank = Array.isArray(state.players) ? [...state.players] : [];
@@ -977,18 +990,23 @@ function renderState(state) {
       leaderboardEl.appendChild(li);
     });
   } else if (gameOverWrap) {
+    if (gameUiRoot) {
+      gameUiRoot.classList.remove("game-over-mode");
+    }
     gameOverWrap.classList.add("hidden");
   }
 
   let turnLine = `Round ${roundNo} · Turn ${turnNo} · Current Player: ${currentDisplayName}`;
-  if (isAiTurn) {
+  if (state.gameOver) {
+    turnLine = `Game over · Winner: ${winnerDisplay}`;
+  } else if (isAiTurn) {
     turnLine += " (AI turn)";
   } else if (isMyTurn) {
     turnLine += " (Your turn)";
   } else {
     turnLine += " (Other player's turn)";
   }
-  if (state.endgameFinalRound) {
+  if (!state.gameOver && state.endgameFinalRound) {
     turnLine += " · Final round: remaining players in this round take their last turn";
   }
   turnInfo.textContent = turnLine;
@@ -1320,18 +1338,23 @@ function renderState(state) {
       const extra = document.createElement("div");
       extra.style.fontSize = "0.78rem";
       extra.style.marginTop = "3px";
-      const nobleText = p.noble ? `Noble: ${p.noble}` : "No noble yet";
       const boughtCount = Number.isFinite(Number(p.purchasedCards))
         ? Number(p.purchasedCards)
         : Array.isArray(p.boughtCards)
           ? p.boughtCards.length
           : Object.values(p.bonuses || {}).reduce((sum, n) => sum + Number(n || 0), 0);
-      extra.textContent = `${nobleText} · Reserved: ${p.reservedCount} · Bought: ${boughtCount} cards`;
+      extra.textContent = `Reserved: ${p.reservedCount} · Bought: ${boughtCount} cards`;
 
       card.appendChild(name);
       card.appendChild(meta);
       if (afkMeta.textContent) {
         card.appendChild(afkMeta);
+      }
+      if (p.noble) {
+        const nobleBadge = document.createElement("div");
+        nobleBadge.className = "player-noble-badge";
+        nobleBadge.textContent = `Noble claimed: ${p.noble}`;
+        card.appendChild(nobleBadge);
       }
       const canManageAfk =
         currentPlayerName === currentOwner &&
@@ -1590,13 +1613,17 @@ function renderState(state) {
   // Only show available actions for the active local player's turn.
   const takeBtn = document.getElementById("take-gems-btn");
   if (takeBtn) {
-    takeBtn.disabled = !isMyTurn;
+    takeBtn.disabled = state.gameOver || !isMyTurn;
   }
   if (typeof uiState.syncTakeGemUi === "function") {
-    uiState.syncTakeGemUi(state);
+    uiState.syncTakeGemUi({
+      ...state,
+      isMyTurn: !state.gameOver && isMyTurn,
+      isHumanTurn: !state.gameOver && state.isHumanTurn,
+    });
   }
   // Realtime popups: new action and turn changes.
-  if (!suppressRealtimeToasts) {
+  if (!suppressRealtimeToasts && !state.gameOver) {
     if (actions.length > lastSeenActionCount) {
       const latestAction = actions[actions.length - 1];
       if (latestAction) {
@@ -1764,6 +1791,11 @@ function setupGemSelection() {
     });
   }
 
+  function resetTakeGemUiSelection() {
+    gemTypes.forEach((gem) => setGemCount(gem, 0));
+    syncTakeGemUiFromState(latestState);
+  }
+
   gemTypes.forEach((gem) => {
     const row = document.createElement("div");
     row.className = `pill gem-${gem} take-gem-option`;
@@ -1858,6 +1890,7 @@ function setupGemSelection() {
     }
   }
   uiState.syncTakeGemUi = syncTakeGemUiFromState;
+  uiState.resetTakeGemUiSelection = resetTakeGemUiSelection;
 
   function closeDiscardPanel(animated = false) {
     if (discardCollapseTimer) {
@@ -1920,13 +1953,24 @@ function setupGemSelection() {
       const result = await postAction({ type: "takeGems", gems, discard });
       messageEl.textContent = result.message || (result.success ? "Action done." : "Action failed.");
       messageEl.className = "message " + (result.success ? "ok" : "error");
-      const state = await fetchState();
-      renderState(state);
+      if (!result.success) {
+        showToast(result.message || "Could not take gems.", "error");
+        return;
+      }
       gemTypes.forEach((gem) => setGemCount(gem, 0));
       closeDiscardPanel(true);
+      try {
+        const state = await fetchState();
+        renderState(state);
+      } catch (syncErr) {
+        const text = syncErr && syncErr.message ? syncErr.message : "Action sent, syncing state...";
+        showToast(text, "error");
+      }
     } catch (e) {
-      messageEl.textContent = "Error sending action.";
+      const text = e && e.message ? e.message : "Error sending action.";
+      messageEl.textContent = text;
       messageEl.className = "message error";
+      showToast(text, "error");
     } finally {
       setTakeGemsBusy(false);
     }
@@ -2071,10 +2115,20 @@ function setupGemSelection() {
         latestState && Array.isArray(latestState.players)
           ? latestState.players.find((p) => p.name === latestState.currentPlayer)
           : null;
-      const currentTotal = myPlayer && myPlayer.gems ? Object.values(myPlayer.gems).reduce((s, n) => s + Number(n || 0), 0) : 0;
+      const baseGems = myPlayer && myPlayer.gems ? { ...myPlayer.gems } : {};
+      const currentTotal = Object.values(baseGems).reduce((s, n) => s + Number(n || 0), 0);
       const overflow = Math.max(0, currentTotal + gems.length - 10);
       if (overflow > 0) {
-        const opened = openDiscardPanel(overflow, myPlayer ? myPlayer.gems : {}, gems);
+        // Discard choices must include gems just taken this turn.
+        const discardPool = { ...baseGems };
+        gems.forEach((abbr) => {
+          const gem = GEM_ABBR_TO_NAME[String(abbr || "").toUpperCase()];
+          if (!gem) {
+            return;
+          }
+          discardPool[gem] = Number(discardPool[gem] || 0) + 1;
+        });
+        const opened = openDiscardPanel(overflow, discardPool, gems);
         if (!opened) {
           messageEl.textContent = "Cannot open discard picker right now.";
           messageEl.className = "message error";

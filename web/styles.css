@@ -547,6 +547,49 @@ main {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
+#game-ui.game-over-mode .gameplay-layout,
+#game-ui.game-over-mode #turn-info,
+#game-ui.game-over-mode .game-code-block {
+  display: none !important;
+}
+
+#game-ui.game-over-mode .game-over-wrap {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  border-radius: 0;
+  border: 0;
+  z-index: 3000;
+  background: #181f39;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 28px 18px;
+}
+
+#game-ui.game-over-mode .game-over-banner,
+#game-ui.game-over-mode .game-over-hint,
+#game-ui.game-over-mode .leaderboard {
+  width: min(760px, 100%);
+}
+
+#game-ui.game-over-mode .game-over-banner {
+  font-size: 1.3rem;
+  margin-bottom: 10px;
+}
+
+#game-ui.game-over-mode .game-over-hint {
+  font-size: 0.95rem;
+  margin-bottom: 14px;
+}
+
+#game-ui.game-over-mode .leaderboard {
+  font-size: 1rem;
+  gap: 10px;
+}
+
 .game-over-wrap.hidden {
   display: none !important;
 }
@@ -1073,7 +1116,7 @@ main {
   width: 108px;
   min-height: 150px;
   aspect-ratio: 5 / 7;
-  padding: 8px 6px;
+  padding: 8px 8px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background:
@@ -1105,8 +1148,8 @@ main {
 
 .level-deck-btn__stack {
   position: relative;
-  width: 50px;
-  height: 70px;
+  width: 72px;
+  height: 112px;
   border-radius: 6px;
   background: linear-gradient(165deg, rgba(58, 70, 108, 0.88), rgba(30, 38, 64, 0.92));
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -1137,7 +1180,7 @@ main {
 }
 
 .level-deck-btn__meta {
-  font-size: 0.66rem;
+  font-size: 0.68rem;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: 0.03em;
@@ -1224,6 +1267,21 @@ main {
   font-size: 0.72rem;
   color: #d9c08a;
   margin-top: 2px;
+}
+
+.player-noble-badge {
+  margin-top: 5px;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff2c9;
+  background: linear-gradient(180deg, rgba(232, 163, 23, 0.28), rgba(160, 108, 20, 0.3));
+  border: 1px solid rgba(255, 220, 140, 0.36);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .player-afk-btn {
@@ -2000,6 +2058,11 @@ main {
   justify-content: center;
   text-align: center;
   vertical-align: middle;
+  opacity: 0.96;
+  background: rgba(12, 16, 26, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  color: #f0e4bf;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
 }
 
 .dev-card__actions button:focus-visible {
@@ -2073,8 +2136,8 @@ main {
 
 /* Affordable buy stays quiet until you hover the card or the button (desktop). */
 .dev-card__actions .card-buy-btn.card-buy-btn--affordable {
-  opacity: 0.52;
-  filter: grayscale(0.15) brightness(0.92);
+  opacity: 0.9;
+  filter: grayscale(0.05) brightness(0.98);
   box-shadow: none;
 }
 
