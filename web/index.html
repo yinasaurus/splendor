@@ -154,12 +154,24 @@
             </div>
           </div>
           <div id="game-over-wrap" class="game-over-wrap hidden">
-            <div id="game-over" class="game-over-banner"></div>
-            <p id="game-over-hint" class="game-over-hint"></p>
-            <ol id="leaderboard" class="leaderboard" aria-label="Final standings"></ol>
-            <div class="game-over-actions">
-              <button id="play-again-room-btn" type="button">Play again (same room)</button>
-              <button id="game-over-home-btn" type="button" class="secondary">Back to home</button>
+            <div class="game-over-card">
+              <p class="game-over-eyebrow">Match complete</p>
+              <h2 id="game-over" class="game-over-banner"></h2>
+              <p id="game-over-hint" class="game-over-hint"></p>
+              <ol id="leaderboard" class="leaderboard" aria-label="Final standings"></ol>
+              <div class="game-over-actions">
+                <button
+                  id="play-again-room-btn"
+                  type="button"
+                  class="game-over-btn-primary"
+                  title="Reset to lobby in this room; everyone readies up again"
+                >
+                  Play again
+                </button>
+                <button id="game-over-home-btn" type="button" class="secondary game-over-btn-secondary">
+                  Back to home
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -239,6 +251,15 @@
                 <button id="activity-log-toggle" type="button" class="secondary small-btn">Hide</button>
               </div>
               <ul id="activity-log" class="assist-list"></ul>
+            </div>
+          </section>
+
+          <section class="panel game-chat-panel" aria-label="Table chat">
+            <h2>Table chat</h2>
+            <div id="game-chat-messages" class="game-chat-messages" role="log" aria-live="polite"></div>
+            <div class="game-chat-compose">
+              <input id="game-chat-input" type="text" maxlength="400" placeholder="Say something..." autocomplete="off" />
+              <button id="game-chat-send" type="button" class="secondary small-btn">Send</button>
             </div>
           </section>
 

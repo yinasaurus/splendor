@@ -43,6 +43,8 @@ public class WebServer {
 
 	private static final String DEFAULT_ROOM = "Room A";
 	private static final int ACTION_LOG_LIMIT = 12;
+	private static final int CHAT_LOG_LIMIT = 80;
+	private static final int CHAT_MAX_LENGTH = 400;
 	private static final int AFK_AI_THRESHOLD_SECONDS = 90;
 	private static final Map<String, GameSession> sessions = new ConcurrentHashMap<>();
 	private static final Path LOBBY_SNAPSHOT_FILE = Paths.get("data", "web_lobbies.properties");
@@ -55,10 +57,23 @@ public class WebServer {
 		LinkedHashMap<String, String> aiByName = new LinkedHashMap<>();
 	}
 
+	private static final class ChatLine {
+		final String from;
+		final String text;
+		final long t;
+
+		ChatLine(String from, String text, long t) {
+			this.from = from;
+			this.text = text;
+			this.t = t;
+		}
+	}
+
 	private static class GameSession {
 		GameController controller;
 		Map<Integer, AIPlayer> aiPlayers = new HashMap<>();
 		List<String> actionLog = new ArrayList<>();
+		List<ChatLine> chatLines = new ArrayList<>();
 		int turnNumber = 1;
 		boolean gameStarted = false;
 		String ownerName = "Host";
@@ -90,6 +105,40 @@ public class WebServer {
 		if (session.actionLog.size() > ACTION_LOG_LIMIT) {
 			session.actionLog = new ArrayList<>(
 				session.actionLog.subList(session.actionLog.size() - ACTION_LOG_LIMIT, session.actionLog.size()));
+		}
+	}
+
+	private static String sanitizeChatText(String raw) {
+		if (raw == null) {
+			return "";
+		}
+		StringBuilder sb = new StringBuilder(raw.length());
+		for (int i = 0; i < raw.length(); i++) {
+			char c = raw.charAt(i);
+			if (c == '\n' || c == '\r' || c == '\t') {
+				sb.append(' ');
+			} else if (c >= 32 || c == ' ') {
+				sb.append(c);
+			}
+		}
+		String s = sb.toString().trim();
+		while (s.contains("  ")) {
+			s = s.replace("  ", " ");
+		}
+		if (s.length() > CHAT_MAX_LENGTH) {
+			s = s.substring(0, CHAT_MAX_LENGTH).trim();
+		}
+		return s;
+	}
+
+	private static void addChatLine(GameSession session, String from, String text) {
+		if (session == null || text == null || text.isEmpty()) {
+			return;
+		}
+		String f = from == null ? "" : from.trim();
+		session.chatLines.add(new ChatLine(f, text, System.currentTimeMillis()));
+		while (session.chatLines.size() > CHAT_LOG_LIMIT) {
+			session.chatLines.remove(0);
 		}
 	}
 
@@ -420,6 +469,7 @@ public class WebServer {
 		session.forcedAiDifficultyByName.clear();
 		session.gameStarted = false;
 		session.actionLog.clear();
+		session.chatLines.clear();
 		addActionLog(session, "Lobby created by " + session.ownerName + ".");
 		saveSnapshots();
 	}
@@ -536,6 +586,7 @@ public class WebServer {
 
 		// API endpoints
 		server.createContext("/api/state", new StateHandler());
+		server.createContext("/api/chat", new ChatHandler());
 		server.createContext("/api/action", new ActionHandler());
 		server.createContext("/api/newgame", new NewGameHandler());
 		server.createContext("/api/quit", new QuitHandler());
@@ -843,6 +894,77 @@ public class WebServer {
 			markPlayerSeen(session, viewerName);
 			String json = buildGameStateJson(session, room, viewerName);
 			sendResponse(exchange, 200, json, "application/json; charset=utf-8");
+		}
+	}
+
+	/**
+	 * Table chat: seated players post short messages; history is included in /api/state.
+	 */
+	private static class ChatHandler implements HttpHandler {
+		@Override
+		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
+			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+				return;
+			}
+			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
+			GameSession session = getExistingOrRecoveredSession(room);
+			Map<String, Object> resp = new HashMap<>();
+			if (session == null) {
+				resp.put("success", false);
+				resp.put("sessionMissing", true);
+				resp.put("message", "Session expired. Please rejoin or create a new room.");
+				resp.put("room", room);
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			String name = canonicalizeLobbyName(session, extractStringField(body, "name", ""));
+			String nameKey = name == null ? "" : name.trim().toLowerCase();
+			if (!nameKey.isEmpty() && session.kickedNames.contains(nameKey)) {
+				resp.put("success", false);
+				resp.put("message", "You were removed by the host.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			if (name == null || name.isEmpty() || !session.readyByPlayer.containsKey(name)) {
+				resp.put("success", false);
+				resp.put("message", "Join the room before chatting.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			String sessionToken = extractStringField(body, "sessionToken", "");
+			if (!hasValidSeatToken(session, name, sessionToken)) {
+				resp.put("success", false);
+				resp.put("message", "Seat locked by another browser session.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			if (session.forcedAiByName.contains(name)) {
+				resp.put("success", false);
+				resp.put("message", "You are currently under AI takeover. Refresh to resume control.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			String msg = extractStringField(body, "message", "");
+			if (msg == null || msg.trim().isEmpty()) {
+				msg = extractStringField(body, "text", "");
+			}
+			msg = sanitizeChatText(msg);
+			if (msg.isEmpty()) {
+				resp.put("success", false);
+				resp.put("message", "Message is empty.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			markPlayerSeen(session, name);
+			addChatLine(session, name, msg);
+			resp.put("success", true);
+			resp.put("room", room);
+			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 		}
 	}
 
@@ -2009,6 +2131,19 @@ public class WebServer {
 				sb.append(",");
 			}
 			sb.append("\"").append(escape(session.actionLog.get(i))).append("\"");
+		}
+		sb.append("],");
+		sb.append("\"chat\":[");
+		for (int i = 0; i < session.chatLines.size(); i++) {
+			if (i > 0) {
+				sb.append(",");
+			}
+			ChatLine line = session.chatLines.get(i);
+			sb.append("{");
+			sb.append("\"from\":\"").append(escape(line.from)).append("\",");
+			sb.append("\"text\":\"").append(escape(line.text)).append("\",");
+			sb.append("\"t\":").append(line.t);
+			sb.append("}");
 		}
 		sb.append("]");
 		List<Noble> claimable = session.controller.getRules().getVisitableNobles(board.getAvailableNobles(), current);

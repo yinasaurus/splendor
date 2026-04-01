@@ -33,6 +33,7 @@ const API_BASE = resolveApiBase();
 })();
 
 const API_STATE = `${API_BASE}/api/state`;
+const API_CHAT = `${API_BASE}/api/chat`;
 const API_ACTION = `${API_BASE}/api/action`;
 const API_NEW_GAME = `${API_BASE}/api/newgame`;
 const API_QUIT = `${API_BASE}/api/quit`;
@@ -55,6 +56,19 @@ let currentReady = false;
 let currentOwner = "";
 let activityLogCollapsed = false;
 let lastLiveStateDigest = "";
+
+/** Set from init(); used by renderState for rematch / home (nested functions are not in scope there). */
+const gameUiNav = {
+  showWaitingRoom() {},
+  showHome(_resetLobbyRoom) {},
+  startLiveSync() {},
+};
+
+/** Set from renderState while game over; used by capture-phase listener on #game-ui (reliable clicks). */
+const gameOverUiCallbacks = {
+  playAgain: null,
+  home: null,
+};
 
 async function readErrorMessage(res, fallback) {
   let text = "";
@@ -161,6 +175,9 @@ let toastTimer = null;
 let latestState = null;
 let lastSeenTurnNumber = null;
 let lastSeenActionCount = 0;
+let lastChatRenderDigest = "";
+/** Dedupes "someone hit 15 prestige" toasts (by opponent names). */
+let prestigeOthersAlertSig = "";
 let suppressRealtimeToasts = true;
 let lastAutoRejoinAt = 0;
 let lastRecoveryToastAt = 0;
@@ -314,6 +331,12 @@ function computeLiveStateDigest(state) {
       : "";
   const deck = state && state.deckRemaining ? JSON.stringify(state.deckRemaining) : "{}";
   const actions = Array.isArray(state.recentActions) ? state.recentActions.slice(-8).join("||") : "";
+  const chatDigest = Array.isArray(state.chat)
+    ? state.chat
+        .slice(-24)
+        .map((c) => `${c && c.from != null ? c.from : ""}:${c && c.t != null ? c.t : 0}:${c && c.text != null ? c.text : ""}`)
+        .join("||")
+    : "";
   return [
     String(state.turnNumber || 0),
     String(state.roundNumber || 0),
@@ -323,6 +346,7 @@ function computeLiveStateDigest(state) {
     deck,
     actions,
     players,
+    chatDigest,
   ].join("~");
 }
 
@@ -478,6 +502,45 @@ function resolveNobleArtImageUrl(noble) {
   return null;
 }
 
+/** Toast once per set of opponents when any of them reach 15+ prestige (final-round signal). */
+function notifyOthersPrestigeThreshold(state) {
+  if (!state || state.gameOver || !String(currentPlayerName || "").trim()) {
+    return;
+  }
+  const players = Array.isArray(state.players) ? state.players : [];
+  const anyAt15 = players.some((p) => Number(p && p.prestige) >= 15);
+  if (!anyAt15) {
+    prestigeOthersAlertSig = "";
+    return;
+  }
+  const othersAt15 = players.filter(
+    (p) =>
+      Number(p && p.prestige) >= 15 &&
+      currentPlayerName &&
+      !samePlayerName(p && p.name, currentPlayerName)
+  );
+  if (othersAt15.length === 0) {
+    return;
+  }
+  const sig = othersAt15
+    .map((p) => String((p && p.name) || "").trim().toLowerCase())
+    .filter(Boolean)
+    .sort()
+    .join("|");
+  if (!sig || sig === prestigeOthersAlertSig) {
+    return;
+  }
+  prestigeOthersAlertSig = sig;
+  if (othersAt15.length === 1) {
+    showToast(
+      `${othersAt15[0].name} reached 15+ prestige. Everyone gets a last turn, then highest score wins.`,
+      "warning"
+    );
+  } else {
+    showToast(`${othersAt15.length} players are at 15+ prestige. Final-round rules apply.`, "warning");
+  }
+}
+
 function showToast(message, type = "ok") {
   const txt = String(message || "");
   if (
@@ -495,9 +558,10 @@ function showToast(message, type = "ok") {
   if (toastTimer) {
     clearTimeout(toastTimer);
   }
+  const hideMs = type === "warning" ? 5200 : 3200;
   toastTimer = setTimeout(() => {
     toast.classList.remove("show");
-  }, 3200);
+  }, hideMs);
 }
 
 function clearTransientUi() {
@@ -519,6 +583,10 @@ function clearTransientUi() {
 
 function rememberRoom(room) {
   const safeRoom = (room || "Room A").trim() || "Room A";
+  if (safeRoom !== currentRoom) {
+    lastChatRenderDigest = "";
+    prestigeOthersAlertSig = "";
+  }
   currentRoom = safeRoom;
   currentSessionToken = getRememberedSeatToken(currentRoom, currentPlayerName);
   try {
@@ -834,6 +902,63 @@ async function postAction(payload) {
   }
 }
 
+async function postGameChat(message) {
+  const trimmed = String(message || "").trim();
+  if (!trimmed || !currentRoom || !currentPlayerName) {
+    return { success: false, message: "Nothing to send." };
+  }
+  const res = await fetch(API_CHAT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      room: currentRoom,
+      name: currentPlayerName,
+      sessionToken: currentSessionToken,
+      message: trimmed,
+    }),
+  });
+  if (!res.ok) {
+    return { success: false, message: "Could not send chat." };
+  }
+  return res.json();
+}
+
+function updateGameChat(state) {
+  const box = document.getElementById("game-chat-messages");
+  if (!box) {
+    return;
+  }
+  const lines = state && Array.isArray(state.chat) ? state.chat : [];
+  const digest = `${lines.length}^${lines.map((l) => `${l.t}|${l.from}|${l.text}`).join("^")}`;
+  if (digest === lastChatRenderDigest) {
+    return;
+  }
+  lastChatRenderDigest = digest;
+  box.innerHTML = "";
+  if (lines.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "game-chat-empty hint small";
+    empty.style.margin = "0";
+    empty.textContent = "No messages yet.";
+    box.appendChild(empty);
+    return;
+  }
+  lines.forEach((line) => {
+    const row = document.createElement("div");
+    row.className = "game-chat-line";
+    const who = document.createElement("span");
+    who.className = "game-chat-from";
+    who.textContent = `${String(line.from || "?")}: `;
+    const txt = document.createElement("span");
+    txt.className = "game-chat-text";
+    txt.textContent = String(line.text || "");
+    row.appendChild(who);
+    row.appendChild(txt);
+    box.appendChild(row);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+
 async function postNewGame(payload) {
   const withRoom = { ...payload, room: currentRoom };
   const res = await fetch(API_NEW_GAME, {
@@ -1127,6 +1252,7 @@ function renderState(state) {
     }
     gameOverWrap.classList.remove("hidden");
     gameOverBanner.textContent = `${winnerDisplay} wins`;
+    gameOverBanner.setAttribute("title", `${winnerDisplay} wins`);
     if (gameOverHint) {
       gameOverHint.textContent = "Tie-breaker: if prestige is tied, the player with fewer purchased development cards wins.";
     }
@@ -1152,13 +1278,31 @@ function renderState(state) {
       }
       const pts = Number(p.prestige) || 0;
       const cards = Number.isFinite(Number(p.purchasedCards)) ? Number(p.purchasedCards) : "—";
-      li.textContent = `${p.name} — ${pts} prestige · ${cards} cards`;
+      const displayName = replaceGenericSeatNames(p && p.name != null ? String(p.name) : "?", lobbyNames);
+      const rank = document.createElement("span");
+      rank.className = "leaderboard__rank";
+      rank.textContent = String(idx + 1);
+      const mid = document.createElement("div");
+      mid.className = "leaderboard__mid";
+      const nameEl = document.createElement("span");
+      nameEl.className = "leaderboard__name";
+      nameEl.textContent = displayName;
+      nameEl.title = displayName;
+      mid.appendChild(nameEl);
+      const stats = document.createElement("span");
+      stats.className = "leaderboard__stats";
+      stats.textContent = `${pts} pts · ${cards} cards`;
+      li.appendChild(rank);
+      li.appendChild(mid);
+      li.appendChild(stats);
       leaderboardEl.appendChild(li);
     });
     if (playAgainRoomBtn) {
       playAgainRoomBtn.disabled = false;
-      playAgainRoomBtn.onclick = async () => {
-        if (playAgainRoomBtn.disabled) return;
+      gameOverUiCallbacks.playAgain = async () => {
+        if (playAgainRoomBtn.disabled) {
+          return;
+        }
         playAgainRoomBtn.disabled = true;
         playAgainRoomBtn.textContent = "Preparing lobby...";
         try {
@@ -1178,8 +1322,8 @@ function renderState(state) {
             throw new Error((created && created.message) || "Could not prepare rematch lobby.");
           }
           clearTransientUi();
-          showWaitingRoom();
-          startLiveSync();
+          gameUiNav.showWaitingRoom();
+          gameUiNav.startLiveSync();
           const next = await fetchState();
           renderLobbyStatus(next);
           showToast(`New lobby ready in ${currentRoom}. Everyone can ready up again.`);
@@ -1188,17 +1332,20 @@ function renderState(state) {
           showToast(msg, "error");
         } finally {
           playAgainRoomBtn.disabled = false;
-          playAgainRoomBtn.textContent = "Play again (same room)";
+          playAgainRoomBtn.textContent = "Play again";
         }
       };
     }
     if (gameOverHomeBtn) {
-      gameOverHomeBtn.onclick = () => {
+      gameOverUiCallbacks.home = () => {
         clearTransientUi();
-        showHome(true);
+        document.getElementById("game-ui")?.classList.remove("game-over-mode");
+        gameUiNav.showHome(true);
       };
     }
   } else if (gameOverWrap) {
+    gameOverUiCallbacks.playAgain = null;
+    gameOverUiCallbacks.home = null;
     if (gameUiRoot) {
       gameUiRoot.classList.remove("game-over-mode");
     }
@@ -1481,13 +1628,41 @@ function renderState(state) {
       if (p.name === currentDisplayName) {
         card.classList.add("current");
       }
+      const pts = Number(p.prestige) || 0;
+      if (pts >= 15) {
+        card.classList.add("player-card--prestige-alert");
+      }
+
+      const header = document.createElement("div");
+      header.className = "player-card__header";
+      const nameBlock = document.createElement("div");
+      nameBlock.className = "player-card__name-block";
       const name = document.createElement("div");
       name.className = "player-name";
-      name.textContent = p.name;
+      name.appendChild(document.createTextNode(p.name));
+      if (samePlayerName(p.name, currentPlayerName)) {
+        const you = document.createElement("span");
+        you.className = "player-name__you";
+        you.textContent = " (You)";
+        name.appendChild(you);
+      }
+      nameBlock.appendChild(name);
+      const prestigeBadge = document.createElement("div");
+      prestigeBadge.className = "player-card__prestige";
+      if (pts >= 15) {
+        prestigeBadge.classList.add("player-card__prestige--high");
+      }
+      prestigeBadge.textContent = String(pts);
+      prestigeBadge.setAttribute("aria-label", `Prestige points: ${pts}`);
+      prestigeBadge.title =
+        pts >= 15 ? "15+ prestige — final round may be in effect" : "Prestige points (first to 15 triggers last round)";
+      header.appendChild(nameBlock);
+      header.appendChild(prestigeBadge);
+
       const meta = document.createElement("div");
       meta.className = "player-meta";
       const totalCoins = Object.values(p.gems || {}).reduce((sum, n) => sum + Number(n || 0), 0);
-      meta.textContent = `${p.human ? "Human" : "AI"} · ${p.prestige} pts · Coins: ${totalCoins}`;
+      meta.textContent = `${p.human ? "Human" : "AI"} · Coins: ${totalCoins}`;
       const afkMeta = document.createElement("div");
       afkMeta.className = "player-afk-meta";
       const afkSec = Number.isFinite(Number(p.afkSeconds)) ? Number(p.afkSeconds) : 0;
@@ -1537,7 +1712,7 @@ function renderState(state) {
           : Object.values(p.bonuses || {}).reduce((sum, n) => sum + Number(n || 0), 0);
       extra.textContent = `Reserved: ${p.reservedCount} · Bought: ${boughtCount} cards`;
 
-      card.appendChild(name);
+      card.appendChild(header);
       card.appendChild(meta);
       if (afkMeta.textContent) {
         card.appendChild(afkMeta);
@@ -1801,6 +1976,8 @@ function renderState(state) {
     }
   }
 
+  updateGameChat(state);
+
   // Only show available actions for the active local player's turn.
   const takeBtn = document.getElementById("take-gems-btn");
   if (takeBtn) {
@@ -1863,6 +2040,7 @@ function renderState(state) {
   lastSeenActionCount = actions.length;
   lastSeenTurnNumber = turnNo;
   suppressRealtimeToasts = false;
+  notifyOthersPrestigeThreshold(state);
   if (boardColEl || sideColEl) {
     window.requestAnimationFrame(() => {
       if (boardColEl && boardScrollTop !== null) {
@@ -2668,6 +2846,41 @@ async function init() {
   const startScreen = document.getElementById("start-screen");
   const waitingRoom = document.getElementById("waiting-room");
   const gameUi = document.getElementById("game-ui");
+  if (gameUi) {
+    gameUi.addEventListener(
+      "click",
+      (e) => {
+        if (!gameUi.classList.contains("game-over-mode")) {
+          return;
+        }
+        const t = e.target;
+        if (!(t instanceof Element)) {
+          return;
+        }
+        const playBtn = t.closest("#play-again-room-btn");
+        const homeBtn = t.closest("#game-over-home-btn");
+        if (playBtn) {
+          if (playBtn.disabled) {
+            return;
+          }
+          e.preventDefault();
+          const fn = gameOverUiCallbacks.playAgain;
+          if (typeof fn === "function") {
+            fn();
+          }
+          return;
+        }
+        if (homeBtn) {
+          e.preventDefault();
+          const fn = gameOverUiCallbacks.home;
+          if (typeof fn === "function") {
+            fn();
+          }
+        }
+      },
+      true
+    );
+  }
   const videoPanel = document.querySelector(".video-panel");
   const startBtn = document.getElementById("start-game-btn");
   const addAiBtn = document.getElementById("add-ai-btn");
@@ -3095,6 +3308,10 @@ async function init() {
     }
   }
 
+  gameUiNav.showWaitingRoom = showWaitingRoom;
+  gameUiNav.showHome = showHome;
+  gameUiNav.startLiveSync = startLiveSync;
+
   function getEnteredName() {
     if (!playerNameInput) {
       return "";
@@ -3260,6 +3477,54 @@ async function init() {
       }
     });
   }
+
+  const gameChatInput = document.getElementById("game-chat-input");
+  const gameChatSend = document.getElementById("game-chat-send");
+  let gameChatSending = false;
+  async function trySendGameChat() {
+    if (!gameChatInput || gameChatSending) {
+      return;
+    }
+    const text = gameChatInput.value;
+    if (!String(text || "").trim()) {
+      return;
+    }
+    gameChatSending = true;
+    if (gameChatSend) {
+      gameChatSend.disabled = true;
+    }
+    try {
+      const result = await postGameChat(text);
+      if (!result || !result.success) {
+        showToast((result && result.message) || "Could not send chat.", "error");
+        return;
+      }
+      gameChatInput.value = "";
+      const st = await fetchState();
+      renderState(st);
+    } catch (_) {
+      showToast("Could not send chat.", "error");
+    } finally {
+      gameChatSending = false;
+      if (gameChatSend) {
+        gameChatSend.disabled = false;
+      }
+    }
+  }
+  if (gameChatSend) {
+    gameChatSend.addEventListener("click", () => {
+      trySendGameChat();
+    });
+  }
+  if (gameChatInput) {
+    gameChatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        trySendGameChat();
+      }
+    });
+  }
+
   if (createDialogCancel) {
     createDialogCancel.addEventListener("click", () => closeCreateRoomDialog());
   }
