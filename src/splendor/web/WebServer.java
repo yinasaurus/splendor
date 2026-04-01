@@ -1384,6 +1384,35 @@ public class WebServer {
 		}
 	}
 
+	private static Map<GemType, Integer> parseDiscardGemMap(String body) {
+		Map<GemType, Integer> gemsToDiscard = new HashMap<>();
+		if (body == null) {
+			return gemsToDiscard;
+		}
+		String lower = body.toLowerCase();
+		int discardIdx = lower.indexOf("\"discard\"");
+		if (discardIdx < 0) {
+			return gemsToDiscard;
+		}
+		int dStart = body.indexOf("[", discardIdx);
+		int dEnd = body.indexOf("]", dStart);
+		if (dStart < 0 || dEnd <= dStart) {
+			return gemsToDiscard;
+		}
+		String inner = body.substring(dStart + 1, dEnd);
+		String[] parts = inner.split(",");
+		for (String part : parts) {
+			String trimmed = part.replace("\"", "").trim().toUpperCase();
+			if (!trimmed.isEmpty()) {
+				GemType type = GemType.fromAbbreviation(trimmed);
+				if (type != null) {
+					gemsToDiscard.put(type, gemsToDiscard.getOrDefault(type, 0) + 1);
+				}
+			}
+		}
+		return gemsToDiscard;
+	}
+
 	private static Map<String, Object> handleAction(GameSession session, String body) {
 		Map<String, Object> response = new HashMap<>();
 		body = body.trim();
@@ -1465,24 +1494,7 @@ public class WebServer {
 					}
 				}
 			}
-			int discardIdx = lower.indexOf("\"discard\"");
-			if (discardIdx >= 0) {
-				int dStart = body.indexOf("[", discardIdx);
-				int dEnd = body.indexOf("]", dStart);
-				if (dStart >= 0 && dEnd > dStart) {
-					String inner = body.substring(dStart + 1, dEnd);
-					String[] parts = inner.split(",");
-					for (String part : parts) {
-						String trimmed = part.replace("\"", "").trim().toUpperCase();
-						if (!trimmed.isEmpty()) {
-							GemType type = GemType.fromAbbreviation(trimmed);
-							if (type != null) {
-								gemsToDiscard.put(type, gemsToDiscard.getOrDefault(type, 0) + 1);
-							}
-						}
-					}
-				}
-			}
+			gemsToDiscard.putAll(parseDiscardGemMap(body));
 			if (!gemsToTake.isEmpty()) {
 				GameRules.ValidationResult vr = session.controller.takeGemsWithDiscard(gemsToTake, gemsToDiscard);
 				success = vr.isValid();
@@ -1522,7 +1534,8 @@ public class WebServer {
 				success = false;
 				message = "No cards left in this deck.";
 			} else {
-				success = session.controller.reserveTopCard(level);
+				Map<GemType, Integer> discardMap = parseDiscardGemMap(body);
+				success = session.controller.reserveTopCard(level, discardMap);
 				message = success ? "Top card reserved." : "Cannot reserve from this deck.";
 				if (success) {
 					actionSummary = actor + " reserved the top card from Level " + topCard.getLevel()
@@ -1542,7 +1555,8 @@ public class WebServer {
 				message = "Invalid card index for this level.";
 			} else {
 				Card card = visible.get(index);
-				success = session.controller.reserveCard(level, index);
+				Map<GemType, Integer> discardMap = parseDiscardGemMap(body);
+				success = session.controller.reserveCard(level, index, discardMap);
 				message = success ? "Card reserved." : "Cannot reserve this card.";
 				if (success) {
 					actionSummary = actor + " reserved a Level " + card.getLevel()

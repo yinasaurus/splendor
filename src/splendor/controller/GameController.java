@@ -363,6 +363,59 @@ public class GameController {
 	}
 
 	/**
+	 * After a successful reserve, take 1 gold from the bank if any remains, then
+	 * discard down to {@link GameConfig#getMaxGemsPerPlayer()} (same auto-fill idea
+	 * as {@link #takeGemsWithDiscard}). Splendor rules: you always receive gold
+	 * when reserving if gold is available; over 10 gems you must return tokens.
+	 */
+	private void giveGoldThenApplyDiscard(Player player, Map<GemType, Integer> requestedDiscard) {
+		if (board.getGemCount(GemType.GOLD) > 0) {
+			Map<GemType, Integer> oneGold = new HashMap<>();
+			oneGold.put(GemType.GOLD, 1);
+			board.removeGems(oneGold);
+			player.addGems(oneGold);
+		}
+		int maxGems = config.getMaxGemsPerPlayer();
+		int needDiscard = Math.max(0, player.getTotalGemCount() - maxGems);
+		if (needDiscard <= 0) {
+			return;
+		}
+		Map<GemType, Integer> req = requestedDiscard == null ? new HashMap<>() : new HashMap<>(requestedDiscard);
+		Map<GemType, Integer> discardToApply = new HashMap<>();
+		Map<GemType, Integer> afterGold = player.getGems();
+		for (Map.Entry<GemType, Integer> e : req.entrySet()) {
+			int qty = e.getValue() == null ? 0 : e.getValue();
+			if (qty <= 0) {
+				continue;
+			}
+			int have = afterGold.getOrDefault(e.getKey(), 0);
+			if (have <= 0) {
+				continue;
+			}
+			discardToApply.put(e.getKey(), Math.min(qty, have));
+		}
+		int currentDiscard = discardToApply.values().stream().mapToInt(Integer::intValue).sum();
+		if (currentDiscard < needDiscard) {
+			for (GemType t : GemType.values()) {
+				if (currentDiscard >= needDiscard) {
+					break;
+				}
+				int have = afterGold.getOrDefault(t, 0);
+				int already = discardToApply.getOrDefault(t, 0);
+				int canAdd = Math.max(0, have - already);
+				if (canAdd <= 0) {
+					continue;
+				}
+				int add = Math.min(canAdd, needDiscard - currentDiscard);
+				discardToApply.put(t, already + add);
+				currentDiscard += add;
+			}
+		}
+		player.removeGems(discardToApply);
+		board.addGems(discardToApply);
+	}
+
+	/**
 	 * Executes a reserve card action.
 	 *
 	 * @param level the card level (1, 2, or 3)
@@ -370,50 +423,47 @@ public class GameController {
 	 * @return true if the action was successful
 	 */
 	public boolean reserveCard(int level, int cardIndex) {
+		return reserveCard(level, cardIndex, null);
+	}
+
+	/**
+	 * Same as {@link #reserveCard(int, int)} with optional discard preference when
+	 * receiving gold would exceed the gem limit (used by web client).
+	 *
+	 * @param gemsToDiscard map of gems to return to the bank after gold is taken; may be null
+	 */
+	public boolean reserveCard(int level, int cardIndex, Map<GemType, Integer> gemsToDiscard) {
 		Player player = getCurrentPlayer();
-		
-		// Validate action
+
 		GameRules.ValidationResult result = rules.validateReserveCard(player);
 		if (!result.isValid()) {
 			return false;
 		}
-		
-		// Get the card
+
 		List<Card> visibleCards = board.getVisibleCards(level);
 		if (cardIndex < 0 || cardIndex >= visibleCards.size()) {
 			return false;
 		}
-		
+
 		Card card = visibleCards.get(cardIndex);
-		
-		// Execute action
+
 		board.removeCard(level, card);
 		player.reserveCard(card);
-		
-		// Draw new card from deck to replace
+
 		Card newCard = board.drawCardFromDeck(level);
 		if (newCard != null) {
 			board.addCard(level, newCard);
 		}
-		
-		// Give player a gold gem if available
-		int currentTotalGems = player.getTotalGemCount();
-		if (board.getGemCount(GemType.GOLD) > 0 && currentTotalGems < config.getMaxGemsPerPlayer()) {
-			Map<GemType, Integer> gold = new HashMap<>();
-			gold.put(GemType.GOLD, 1);
-			board.removeGems(gold);
-			player.addGems(gold);
-		}
-		
-		// Record statistics
+
+		giveGoldThenApplyDiscard(player, gemsToDiscard);
+
 		statistics.recordReservation(player);
 		statistics.recordTurn(player, "Reserved card");
-		
-		// Check for noble visits
+
 		checkNobleVisits(player);
-		
+
 		afterSuccessfulAction(player);
-		
+
 		return true;
 	}
 
@@ -424,15 +474,20 @@ public class GameController {
 	 * @return true if the action was successful
 	 */
 	public boolean reserveTopCard(int level) {
+		return reserveTopCard(level, null);
+	}
+
+	/**
+	 * @param gemsToDiscard optional preference when discarding after receiving gold
+	 */
+	public boolean reserveTopCard(int level, Map<GemType, Integer> gemsToDiscard) {
 		Player player = getCurrentPlayer();
 
-		// Validate reserve slot availability first.
 		GameRules.ValidationResult result = rules.validateReserveCard(player);
 		if (!result.isValid()) {
 			return false;
 		}
 
-		// Draw top card from selected deck.
 		Card topCard = board.drawCardFromDeck(level);
 		if (topCard == null) {
 			return false;
@@ -440,14 +495,7 @@ public class GameController {
 
 		player.reserveCard(topCard);
 
-		// Give player a gold gem if available and hand-size allows.
-		int currentTotalGems = player.getTotalGemCount();
-		if (board.getGemCount(GemType.GOLD) > 0 && currentTotalGems < config.getMaxGemsPerPlayer()) {
-			Map<GemType, Integer> gold = new HashMap<>();
-			gold.put(GemType.GOLD, 1);
-			board.removeGems(gold);
-			player.addGems(gold);
-		}
+		giveGoldThenApplyDiscard(player, gemsToDiscard);
 
 		statistics.recordReservation(player);
 		statistics.recordTurn(player, "Reserved top card");
@@ -557,11 +605,85 @@ public class GameController {
 	}
 
 	/**
+	 * True if the current player could still take gems (bank allows a structural take),
+	 * buy something, or reserve a card from the table or a deck.
+	 */
+	public boolean hasLegalMovesAvailable() {
+		Player p = getCurrentPlayer();
+		if (anyAffordablePurchase(p)) {
+			return true;
+		}
+		if (bankAllowsStructuralGemTake()) {
+			return true;
+		}
+		if (anyReserveAvailable(p)) {
+			return true;
+		}
+		return false;
+	}
+
+	private boolean anyAffordablePurchase(Player p) {
+		for (int level = 1; level <= 3; level++) {
+			for (Card c : board.getVisibleCards(level)) {
+				if (c.canAfford(p.getGems(), p.getBonuses())) {
+					return true;
+				}
+			}
+		}
+		for (Card c : p.getReservedCards()) {
+			if (c.canAfford(p.getGems(), p.getBonuses())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Bank has either 3+ non-gold colors with supply, or 4+ of one color (Splendor take rules). */
+	private boolean bankAllowsStructuralGemTake() {
+		List<GemType> nonGoldWithStock = new ArrayList<>();
+		for (GemType t : GemType.values()) {
+			if (t == GemType.GOLD) {
+				continue;
+			}
+			if (board.getGemCount(t) > 0) {
+				nonGoldWithStock.add(t);
+			}
+		}
+		if (nonGoldWithStock.size() >= 3) {
+			return true;
+		}
+		for (GemType t : nonGoldWithStock) {
+			if (board.getGemCount(t) >= 4) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean anyReserveAvailable(Player p) {
+		if (!rules.validateReserveCard(p).isValid()) {
+			return false;
+		}
+		for (int level = 1; level <= 3; level++) {
+			if (!board.getVisibleCards(level).isEmpty()) {
+				return true;
+			}
+			if (board.getDeckSize(level) > 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * Executes a pass turn action.
 	 *
 	 * @return true if the action was successful
 	 */
 	public boolean passTurn() {
+		if (hasLegalMovesAvailable()) {
+			return false;
+		}
 		Player player = getCurrentPlayer();
 		statistics.recordTurn(player, "Passed turn");
 		afterSuccessfulAction(player);

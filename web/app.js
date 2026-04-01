@@ -988,52 +988,77 @@ const guidedSteps = [
 
   "You're set!\n\nEnd the tutorial anytime with \"End Tutorial\", or tap \"Finish\" to return to the start screen. Have fun!"
 ];
+function sumPlayerGems(gems) {
+  if (!gems || typeof gems !== "object") {
+    return 0;
+  }
+  return Object.values(gems).reduce((s, n) => s + Number(n || 0), 0);
+}
+
+/**
+ * Same structural rule as server bankAllowsStructuralGemTake: can the bank support
+ * any take-gems shape (3 different or 2 same with 4+ in bank). Hand size does not
+ * matter — player may take then discard.
+ */
+function bankAllowsStructuralGemTakeFromState(state) {
+  const bankGems = state.gems || {};
+  const nonGoldColors = Object.entries(bankGems).filter(([gem, count]) => gem !== "GOLD" && Number(count) > 0);
+  if (nonGoldColors.length >= 3) {
+    return true;
+  }
+  return nonGoldColors.some(([, count]) => Number(count) >= 4);
+}
+
+/**
+ * True if the current player could reserve from a visible row or a non-empty deck.
+ */
+function canReserveAnyTarget(state) {
+  const myPlayer = (state.players || []).find((p) => samePlayerName(p.name, state.currentPlayer));
+  const reservedList = myPlayer && Array.isArray(myPlayer.reserved) ? myPlayer.reserved : [];
+  const reservedCount =
+    myPlayer && myPlayer.reservedCount != null ? Number(myPlayer.reservedCount) : reservedList.length;
+  if (reservedCount >= 3) {
+    return false;
+  }
+  const levels = state.levels || {};
+  const decks = state.deckRemaining || {};
+  for (let lvl = 1; lvl <= 3; lvl++) {
+    const row = levels[lvl] || levels[String(lvl)] || [];
+    if (row.length > 0) {
+      return true;
+    }
+    const left = Number(decks[lvl] ?? decks[String(lvl)] ?? 0);
+    if (left > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Determines if the current player has no valid action available.
  * A player is stuck if they cannot:
- *  (a) take any gems (bank is depleted by Splendor rules), AND
+ *  (a) take any gems (bank cannot support a legal take pattern), AND
  *  (b) buy any visible or reserved card, AND
- *  (c) reserve a new card (reserve already full at 3)
+ *  (c) reserve a new card (no slot or no card/deck source)
  *
  * @param {object} state - The current game state.
  * @returns {boolean} true if the player is stuck and should see "Pass Turn".
  */
 function isPlayerStuck(state) {
-  const bankGems = state.gems || {};
+  const canTakeGems = bankAllowsStructuralGemTakeFromState(state);
 
-  // --- Gem Availability Rules ---
-  // Non-gold gem colors with at least 1 available
-  const nonGoldColors = Object.entries(bankGems)
-    .filter(([gem, count]) => gem !== "GOLD" && count > 0);
-
-  // 3-Different Rule: need >= 3 distinct colors to take 3 different gems
-  const canTake3Different = nonGoldColors.length >= 3;
-
-  // 2-of-a-Kind Rule: need at least one color with >= 4 gems to take 2 of the same
-  const canTake2OfSame = nonGoldColors.some(([, count]) => count >= 4);
-
-  const canTakeGems = canTake3Different || canTake2OfSame;
-
-  // --- Affordability Check ---
-  // Check visible board cards
   const affordableVisible = Object.values(state.levels || {})
     .flat()
     .some((c) => !!c.affordable);
 
-  // Find the current player's own reserved cards and check affordability
-  const myPlayer = (state.players || []).find((p) =>
-    samePlayerName(p.name, state.currentPlayer)
-  );
-  const reservedCount = myPlayer ? (myPlayer.reserved || []).length : 0;
+  const myPlayer = (state.players || []).find((p) => samePlayerName(p.name, state.currentPlayer));
   const affordableReserved = myPlayer
     ? (myPlayer.reserved || []).some((rc) => !!rc.affordable)
     : false;
 
-  // --- Reserve Check ---
-  // Can still reserve if slots remain (< 3 reserved)
-  const canReserve = reservedCount < 3;
+  const canReserve = canReserveAnyTarget(state);
 
-  // Player is stuck if NONE of the following are possible:
   return !canTakeGems && !affordableVisible && !affordableReserved && !canReserve;
 }
 
@@ -1289,7 +1314,7 @@ function renderState(state) {
     resBtn.onclick = async (e) => {
       e.stopPropagation();
       if (resBtn.disabled) return;
-      await postReserveTop(lvl);
+      await postReserveTop(lvl, state);
     };
     deckLi.appendChild(deckCard);
     ul.appendChild(deckLi);
@@ -1405,20 +1430,8 @@ function renderState(state) {
 
       reserveBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
-        try {
-          const result = await postAction({ type: "reserve", level: lvl, index });
-          const msg = document.getElementById("action-message");
-          msg.textContent = result.message || (result.success ? "Reserved." : "Reserve failed.");
-          msg.className = "message " + (result.success ? "ok" : "error");
-          if (result.success) {
-            showToast("Card reserved successfully.");
-          }
-          const newState = await fetchState();
-          renderState(newState);
-        } catch (e2) {
-          const msg = document.getElementById("action-message");
-          msg.textContent = "Error reserving card.";
-          msg.className = "message error";
+        if (typeof uiState.tryReserveVisible === "function") {
+          await uiState.tryReserveVisible(lvl, index, state);
         }
       });
 
@@ -1705,26 +1718,25 @@ function renderState(state) {
             costBadges.appendChild(pill);
           });
           mini.appendChild(costBadges);
-          const buyR = document.createElement("button");
-          buyR.type = "button";
-          buyR.className = "reserved-mini__buy card-buy-btn";
-          buyR.textContent = "Buy reserved";
           const isYou = samePlayerName(p.name, currentPlayerName);
-          const canBuyReserved = isMyTurn && isYou && p.human && !!rc.affordable;
-          buyR.disabled = actionRequestInFlight || !canBuyReserved;
-          buyR.title = canBuyReserved
-            ? "Buy this reserved card"
-            : isYou
-              ? "Not affordable yet"
-              : "Other player’s reserve";
-          buyR.addEventListener("click", async (e) => {
-            e.stopPropagation();
-            if (buyR.disabled) {
-              return;
-            }
-            await postPurchaseReserved(rIdx);
-          });
-          mini.appendChild(buyR);
+          // Only your own reserved row gets a buy control; opponents’ reserves are hidden information enough without a dummy button.
+          if (isYou) {
+            const buyR = document.createElement("button");
+            buyR.type = "button";
+            buyR.className = "reserved-mini__buy card-buy-btn";
+            buyR.textContent = "Buy reserved";
+            const canBuyReserved = isMyTurn && p.human && !!rc.affordable;
+            buyR.disabled = actionRequestInFlight || !canBuyReserved;
+            buyR.title = canBuyReserved ? "Buy this reserved card" : "Not affordable yet";
+            buyR.addEventListener("click", async (e) => {
+              e.stopPropagation();
+              if (buyR.disabled) {
+                return;
+              }
+              await postPurchaseReserved(rIdx);
+            });
+            mini.appendChild(buyR);
+          }
           resSlots.appendChild(mini);
         });
         resWrap.appendChild(resSlots);
@@ -2111,7 +2123,8 @@ function setupGemSelection() {
   const discardConfirmBtn = document.getElementById("discard-gems-confirm-btn");
   const discardCancelBtn = document.getElementById("discard-gems-cancel-btn");
   let takeGemsSubmitting = false;
-  let pendingTakeGems = null;
+  /** @type {{ kind: 'take', gems: string[] } | { kind: 'reserve', level: number, index: number } | { kind: 'reserveTop', level: number } | null} */
+  let activeDiscardFlow = null;
   let requiredDiscardCount = 0;
   const discardSelected = new Map();
   let discardCollapseTimer = null;
@@ -2127,7 +2140,7 @@ function setupGemSelection() {
     });
     syncTakeGemUiFromState(latestState);
     if (discardConfirmBtn) {
-      discardConfirmBtn.disabled = isBusy || !pendingTakeGems;
+      discardConfirmBtn.disabled = isBusy || !activeDiscardFlow;
     }
     if (discardCancelBtn) {
       discardCancelBtn.disabled = isBusy;
@@ -2141,7 +2154,7 @@ function setupGemSelection() {
       window.clearTimeout(discardCollapseTimer);
       discardCollapseTimer = null;
     }
-    pendingTakeGems = null;
+    activeDiscardFlow = null;
     requiredDiscardCount = 0;
     discardSelected.clear();
     const finalize = () => {
@@ -2183,9 +2196,13 @@ function setupGemSelection() {
       return;
     }
     const picked = collectDiscardAbbr().length;
-    discardConfirmBtn.disabled = takeGemsSubmitting || !pendingTakeGems || picked !== requiredDiscardCount;
+    discardConfirmBtn.disabled = takeGemsSubmitting || !activeDiscardFlow || picked !== requiredDiscardCount;
     if (discardHint && requiredDiscardCount > 0) {
-      discardHint.textContent = `Pick exactly ${requiredDiscardCount} gem(s) to discard.`;
+      if (activeDiscardFlow && activeDiscardFlow.kind !== "take") {
+        discardHint.textContent = `Reserving gives 1 gold. Pick exactly ${requiredDiscardCount} gem(s) to return to the bank.`;
+      } else {
+        discardHint.textContent = `Pick exactly ${requiredDiscardCount} gem(s) to discard.`;
+      }
     }
   }
 
@@ -2215,7 +2232,7 @@ function setupGemSelection() {
             });
             const needed = Math.max(0, Number(mustDiscardMatch[1] || 0));
             if (needed > 0) {
-              openDiscardPanel(needed, baseGems, gems);
+              openDiscardPanel(needed, baseGems, { kind: "take", gems });
             }
           } catch (_) {
             // Keep original failure message if resync fails.
@@ -2245,16 +2262,25 @@ function setupGemSelection() {
     }
   }
 
-  function openDiscardPanel(required, myGems, gemsToTake) {
+  /**
+   * @param {number} required
+   * @param {Record<string, number>} myGems
+   * @param {{ kind: 'take', gems: string[] } | { kind: 'reserve', level: number, index: number } | { kind: 'reserveTop', level: number }} flowSpec
+   */
+  function openDiscardPanel(required, myGems, flowSpec) {
     if (!discardPanel || !discardOptions) {
       return false;
     }
-    pendingTakeGems = Array.isArray(gemsToTake) ? [...gemsToTake] : [];
+    activeDiscardFlow = flowSpec;
     requiredDiscardCount = Math.max(0, Number(required) || 0);
     discardSelected.clear();
     discardOptions.innerHTML = "";
     if (discardTitle) {
-      discardTitle.textContent = `Discard ${requiredDiscardCount} gem${requiredDiscardCount === 1 ? "" : "s"}`;
+      if (flowSpec.kind === "take") {
+        discardTitle.textContent = `Discard ${requiredDiscardCount} gem${requiredDiscardCount === 1 ? "" : "s"}`;
+      } else {
+        discardTitle.textContent = `Return ${requiredDiscardCount} gem${requiredDiscardCount === 1 ? "" : "s"} (reserve + gold)`;
+      }
     }
     const gemTypesLocal = ["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"];
     gemTypesLocal.forEach((gem) => {
@@ -2397,7 +2423,7 @@ function setupGemSelection() {
           }
           discardPool[gem] = Number(discardPool[gem] || 0) + 1;
         });
-        const opened = openDiscardPanel(overflow, discardPool, gems);
+        const opened = openDiscardPanel(overflow, discardPool, { kind: "take", gems });
         if (!opened) {
           messageEl.textContent = "Cannot open discard picker right now.";
           messageEl.className = "message error";
@@ -2416,7 +2442,7 @@ function setupGemSelection() {
 
   if (discardConfirmBtn) {
     discardConfirmBtn.addEventListener("click", async () => {
-      if (!pendingTakeGems || takeGemsSubmitting) {
+      if (!activeDiscardFlow || takeGemsSubmitting) {
         return;
       }
       const discard = collectDiscardAbbr();
@@ -2425,16 +2451,161 @@ function setupGemSelection() {
         messageEl.className = "message error";
         return;
       }
-      await submitTakeGems(pendingTakeGems, discard);
+      if (activeDiscardFlow.kind === "take") {
+        await submitTakeGems(activeDiscardFlow.gems, discard);
+        return;
+      }
+      try {
+        setTakeGemsBusy(true);
+        messageEl.textContent = "Submitting reserve...";
+        messageEl.className = "message";
+        let result;
+        if (activeDiscardFlow.kind === "reserve") {
+          result = await postAction({
+            type: "reserve",
+            level: activeDiscardFlow.level,
+            index: activeDiscardFlow.index,
+            discard,
+          });
+        } else {
+          result = await postAction({
+            type: "reserveTop",
+            level: activeDiscardFlow.level,
+            discard,
+          });
+        }
+        messageEl.textContent = result.message || (result.success ? "Reserved." : "Reserve failed.");
+        messageEl.className = "message " + (result.success ? "ok" : "error");
+        if (result.success) {
+          showToast(activeDiscardFlow.kind === "reserveTop" ? "Top card reserved." : "Card reserved.");
+          closeDiscardPanel(true);
+          const newState = await fetchState();
+          renderState(newState);
+        } else {
+          showToast(result.message || "Could not reserve.", "error");
+        }
+      } catch (e) {
+        const text = e && e.message ? e.message : "Error reserving.";
+        messageEl.textContent = text;
+        messageEl.className = "message error";
+        showToast(text, "error");
+      } finally {
+        setTakeGemsBusy(false);
+      }
     });
   }
   if (discardCancelBtn) {
     discardCancelBtn.addEventListener("click", () => {
+      const was = activeDiscardFlow && activeDiscardFlow.kind;
       closeDiscardPanel();
-      messageEl.textContent = "Take gems cancelled.";
+      if (was === "take") {
+        messageEl.textContent = "Take gems cancelled.";
+      } else if (was === "reserve" || was === "reserveTop") {
+        messageEl.textContent = "Reserve cancelled.";
+      } else {
+        messageEl.textContent = "Cancelled.";
+      }
       messageEl.className = "message error";
     });
   }
+
+  uiState.tryReserveVisible = async (level, index, liveState) => {
+    const st = liveState || latestState;
+    const msg = document.getElementById("action-message");
+    const my =
+      st && Array.isArray(st.players)
+        ? st.players.find((p) => samePlayerName(p && p.name, st.currentPlayer))
+        : null;
+    const gems = my && my.gems ? { ...my.gems } : {};
+    const total = sumPlayerGems(gems);
+    const bankGold = Number(st && st.gems && st.gems.GOLD != null ? st.gems.GOLD : 0);
+    if (total >= 10 && bankGold > 0) {
+      const pool = { ...gems, GOLD: Number(gems.GOLD || 0) + 1 };
+      const opened = openDiscardPanel(1, pool, { kind: "reserve", level, index });
+      if (!opened) {
+        if (msg) {
+          msg.textContent = "Cannot open discard picker.";
+          msg.className = "message error";
+        }
+        return;
+      }
+      if (msg) {
+        msg.textContent = "You receive 1 gold when reserving. Pick 1 gem to return to the bank.";
+        msg.className = "message";
+      }
+      return;
+    }
+    try {
+      const result = await postAction({ type: "reserve", level, index });
+      if (msg) {
+        msg.textContent = result.message || (result.success ? "Reserved." : "Reserve failed.");
+        msg.className = "message " + (result.success ? "ok" : "error");
+      }
+      if (result.success) {
+        showToast("Card reserved.");
+      } else {
+        showToast(result.message || "Reserve failed.", "error");
+      }
+      const newState = await fetchState();
+      renderState(newState);
+    } catch (e) {
+      const text = e && e.message ? e.message : "Error reserving.";
+      if (msg) {
+        msg.textContent = text;
+        msg.className = "message error";
+      }
+      showToast(text, "error");
+    }
+  };
+
+  uiState.tryReserveTop = async (level, liveState) => {
+    const st = liveState || latestState;
+    const msg = document.getElementById("action-message");
+    const my =
+      st && Array.isArray(st.players)
+        ? st.players.find((p) => samePlayerName(p && p.name, st.currentPlayer))
+        : null;
+    const gems = my && my.gems ? { ...my.gems } : {};
+    const total = sumPlayerGems(gems);
+    const bankGold = Number(st && st.gems && st.gems.GOLD != null ? st.gems.GOLD : 0);
+    if (total >= 10 && bankGold > 0) {
+      const pool = { ...gems, GOLD: Number(gems.GOLD || 0) + 1 };
+      const opened = openDiscardPanel(1, pool, { kind: "reserveTop", level });
+      if (!opened) {
+        if (msg) {
+          msg.textContent = "Cannot open discard picker.";
+          msg.className = "message error";
+        }
+        return;
+      }
+      if (msg) {
+        msg.textContent = "You receive 1 gold when reserving. Pick 1 gem to return to the bank.";
+        msg.className = "message";
+      }
+      return;
+    }
+    try {
+      const result = await postAction({ type: "reserveTop", level });
+      if (msg) {
+        msg.textContent = result.message || (result.success ? "Top card reserved." : "Reserve top failed.");
+        msg.className = "message " + (result.success ? "ok" : "error");
+      }
+      if (result.success) {
+        showToast(`Reserved top Level ${level} card.`);
+      } else {
+        showToast(result.message || "Could not reserve top card.", "error");
+      }
+      const newState = await fetchState();
+      renderState(newState);
+    } catch (e) {
+      const text = e && e.message ? e.message : "Error reserving top card.";
+      if (msg) {
+        msg.textContent = text;
+        msg.className = "message error";
+      }
+      showToast(text, "error");
+    }
+  };
 
   uiState.gemUiInitialized = true;
 }
@@ -2461,7 +2632,11 @@ async function postPurchaseReserved(index) {
   }
 }
 
-async function postReserveTop(level) {
+async function postReserveTop(level, liveState) {
+  if (typeof uiState.tryReserveTop === "function") {
+    await uiState.tryReserveTop(level, liveState);
+    return;
+  }
   const msg = document.getElementById("action-message");
   try {
     const result = await postAction({ type: "reserveTop", level });
