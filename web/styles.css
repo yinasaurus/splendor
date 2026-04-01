@@ -2524,3 +2524,124 @@ button.secondary:focus-visible {
   }
 }
 
+/* Mobile polish pass: tighter spacing, cleaner stacking, easier taps */
+@media (max-width: 768px) {
+  .app {
+    padding: 14px 10px 26px;
+  }
+
+  .app-header {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+  }
+
+  .subtitle {
+    font-size: 0.8rem;
+    margin-top: 6px;
+  }
+
+  .panel {
+    padding: 12px 12px;
+    border-radius: 12px;
+  }
+
+  #game-ui {
+    gap: 10px;
+  }
+
+  #game-ui .gameplay-toolbar {
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  #game-ui .gameplay-toolbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .gameplay-layout {
+    gap: 10px;
+  }
+
+  .gameplay-side-col {
+    gap: 10px;
+  }
+
+  .assist-panel {
+    gap: 8px;
+  }
+
+  .assist-list {
+    gap: 6px;
+    font-size: 0.8rem;
+  }
+
+  .players-row {
+    gap: 8px;
+    overflow-x: visible;
+    flex-direction: column;
+  }
+
+  .player-card {
+    min-width: 0;
+    width: 100%;
+    padding: 8px 10px;
+  }
+
+  .reserved-mini,
+  .purchased-mini {
+    width: 74px;
+  }
+
+  .actions-panel--sticky {
+    position: static;
+  }
+
+  .actions h3 {
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+  }
+
+  #take-gems-options.pill-row {
+    gap: 8px;
+  }
+
+  .take-gem-option {
+    padding: 8px 10px;
+    border-radius: 12px;
+  }
+
+  .take-gem-option__preview {
+    gap: 6px;
+  }
+
+  .take-gem-option .gem-sprite--stone {
+    --gw: 1.55rem;
+  }
+
+  .take-gem-option__btn {
+    min-width: 30px;
+    min-height: 28px;
+    padding: 2px 7px;
+  }
+
+  .take-gem-option__count {
+    min-width: 1.2rem;
+    font-size: 0.85rem;
+  }
+
+  .actions #take-gems-btn {
+    margin-top: 10px;
+    padding: 10px 12px;
+  }
+
+  .rulebook-panel {
+    width: min(100%, 96vw);
+    padding: 12px;
+  }
+
+  .rulebook-toolbar h2 {
+    font-size: 1.2rem;
+  }
+}
+
