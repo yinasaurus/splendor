@@ -116,9 +116,7 @@
           </div>
           <p class="hint small game-code-block__hint">Same code appears in the match header after start. Everyone must use this exact code to join.</p>
         </div>
-        <label>Your display name:
-          <input id="waiting-player-name" type="text" value="" readonly>
-        </label>
+        <input id="waiting-player-name" class="waiting-room-name-field" type="text" value="" readonly aria-label="Your display name">
         <div id="host-ai-controls" class="host-controls hidden">
           <label>Add AI difficulty:
             <select id="add-ai-difficulty">
@@ -158,76 +156,6 @@
         </div>
       </section>
 
-      <section id="tutorial-panel" class="panel hidden">
-        <div class="tutorial-header">
-          <h2>How to Play Splendor</h2>
-          <button id="close-tutorial-btn" type="button" class="secondary">Close</button>
-        </div>
-        <div class="tutorial-body">
-          <p><strong>Goal</strong>: Be the first player to reach the required prestige points (default 15) to win.</p>
-          <p><strong>On your turn, choose ONE action:</strong></p>
-          <ol>
-            <li><strong>Take gems</strong>
-              <ul>
-                <li>Option A: Take 3 different colored gems (e.g., R, E, S).</li>
-                <li>Option B: Take 2 of the same color (only if there are 4+ of that color on the board).</li>
-                <li>You cannot take GOLD directly and you cannot exceed 10 total gems.</li>
-              </ul>
-            </li>
-            <li><strong>Reserve a card</strong>
-              <ul>
-                <li>Reserve a face-up card from the board (max 3 reserved cards).</li>
-                <li>Gain 1 GOLD (wild) gem if any are available.</li>
-              </ul>
-            </li>
-            <li><strong>Purchase a card</strong>
-              <ul>
-                <li>Buy a face-up card or one of your reserved cards.</li>
-                <li>Pay using gems in hand plus permanent color bonuses from cards you already own.</li>
-                <li>GOLD gems can substitute any color.</li>
-              </ul>
-            </li>
-          </ol>
-          <p><strong>Cards and bonuses</strong></p>
-          <ul>
-            <li>Level 1 cards: cheap, usually 0 points, but give permanent color bonuses (discounts).</li>
-            <li>Level 2 cards: mid-cost, often 1–2 prestige.</li>
-            <li>Level 3 cards: expensive, give lots of prestige.</li>
-            <li>Each purchased card’s color gives you a permanent discount of that color for future cards.</li>
-          </ul>
-          <p><strong>What “discount” means (UI)</strong></p>
-          <ul>
-            <li>On each card, the <strong>bonus</strong> is the discount color you get after buying it.</li>
-            <li>Your <strong>player bonuses</strong> (in the Players panel) are permanent discounts that apply to ALL future purchases of that gem color.</li>
-            <li>A noble’s requirements look at <strong>bonuses</strong>, not loose gems.</li>
-          </ul>
-          <p><strong>How to read the screen</strong></p>
-          <ul>
-            <li><strong>Board Gems</strong>: the tokens you can take from the bank.</li>
-            <li><strong>Card cost</strong>: how many gems (or wild/gold substitutions) you must pay to buy it.</li>
-            <li><strong>Card bonus</strong>: the permanent discount color you gain after purchase.</li>
-            <li><strong>Players → gems</strong>: loose gems you currently hold.</li>
-            <li><strong>Players → bonuses</strong>: permanent discounts you earned.</li>
-            <li><strong>Nobles</strong>: requirements for bonuses (free extra prestige).</li>
-          </ul>
-          <p><strong>Nobles</strong></p>
-          <ul>
-            <li>Nobles show color requirements in permanent bonuses (not loose gems).</li>
-            <li>At the end of your turn, if your bonuses meet a noble’s requirement, that noble visits you automatically and gives extra points.</li>
-          </ul>
-          <p><strong>Winning & tie-breaker</strong></p>
-          <ul>
-            <li>When a player reaches the winning points, finish the round so everyone has played the same number of turns.</li>
-            <li>Highest prestige wins; if tied, the player with <em>fewer</em> purchased cards wins.</li>
-          </ul>
-          <p><strong>Tips</strong></p>
-          <ul>
-            <li>Buy cheap Level 1 cards early to build strong discounts.</li>
-            <li>Plan towards nobles—they are free extra points once your bonuses match.</li>
-          </ul>
-        </div>
-      </section>
-
       <section id="game-ui" class="hidden">
       <div id="guided-overlay" class="guided-overlay hidden">
         <div class="guided-card">
@@ -245,7 +173,7 @@
           </div>
         </div>
       </div>
-      <section class="status">
+      <section class="status gameplay-toolbar">
         <div class="status-main">
           <div id="turn-info"></div>
           <div class="game-code-block game-code-block--compact">
@@ -261,72 +189,171 @@
             <ol id="leaderboard" class="leaderboard" aria-label="Final standings"></ol>
           </div>
         </div>
-        <button id="open-rulebook-btn" type="button" class="secondary">Rule Book</button>
-        <button id="quit-game-btn" type="button" class="secondary">Quit to menu</button>
-      </section>
-
-      <section class="panel assist-panel">
-        <div>
-          <h2>Recommended Steps</h2>
-          <ul id="recommended-steps" class="assist-list"></ul>
-        </div>
-        <div>
-          <h2>Recent Actions</h2>
-          <ul id="activity-log" class="assist-list"></ul>
+        <div class="gameplay-toolbar-actions">
+          <button id="open-rulebook-btn" type="button" class="secondary">Rule book</button>
+          <button id="quit-game-btn" type="button" class="secondary">Quit to menu</button>
         </div>
       </section>
 
-      <section class="board">
-        <div class="panel panel--board-strip">
-          <h2>Board Gems</h2>
-          <div id="board-gems" class="pill-row pill-row--board-gems"></div>
-        </div>
-
-        <div class="panel panel--board-strip">
-          <h2>Nobles</h2>
-          <div id="nobles" class="nobles-list"></div>
-        </div>
-
-        <div class="panel levels">
-          <h2>Development Cards</h2>
-          <div class="levels-row">
-            <div class="level-col">
-              <h3>Level 3</h3>
-              <ul id="level-3" class="card-list dev-card-list"></ul>
+      <div class="gameplay-layout">
+        <div class="gameplay-board-col">
+          <section class="board">
+            <div class="panel panel--board-strip">
+              <h2>Board Gems</h2>
+              <div id="board-gems" class="pill-row pill-row--board-gems"></div>
             </div>
-            <div class="level-col">
-              <h3>Level 2</h3>
-              <ul id="level-2" class="card-list dev-card-list"></ul>
-            </div>
-            <div class="level-col">
-              <h3>Level 1</h3>
-              <ul id="level-1" class="card-list dev-card-list"></ul>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      <section class="players panel">
-        <h2>Players</h2>
-        <div id="players" class="players-row"></div>
-      </section>
+            <div class="panel panel--board-strip">
+              <h2>Nobles</h2>
+              <div id="nobles" class="nobles-list"></div>
+            </div>
 
-      <section class="actions panel">
-        <h2>Actions</h2>
-        <div class="actions-grid actions-grid-single">
-          <div>
-            <h3>Take Gems</h3>
-            <p class="hint">Select up to 3 different gems OR 2 of the same color (if rules allow).</p>
-            <div id="take-gems-options" class="pill-row"></div>
-            <button id="take-gems-btn">Confirm Take Gems</button>
-            <p class="hint small">Reserved cards appear on <strong>your</strong> player panel—use <strong>Buy reserved</strong> there.</p>
-          </div>
+            <div class="panel levels">
+              <h2>Development Cards</h2>
+              <div class="levels-row">
+                <div class="level-col">
+                  <h3>Level 3</h3>
+                  <ul id="level-3" class="card-list dev-card-list"></ul>
+                </div>
+                <div class="level-col">
+                  <h3>Level 2</h3>
+                  <ul id="level-2" class="card-list dev-card-list"></ul>
+                </div>
+                <div class="level-col">
+                  <h3>Level 1</h3>
+                  <ul id="level-1" class="card-list dev-card-list"></ul>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
-        <div id="action-message" class="message"></div>
-      </section>
+
+        <aside class="gameplay-side-col">
+          <section class="panel assist-panel">
+            <div>
+              <h2>Recommended</h2>
+              <ul id="recommended-steps" class="assist-list"></ul>
+            </div>
+            <div>
+              <h2>Recent actions</h2>
+              <ul id="activity-log" class="assist-list"></ul>
+            </div>
+          </section>
+
+          <section class="players panel">
+            <h2>Players</h2>
+            <div id="players" class="players-row"></div>
+          </section>
+
+          <section class="actions panel actions-panel--sticky">
+            <h2>Your actions</h2>
+            <div class="actions-grid actions-grid-single">
+              <div>
+                <h3>Take gems</h3>
+                <p class="hint">Pick chips, then confirm. Max 10 gems in hand.</p>
+                <div id="take-gems-options" class="pill-row"></div>
+                <button id="take-gems-btn">Confirm take gems</button>
+                <p class="hint small">Reserve / buy cards on the board. <strong>Buy reserved</strong> is on <strong>your</strong> player card.</p>
+              </div>
+            </div>
+            <div id="action-message" class="message"></div>
+          </section>
+        </aside>
+      </div>
       </section>
     </main>
   </div>
+
+  <div id="rulebook-overlay" class="rulebook-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="rulebook-title">
+    <div class="rulebook-panel panel" tabindex="-1">
+      <div class="rulebook-toolbar">
+        <div>
+          <h2 id="rulebook-title">How to play</h2>
+          <p class="rulebook-lead">One action per turn. Use the board on the left and your player card on the right. This window scrolls — jump with the links below.</p>
+        </div>
+        <button id="close-tutorial-btn" type="button" class="secondary">Close</button>
+      </div>
+      <nav class="rulebook-toc" aria-label="Rulebook sections">
+        <a href="#rb-goal" class="rulebook-toc__link">Goal</a>
+        <a href="#rb-turn" class="rulebook-toc__link">Your turn</a>
+        <a href="#rb-cards" class="rulebook-toc__link">Cards</a>
+        <a href="#rb-ui" class="rulebook-toc__link">This screen</a>
+        <a href="#rb-nobles" class="rulebook-toc__link">Nobles</a>
+        <a href="#rb-win" class="rulebook-toc__link">Winning</a>
+        <a href="#rb-tips" class="rulebook-toc__link">Tips</a>
+      </nav>
+      <div id="rulebook-body" class="rulebook-body">
+        <section class="rulebook-section" id="rb-goal">
+          <h3>Goal</h3>
+          <p>Reach <strong>15 prestige</strong> (default) first — but when someone does, everyone else still gets <strong>one last turn</strong>. Highest score wins; ties go to whoever bought <em>fewer</em> development cards.</p>
+        </section>
+        <section class="rulebook-section" id="rb-turn">
+          <h3>Your turn — pick exactly one</h3>
+          <ol class="rulebook-steps">
+            <li>
+              <strong>Take gems</strong>
+              <ul>
+                <li><strong>3 different</strong> colors, or</li>
+                <li><strong>2 of the same</strong> color only if at least 4 of that color are on the board.</li>
+                <li>You can’t take gold this way. Max <strong>10 gems</strong> in hand.</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Reserve a card</strong> (max 3 reserved)
+              <ul>
+                <li>Take a face-up card into your reserve.</li>
+                <li>Gain <strong>1 gold</strong> chip if any are left.</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Buy a card</strong>
+              <ul>
+                <li>Face-up on the board, or one of <strong>your</strong> reserved cards (button on your player panel).</li>
+                <li>Pay with gems in hand plus <strong>bonuses</strong> from cards you already bought. Gold counts as any color.</li>
+              </ul>
+            </li>
+          </ol>
+        </section>
+        <section class="rulebook-section" id="rb-cards">
+          <h3>Cards &amp; bonuses</h3>
+          <ul>
+            <li><strong>Level 1</strong> — cheap, often 0 points, builds discounts.</li>
+            <li><strong>Level 2</strong> — medium cost, often 1–2 prestige.</li>
+            <li><strong>Level 3</strong> — expensive, big prestige.</li>
+            <li>Each card’s <strong>bonus color</strong> is a permanent discount on future buys of that gem color.</li>
+          </ul>
+        </section>
+        <section class="rulebook-section" id="rb-ui">
+          <h3>Reading this app</h3>
+          <ul>
+            <li><strong>Board gems</strong> — supply you take from.</li>
+            <li><strong>Level 1–3 headers</strong> — include <strong>how many cards are left</strong> in that level’s deck (face-down pile).</li>
+            <li><strong>Card cost</strong> — gems (and gold) to pay.</li>
+            <li><strong>Card bonus</strong> — discount you keep after purchase.</li>
+            <li><strong>Players</strong> — your gems, bonuses, bought &amp; reserved cards.</li>
+            <li><strong>Nobles</strong> — need bonuses (not loose gems) to visit you.</li>
+          </ul>
+        </section>
+        <section class="rulebook-section" id="rb-nobles">
+          <h3>Nobles</h3>
+          <p>At the <strong>end</strong> of your turn, if your bonuses match a noble, they visit automatically and grant extra prestige. You never pay gems for them.</p>
+          <p class="rulebook-note">Noble names here are just labels (e.g. “Noble 1”). What matters is the gem requirements and prestige shown on the tile.</p>
+        </section>
+        <section class="rulebook-section" id="rb-win">
+          <h3>End of game</h3>
+          <p>After someone hits 15 prestige, the <strong>final round</strong> runs so each other player gets one more turn. Then the leaderboard decides the winner.</p>
+        </section>
+        <section class="rulebook-section" id="rb-tips">
+          <h3>Tips</h3>
+          <ul>
+            <li>Early level-1 buys = strong discounts later.</li>
+            <li>Nobles are free points once your bonuses line up.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <div id="action-toast" class="toast" aria-live="polite"></div>
 
   <script src="config.js"></script>

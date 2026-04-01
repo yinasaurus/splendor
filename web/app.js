@@ -14,11 +14,11 @@ function resolveApiBase() {
 const API_BASE = resolveApiBase();
 
 (function splendorApplyMediaSpriteCss() {
-  if (typeof document === "undefined") {
+  if (typeof document === "undefined" || typeof window === "undefined") {
     return;
   }
-  /* Default UI uses CSS gem dots (no white box around bitmap chips). Set __SPLENDOR_USE_IMAGE_SPRITES__ = true to use media/chips.jpg + gems.png. */
-  if (typeof window === "undefined" || window.__SPLENDOR_USE_IMAGE_SPRITES__ !== true) {
+  /* Default: web/media chip + gem sprites. Set __SPLENDOR_USE_CSS_GEMS__ = true for CSS spheres only. */
+  if (window.__SPLENDOR_USE_CSS_GEMS__ === true) {
     return;
   }
   try {
@@ -616,7 +616,7 @@ function renderState(state) {
 
       const head = document.createElement("div");
       head.className = "noble-card__head";
-      head.textContent = `${n.name} · ${n.points} pts`;
+      head.textContent = `${n.name} · ${n.points} prestige`;
 
       const row = document.createElement("div");
       row.className = "pill-row noble-card__reqs";
@@ -704,16 +704,11 @@ function renderState(state) {
         costsCol.appendChild(chip);
       });
 
-      const slotHint = document.createElement("span");
-      slotHint.className = "dev-card__slot";
-      slotHint.textContent = String(index);
-
       face.appendChild(bg);
       face.appendChild(vignette);
       face.appendChild(prestige);
       face.appendChild(bonusWrap);
       face.appendChild(costsCol);
-      face.appendChild(slotHint);
 
       const chrome = document.createElement("div");
       chrome.className = "dev-card__chrome";
@@ -843,13 +838,62 @@ function renderState(state) {
       extra.style.fontSize = "0.78rem";
       extra.style.marginTop = "3px";
       const nobleText = p.noble ? `Noble: ${p.noble}` : "No noble yet";
-      const boughtCount = Object.values(p.bonuses || {}).reduce((sum, n) => sum + Number(n || 0), 0);
-      extra.textContent = `${nobleText} · Reserved: ${p.reservedCount} · Bought: ${boughtCount}`;
+      const boughtCount = Number.isFinite(Number(p.purchasedCards))
+        ? Number(p.purchasedCards)
+        : Array.isArray(p.boughtCards)
+          ? p.boughtCards.length
+          : Object.values(p.bonuses || {}).reduce((sum, n) => sum + Number(n || 0), 0);
+      extra.textContent = `${nobleText} · Reserved: ${p.reservedCount} · Bought: ${boughtCount} cards`;
 
       card.appendChild(name);
       card.appendChild(meta);
       card.appendChild(gemsRow);
       card.appendChild(bonusesRow);
+
+      const boughtList = Array.isArray(p.boughtCards) ? p.boughtCards : [];
+      if (boughtList.length > 0) {
+        const boughtWrap = document.createElement("div");
+        boughtWrap.className = "player-bought-row";
+        const boughtLabel = document.createElement("div");
+        boughtLabel.className = "player-bought-label";
+        boughtLabel.textContent = "Bought cards";
+        boughtWrap.appendChild(boughtLabel);
+        const boughtSlots = document.createElement("div");
+        boughtSlots.className = "player-bought-slots";
+        boughtList.forEach((bc) => {
+          const mini = document.createElement("div");
+          mini.className = "purchased-mini";
+          mini.title = `Level ${bc.level} · +${bc.bonusAbbr || ""} bonus${Number(bc.points) > 0 ? ` · ${bc.points} prestige` : ""}`;
+          const face = document.createElement("div");
+          face.className = "purchased-mini__face";
+          const bgB = document.createElement("div");
+          bgB.className = "purchased-mini__bg";
+          const artUrlB = resolveDevCardArtImageUrl(Number(bc.level) || 1, bc);
+          if (artUrlB) {
+            bgB.style.backgroundImage = `url(${JSON.stringify(artUrlB)})`;
+            face.classList.add("purchased-mini__face--art");
+          } else {
+            bgB.classList.add(`purchased-mini__bg--level-${Number(bc.level) || 1}`);
+          }
+          const ptsB = document.createElement("div");
+          ptsB.className = "purchased-mini__pts";
+          ptsB.textContent = Number(bc.points) > 0 ? String(bc.points) : "";
+          const bonusB = document.createElement("div");
+          bonusB.className = "purchased-mini__bonus";
+          bonusB.innerHTML = gemSpriteMarkup(bc.bonusGem || "DIAMOND", "stone");
+          face.appendChild(bgB);
+          face.appendChild(ptsB);
+          face.appendChild(bonusB);
+          mini.appendChild(face);
+          const capB = document.createElement("div");
+          capB.className = "purchased-mini__cap";
+          capB.textContent = `L${bc.level} · ${bc.bonusAbbr || ""}`;
+          mini.appendChild(capB);
+          boughtSlots.appendChild(mini);
+        });
+        boughtWrap.appendChild(boughtSlots);
+        card.appendChild(boughtWrap);
+      }
 
       const reservedList = Array.isArray(p.reserved) ? p.reserved : [];
       if (reservedList.length > 0) {
@@ -1187,7 +1231,8 @@ async function init() {
   const p2Row = p2Type.closest(".player-type-row");
   const p3Row = p3Type.closest(".player-type-row");
   const p4Row = p4Type.closest(".player-type-row");
-  const tutorialPanel = document.getElementById("tutorial-panel");
+  const rulebookOverlay = document.getElementById("rulebook-overlay");
+  const rulebookBody = document.getElementById("rulebook-body");
   const openTutorialBtn = document.getElementById("open-tutorial-btn");
   const openRulebookBtn = document.getElementById("open-rulebook-btn");
   const closeTutorialBtn = document.getElementById("close-tutorial-btn");
@@ -1205,6 +1250,41 @@ async function init() {
   let guidedIndex = 0;
   let guidedSize = "md";
   let dragState = null;
+
+  function openRulebook() {
+    if (!rulebookOverlay) {
+      return;
+    }
+    rulebookOverlay.classList.remove("hidden");
+    if (rulebookBody) {
+      rulebookBody.scrollTop = 0;
+    }
+  }
+
+  function closeRulebook() {
+    rulebookOverlay?.classList.add("hidden");
+  }
+
+  if (rulebookOverlay) {
+    rulebookOverlay.querySelectorAll(".rulebook-toc a").forEach((a) => {
+      a.addEventListener("click", (e) => {
+        const href = a.getAttribute("href");
+        if (!href || href.charAt(0) !== "#") {
+          return;
+        }
+        e.preventDefault();
+        const el = document.getElementById(href.slice(1));
+        if (el && rulebookBody) {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      });
+    });
+    rulebookOverlay.addEventListener("click", (e) => {
+      if (e.target === rulebookOverlay) {
+        closeRulebook();
+      }
+    });
+  }
 
   function applyGuidedSizeClass() {
     guidedOverlay.classList.remove("guided-size-sm", "guided-size-lg");
@@ -1313,7 +1393,7 @@ async function init() {
       closeJoinRoomDialog();
       clearTransientUi();
       closeGuided();
-      tutorialPanel.classList.add("hidden");
+      closeRulebook();
       showWaitingRoom();
       const state = await fetchState();
       renderLobbyStatus(state);
@@ -1405,7 +1485,7 @@ async function init() {
     tutorialFlags.active = true;
     tutorialFlags.tookGemsOnce = false;
     tutorialFlags.boughtLevel1Once = false;
-    tutorialPanel.classList.add("hidden");
+    closeRulebook();
     updateGuidedOverlay();
     guidedOverlay.classList.remove("hidden");
   }
@@ -1423,7 +1503,7 @@ async function init() {
     clearTransientUi();
     closeGuided();
     tutorialFlags.active = false;
-    tutorialPanel.classList.add("hidden");
+    closeRulebook();
     showHome(true);
     // Reset backend state in background; UI should not wait on network.
     postQuit().catch(() => {
@@ -1471,7 +1551,7 @@ async function init() {
       rememberRoom(getRememberedRoom() || "Room A");
       clearTransientUi();
       closeGuided();
-      tutorialPanel.classList.add("hidden");
+      closeRulebook();
 
       // Guided tutorial uses Player 1 as human and Player 2 as AI.
       // If Player 2 dropdown is set to Human, default to AI (Medium).
@@ -1597,7 +1677,7 @@ async function init() {
       }
       clearTransientUi();
       closeGuided();
-      tutorialPanel.classList.add("hidden");
+      closeRulebook();
       const state = await fetchState();
       suppressRealtimeToasts = true;
       lastSeenActionCount = 0;
@@ -1632,19 +1712,31 @@ async function init() {
     });
   }
 
-  openTutorialBtn.addEventListener("click", () => {
-    tutorialPanel.classList.remove("hidden");
-  });
-
-  if (openRulebookBtn) {
-    openRulebookBtn.addEventListener("click", () => {
-      tutorialPanel.classList.remove("hidden");
-      tutorialPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (openTutorialBtn) {
+    openTutorialBtn.addEventListener("click", () => {
+      openRulebook();
     });
   }
 
-  closeTutorialBtn.addEventListener("click", () => {
-    tutorialPanel.classList.add("hidden");
+  if (openRulebookBtn) {
+    openRulebookBtn.addEventListener("click", () => {
+      openRulebook();
+    });
+  }
+
+  if (closeTutorialBtn) {
+    closeTutorialBtn.addEventListener("click", () => {
+      closeRulebook();
+    });
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") {
+      return;
+    }
+    if (rulebookOverlay && !rulebookOverlay.classList.contains("hidden")) {
+      closeRulebook();
+    }
   });
 
   numPlayersSelect.addEventListener("change", updatePlayerRows);

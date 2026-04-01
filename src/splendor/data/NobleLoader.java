@@ -117,8 +117,6 @@ public class NobleLoader {
 			boolean distribution = isDistributionNoblesHeader(first);
 
 			if (distribution) {
-				int baseCount = 0;
-				int expCount = 0;
 				String line;
 				while ((line = br.readLine()) != null) {
 					line = line.trim();
@@ -130,17 +128,12 @@ public class NobleLoader {
 						continue;
 					}
 					String g = p[0].trim();
-					String name;
-					if (g.equalsIgnoreCase("Base")) {
-						baseCount++;
-						name = "Base #" + baseCount;
-					} else if (g.equalsIgnoreCase("Expansion")) {
-						expCount++;
-						name = "Expansion #" + expCount;
-					} else {
+					if (!g.equalsIgnoreCase("Base") && !g.equalsIgnoreCase("Expansion")) {
 						continue;
 					}
+					// Friendly in-game label (CSV "Base"/"Expansion" are sheet categories, not character names).
 					int id = nobles.size() + 1;
+					String name = "Noble " + id;
 					Noble n = parseDistributionNobleLine(line, id, name);
 					if (n != null) {
 						nobles.add(n);

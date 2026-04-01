@@ -999,6 +999,35 @@ public class WebServer {
 				sb.append("}}");
 			}
 			sb.append("],");
+			sb.append("\"boughtCards\":[");
+			List<Card> bought = p.getPurchasedCards();
+			for (int bi = 0; bi < bought.size(); bi++) {
+				if (bi > 0) {
+					sb.append(",");
+				}
+				Card bc = bought.get(bi);
+				sb.append("{");
+				sb.append("\"id\":").append(bc.getCardId()).append(",");
+				sb.append("\"level\":").append(bc.getLevel()).append(",");
+				sb.append("\"points\":").append(bc.getPrestigePoints()).append(",");
+				sb.append("\"bonusGem\":\"").append(bc.getBonusGem().name()).append("\",");
+				sb.append("\"bonusAbbr\":\"").append(bc.getBonusGem().getAbbreviation()).append("\",");
+				sb.append("\"cost\":{");
+				boolean firstBc = true;
+				for (Map.Entry<GemType, Integer> entry : bc.getCost().entrySet()) {
+					int qty = entry.getValue() == null ? 0 : entry.getValue().intValue();
+					if (qty <= 0) {
+						continue;
+					}
+					if (!firstBc) {
+						sb.append(",");
+					}
+					firstBc = false;
+					sb.append("\"").append(entry.getKey().name()).append("\":").append(qty);
+				}
+				sb.append("}}");
+			}
+			sb.append("],");
 			sb.append("\"noble\":");
 			if (p.getVisitedNoble() != null) {
 				sb.append("\"").append(escape(p.getVisitedNoble().getName())).append("\"");
@@ -1064,6 +1093,14 @@ public class WebServer {
 				sb.append("}");
 			}
 			sb.append("]");
+		}
+		sb.append("},");
+		sb.append("\"deckRemaining\":{");
+		for (int level = 1; level <= 3; level++) {
+			if (level > 1) {
+				sb.append(",");
+			}
+			sb.append("\"").append(level).append("\":").append(board.getDeckSize(level));
 		}
 		sb.append("},");
 
