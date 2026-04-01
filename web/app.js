@@ -1993,12 +1993,40 @@ async function init() {
   const pathRoom = roomFromUrlPath();
   if (pathRoom) {
     rememberRoom(pathRoom);
-    showToast(`Room code from link: ${pathRoom}. Enter your name, then Join Room.`);
+  }
+  const rememberedName = getRememberedPlayerName();
+  if (rememberedName) {
+    currentPlayerName = rememberedName;
+    if (playerNameInput && !playerNameInput.value.trim()) {
+      playerNameInput.value = rememberedName;
+    }
   }
   updateLobbyReadiness();
   try {
+    if (pathRoom && currentPlayerName) {
+      try {
+        await postJoinRoom({ room: currentRoom, name: currentPlayerName });
+      } catch (_) {
+        // Ignore auto-join failure; fall back to lobby view with message below.
+      }
+    }
     const state = await fetchState();
     renderLobbyStatus(state);
+    const inRoom =
+      currentPlayerName &&
+      state &&
+      state.lobby &&
+      Array.isArray(state.lobby.players) &&
+      state.lobby.players.some((p) => p.name === currentPlayerName);
+    if (inRoom) {
+      if (state.lobby.gameStarted) {
+        enterGameUiFromState(state, true);
+      } else {
+        showWaitingRoom();
+      }
+    } else if (pathRoom) {
+      showToast(`Room code from link: ${pathRoom}. Enter your name, then Join Room.`);
+    }
   } catch (_) {
     // ignore initial fetch failure
   }
