@@ -79,7 +79,11 @@ async function fetchState() {
   if (!res.ok) {
     throw new Error("Failed to load state");
   }
-  return res.json();
+  const data = await res.json();
+  if (data && data.sessionMissing) {
+    throw new Error(data.message || "Session expired.");
+  }
+  return data;
 }
 
 let tutorialFlags = {

@@ -1648,17 +1648,25 @@ main {
   flex-direction: row;
   gap: 6px;
   flex-wrap: nowrap;
+  align-items: stretch;
 }
 
 .dev-card__actions button {
   margin-top: 0;
-  padding: 4px 8px;
+  padding: 0 10px;
   font-size: 0.72rem;
   border-radius: 6px;
-  width: 50%;
+  width: auto;
+  flex: 1 1 0;
   min-width: 0;
-  min-height: 30px;
+  height: 30px;
+  line-height: 30px;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  vertical-align: middle;
 }
 
 .dev-card__actions button:focus-visible {

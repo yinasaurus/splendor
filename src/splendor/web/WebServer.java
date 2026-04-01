@@ -337,6 +337,11 @@ public class WebServer {
 		return created;
 	}
 
+	private static GameSession getExistingSession(String roomName) {
+		String room = cleanRoomName(roomName);
+		return sessions.get(room);
+	}
+
 	private static String generateRoomCode() {
 		String raw = UUID.randomUUID().toString().replace("-", "").toUpperCase();
 		return "SP-" + raw.substring(0, 6);
@@ -740,7 +745,16 @@ public class WebServer {
 			}
 
 			String room = getRoomFromQuery(exchange);
-			GameSession session = getOrCreateSession(room);
+			GameSession session = getExistingSession(room);
+			if (session == null) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("sessionMissing", true);
+				resp.put("message", "Session expired. Please rejoin or create a new room.");
+				resp.put("room", room);
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			String viewerName = canonicalizeLobbyName(session, getQueryParam(exchange, "name"));
 			markPlayerSeen(session, viewerName);
 			String json = buildGameStateJson(session, room, viewerName);
