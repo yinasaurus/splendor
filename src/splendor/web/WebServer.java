@@ -10,9 +10,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import com.sun.net.httpserver.Headers;
@@ -40,6 +42,7 @@ public class WebServer {
 
 	private static final String DEFAULT_ROOM = "Room A";
 	private static final int ACTION_LOG_LIMIT = 12;
+	private static final int AFK_AI_THRESHOLD_SECONDS = 90;
 	private static final Map<String, GameSession> sessions = new HashMap<>();
 
 	private static class GameSession {
@@ -53,6 +56,9 @@ public class WebServer {
 		String[] lobbyTypes = new String[] { "human", "human", "human", "human" };
 		Map<String, Boolean> readyByPlayer = new LinkedHashMap<>();
 		Map<String, String> aiByName = new LinkedHashMap<>();
+		Map<String, Long> lastSeenByPlayer = new HashMap<>();
+		Set<String> forcedAiByName = new HashSet<>();
+		Map<String, String> forcedAiDifficultyByName = new HashMap<>();
 	}
 
 	private static void addActionLog(GameSession session, String text) {
@@ -72,6 +78,22 @@ public class WebServer {
 		if (session.actionLog.size() > ACTION_LOG_LIMIT) {
 			session.actionLog = new ArrayList<>(
 				session.actionLog.subList(session.actionLog.size() - ACTION_LOG_LIMIT, session.actionLog.size()));
+		}
+	}
+
+	private static void markPlayerSeen(GameSession session, String rawName) {
+		if (session == null || rawName == null) {
+			return;
+		}
+		String name = rawName.trim();
+		if (name.isEmpty()) {
+			return;
+		}
+		session.lastSeenByPlayer.put(name, System.currentTimeMillis());
+		if (session.forcedAiByName.contains(name)) {
+			session.forcedAiByName.remove(name);
+			session.forcedAiDifficultyByName.remove(name);
+			addActionLog(session, name + " returned and resumed control.");
 		}
 	}
 
@@ -143,7 +165,11 @@ public class WebServer {
 		};
 		session.readyByPlayer.clear();
 		session.readyByPlayer.put(session.ownerName, false);
+		session.lastSeenByPlayer.clear();
+		session.lastSeenByPlayer.put(session.ownerName, System.currentTimeMillis());
 		session.aiByName.clear();
+		session.forcedAiByName.clear();
+		session.forcedAiDifficultyByName.clear();
 		session.gameStarted = false;
 		session.actionLog.clear();
 		addActionLog(session, "Lobby created by " + session.ownerName + ".");
@@ -240,6 +266,7 @@ public class WebServer {
 		server.createContext("/api/room/addai", new RoomAddAiHandler());
 		server.createContext("/api/room/kick", new RoomKickHandler());
 		server.createContext("/api/room/start", new RoomStartHandler());
+		server.createContext("/api/room/afkai", new RoomAfkAiHandler());
 
 		server.setExecutor(null);
 		server.start();
@@ -300,6 +327,12 @@ public class WebServer {
 			addActionLog(session, "New game started.");
 		}
 		session.turnNumber = 1;
+		session.lastSeenByPlayer.clear();
+		session.forcedAiByName.clear();
+		session.forcedAiDifficultyByName.clear();
+		for (String playerName : playerNames) {
+			session.lastSeenByPlayer.put(playerName, System.currentTimeMillis());
+		}
 	}
 
 	/**
@@ -488,6 +521,7 @@ public class WebServer {
 			String room = getRoomFromQuery(exchange);
 			GameSession session = getOrCreateSession(room);
 			String viewerName = getQueryParam(exchange, "name");
+			markPlayerSeen(session, viewerName);
 			String json = buildGameStateJson(session, room, viewerName);
 			sendResponse(exchange, 200, json, "application/json; charset=utf-8");
 		}
@@ -594,6 +628,7 @@ public class WebServer {
 				return;
 			}
 			session.readyByPlayer.putIfAbsent(name, false);
+			markPlayerSeen(session, name);
 			ensureLobbyOwner(session, name);
 			addActionLog(session, name + " joined lobby.");
 			Map<String, Object> resp = new HashMap<>();
@@ -624,6 +659,7 @@ public class WebServer {
 				session.readyByPlayer.put(name, false);
 			}
 			session.readyByPlayer.put(name, ready);
+			markPlayerSeen(session, name);
 			addActionLog(session, name + (ready ? " is ready." : " is not ready."));
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
@@ -691,6 +727,64 @@ public class WebServer {
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
 			resp.put("room", room);
+			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+		}
+	}
+
+	private static class RoomAfkAiHandler implements HttpHandler {
+		@Override
+		public void handle(HttpExchange exchange) throws IOException {
+			if (handleCorsPreflight(exchange)) {
+				return;
+			}
+			if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+				sendResponse(exchange, 405, "Method Not Allowed", "text/plain; charset=utf-8");
+				return;
+			}
+			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
+			String owner = extractStringField(body, "ownerName", "");
+			String target = extractStringField(body, "targetName", "");
+			boolean enable = extractBooleanField(body, "enable", true);
+			String difficulty = extractStringField(body, "difficulty", "medium").toLowerCase();
+			if (!difficulty.equals("easy") && !difficulty.equals("medium") && !difficulty.equals("hard")) {
+				difficulty = "medium";
+			}
+			GameSession session = getOrCreateSession(room);
+			ensureLobbyOwner(session, owner);
+			Map<String, Object> resp = new HashMap<>();
+			if (!session.ownerName.equals(owner)) {
+				resp.put("success", false);
+				resp.put("message", "Only owner can manage AFK AI takeover.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			if (target == null || target.trim().isEmpty()) {
+				resp.put("success", false);
+				resp.put("message", "Missing target player.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			target = target.trim();
+			if (!session.readyByPlayer.containsKey(target)) {
+				resp.put("success", false);
+				resp.put("message", "Target player not found.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			if (enable) {
+				session.forcedAiByName.add(target);
+				session.forcedAiDifficultyByName.put(target, difficulty);
+				addActionLog(session, target + " switched to AI takeover (" + difficulty + ") due to AFK.");
+			} else {
+				session.forcedAiByName.remove(target);
+				session.forcedAiDifficultyByName.remove(target);
+				addActionLog(session, target + " AI takeover disabled.");
+			}
+			resp.put("success", true);
+			resp.put("target", target);
+			resp.put("enabled", enable);
+			resp.put("difficulty", difficulty);
 			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 		}
 	}
@@ -858,9 +952,16 @@ public class WebServer {
 			response.put("gameOver", session.controller.isGameOver());
 			return response;
 		}
+		markPlayerSeen(session, requesterName);
 		if (!currentPlayer.isHuman()) {
 			response.put("success", false);
 			response.put("message", "Please wait for the AI turn to finish.");
+			response.put("gameOver", session.controller.isGameOver());
+			return response;
+		}
+		if (session.forcedAiByName.contains(requesterName)) {
+			response.put("success", false);
+			response.put("message", "You are currently under AI takeover. Refresh to resume control.");
 			response.put("gameOver", session.controller.isGameOver());
 			return response;
 		}
@@ -1172,6 +1273,16 @@ public class WebServer {
 			List<Player> players = session.controller.getPlayers();
 			int idx = players.indexOf(current);
 			AIPlayer ai = session.aiPlayers.get(idx);
+			if (ai == null && session.forcedAiByName.contains(current.getName())) {
+				String diff = session.forcedAiDifficultyByName.getOrDefault(current.getName(), "medium");
+				if ("easy".equals(diff)) {
+					ai = new AIPlayer(new EasyAIStrategy());
+				} else if ("hard".equals(diff)) {
+					ai = new AIPlayer(new HardAIStrategy());
+				} else {
+					ai = new AIPlayer(new MediumAIStrategy());
+				}
+			}
 			if (ai == null) {
 				// next player is human, stop here
 				break;
@@ -1195,6 +1306,9 @@ public class WebServer {
 			&& !viewer.isEmpty()
 			&& (current.getName().equals(viewer)
 				|| (isGenericSeatName(current.getName()) && session.readyByPlayer.containsKey(viewer)));
+		if (session.forcedAiByName.contains(current.getName()) && current.getName().equals(viewer)) {
+			isMyTurn = false;
+		}
 
 		sb.append("{");
 		sb.append("\"currentPlayer\":\"").append(escape(current.getName())).append("\",");
@@ -1204,6 +1318,7 @@ public class WebServer {
 		sb.append("\"roundNumber\":").append(roundNumber).append(",");
 		sb.append("\"isHumanTurn\":").append(current.isHuman()).append(",");
 		sb.append("\"isMyTurn\":").append(isMyTurn).append(",");
+		sb.append("\"afkAiThresholdSeconds\":").append(AFK_AI_THRESHOLD_SECONDS).append(",");
 		sb.append("\"endgameFinalRound\":").append(session.controller.isEndgamePending()).append(",");
 		sb.append("\"gameOver\":").append(session.controller.isGameOver()).append(",");
 		if (session.controller.isGameOver() && session.controller.getWinner() != null) {
@@ -1221,6 +1336,10 @@ public class WebServer {
 			sb.append("{");
 			sb.append("\"name\":\"").append(escape(p.getName())).append("\",");
 			sb.append("\"human\":").append(p.isHuman()).append(",");
+			long seenMs = session.lastSeenByPlayer.getOrDefault(p.getName(), System.currentTimeMillis());
+			long afkSeconds = Math.max(0L, (System.currentTimeMillis() - seenMs) / 1000L);
+			sb.append("\"afkSeconds\":").append(afkSeconds).append(",");
+			sb.append("\"forcedAi\":").append(session.forcedAiByName.contains(p.getName())).append(",");
 			sb.append("\"prestige\":").append(p.getPrestigePoints()).append(",");
 			sb.append("\"purchasedCards\":").append(p.getPurchasedCards().size()).append(",");
 			sb.append("\"gems\":{");

@@ -34,6 +34,15 @@ window.__SPLENDOR_USE_IMAGE_SPRITES__ = true;
 
 window.__SPLENDOR_DEV_CARD_ART_BASE__ = "media";
 
+// Optional: assign face art by bonus gem color (deterministic by card id; not random).
+window.__SPLENDOR_DEV_CARD_ART_BY_BONUS__ = {
+  RUBY: ["splendor-1.jpg", "splendor-7.png"],
+  SAPPHIRE: ["splendor-3.jpg", "splendor-8.png"],
+  DIAMOND: ["splendor-11.png", "splendor-6.jpg"],
+  EMERALD: ["splendor-12.png", "splendor-4.jpg"],
+  ONYX: ["splendor-2.jpg", "splendor-5.jpg"],
+};
+
 window.__SPLENDOR_DEV_CARD_ART_FILENAME__ = function (globalIdx) {
 
   const i = Math.floor(Number(globalIdx)) || 1;

@@ -42,6 +42,7 @@ const API_ROOM_READY = `${API_BASE}/api/room/ready`;
 const API_ROOM_START = `${API_BASE}/api/room/start`;
 const API_ROOM_ADDAI = `${API_BASE}/api/room/addai`;
 const API_ROOM_KICK = `${API_BASE}/api/room/kick`;
+const API_ROOM_AFK_AI = `${API_BASE}/api/room/afkai`;
 let currentRoom = "Room A";
 const LAST_ROOM_KEY = "splendor.lastRoom";
 const LAST_NAME_KEY = "splendor.playerName";
@@ -98,6 +99,7 @@ let lastSeenTurnNumber = null;
 let lastSeenActionCount = 0;
 let suppressRealtimeToasts = true;
 let lastAutoRejoinAt = 0;
+let lastRecoveryToastAt = 0;
 
 const KNOWN_GEMS = new Set(["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"]);
 const GEM_ABBR_TO_NAME = {
@@ -225,6 +227,22 @@ function resolveDevCardArtImageUrl(level, card) {
   const base = typeof rawBase === "string" ? rawBase.trim().replace(/\/+$/, "") : "";
   if (!base) {
     return null;
+  }
+  const byBonusRaw = window.__SPLENDOR_DEV_CARD_ART_BY_BONUS__;
+  if (byBonusRaw && typeof byBonusRaw === "object" && card && card.bonusGem) {
+    const bonus = String(card.bonusGem).toUpperCase();
+    const candidatesRaw = byBonusRaw[bonus];
+    const candidates = Array.isArray(candidatesRaw)
+      ? candidatesRaw
+          .map((x) => (x == null ? "" : String(x).trim().replace(/^\/+/, "")))
+          .filter((x) => x.length > 0)
+      : [];
+    if (candidates.length > 0) {
+      const cardId = card && card.id != null ? Number(card.id) : NaN;
+      const seed = Number.isFinite(cardId) && cardId > 0 ? cardId : 1;
+      const idx = Math.abs(seed) % candidates.length;
+      return `${base}/${candidates[idx]}`;
+    }
   }
   const cardId = card && card.id != null ? Number(card.id) : NaN;
   const seqInLevel = Number.isFinite(cardId) && cardId > 0 ? cardId % 1000 : 1;
@@ -543,6 +561,18 @@ async function postKick(payload) {
   });
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, "Kick failed"));
+  }
+  return res.json();
+}
+
+async function postAfkAi(payload) {
+  const res = await fetch(API_ROOM_AFK_AI, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "AFK AI update failed"));
   }
   return res.json();
 }
@@ -900,6 +930,17 @@ function renderState(state) {
       meta.className = "player-meta";
       const totalCoins = Object.values(p.gems || {}).reduce((sum, n) => sum + Number(n || 0), 0);
       meta.textContent = `${p.human ? "Human" : "AI"} · ${p.prestige} pts · Coins: ${totalCoins}`;
+      const afkMeta = document.createElement("div");
+      afkMeta.className = "player-afk-meta";
+      const afkSec = Number.isFinite(Number(p.afkSeconds)) ? Number(p.afkSeconds) : 0;
+      const forcedAi = !!p.forcedAi;
+      if (forcedAi) {
+        afkMeta.textContent = "AI takeover active";
+      } else if (afkSec >= 15) {
+        afkMeta.textContent = `AFK: ${afkSec}s`;
+      } else {
+        afkMeta.textContent = "";
+      }
       const gemsRow = document.createElement("div");
       gemsRow.className = "pill-row";
       ["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"].forEach((gem) => {
@@ -937,6 +978,49 @@ function renderState(state) {
 
       card.appendChild(name);
       card.appendChild(meta);
+      if (afkMeta.textContent) {
+        card.appendChild(afkMeta);
+      }
+      const canManageAfk =
+        currentPlayerName === currentOwner &&
+        !!p.human &&
+        p.name !== currentOwner &&
+        Number.isFinite(Number(state.afkAiThresholdSeconds)) &&
+        Number(p.afkSeconds) >= Number(state.afkAiThresholdSeconds) &&
+        !forcedAi;
+      if (canManageAfk) {
+        const afkBtn = document.createElement("button");
+        afkBtn.type = "button";
+        afkBtn.className = "secondary small-btn player-afk-btn";
+        afkBtn.textContent = "Switch AFK to AI";
+        afkBtn.addEventListener("click", async () => {
+          const ok = window.confirm(
+            `${p.name} has been AFK for ${afkSec}s. Switch to AI takeover? They can resume control when they return.`
+          );
+          if (!ok) {
+            return;
+          }
+          try {
+            const resp = await postAfkAi({
+              room: currentRoom,
+              ownerName: currentPlayerName,
+              targetName: p.name,
+              enable: true,
+              difficulty: "medium",
+            });
+            if (!resp.success) {
+              showToast(resp.message || "Could not enable AI takeover.", "error");
+              return;
+            }
+            showToast(`${p.name} switched to AI takeover.`);
+            const next = await fetchState();
+            renderState(next);
+          } catch (e) {
+            showToast(e && e.message ? e.message : "Could not enable AI takeover.", "error");
+          }
+        });
+        card.appendChild(afkBtn);
+      }
       card.appendChild(gemsRow);
       card.appendChild(bonusesRow);
 
@@ -1658,7 +1742,11 @@ async function init() {
       if ((inWaitingRoom || inGame) && currentPlayerName && !inLobbyList && now - lastAutoRejoinAt > 7000) {
         lastAutoRejoinAt = now;
         try {
-          await postJoinRoom({ room: currentRoom, name: currentPlayerName });
+          const rejoin = await postJoinRoom({ room: currentRoom, name: currentPlayerName });
+          if (rejoin && rejoin.success && now - lastRecoveryToastAt > 15000) {
+            lastRecoveryToastAt = now;
+            showToast("Session recovered after idle restart.");
+          }
           state = await fetchState();
         } catch (_) {
           // Ignore and retry later; prevents UI from being stuck after backend idles/restarts.
