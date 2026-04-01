@@ -757,16 +757,45 @@ async function postAction(payload) {
   }
   actionRequestInFlight = true;
   try {
-    const withRoom = { ...payload, room: currentRoom, name: currentPlayerName, sessionToken: currentSessionToken };
-    const res = await fetch(API_ACTION, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(withRoom),
-    });
-    if (!res.ok) {
-      throw new Error("Action failed");
+    let result = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const withRoom = { ...payload, room: currentRoom, name: currentPlayerName, sessionToken: currentSessionToken };
+      const res = await fetch(API_ACTION, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoom),
+      });
+      if (!res.ok) {
+        throw new Error("Action failed");
+      }
+      result = await res.json();
+      if (!(result && result.sessionMissing)) {
+        break;
+      }
+      // Attempt one silent recovery and retry the action once.
+      if (!currentRoom || !currentPlayerName) {
+        break;
+      }
+      try {
+        const remembered = getRememberedSeatToken(currentRoom, currentPlayerName);
+        if (remembered) {
+          currentSessionToken = remembered;
+        }
+        const joined = await postJoinRoom({
+          room: currentRoom,
+          name: currentPlayerName,
+          sessionToken: currentSessionToken || "",
+        });
+        if (!joined || !joined.success) {
+          break;
+        }
+      } catch (_) {
+        break;
+      }
     }
-    const result = await res.json();
+    if (!result) {
+      return { success: false, message: "Action failed." };
+    }
 
     // Very simple tutorial tracking: record when the player has
     // successfully taken gems or bought any card.
@@ -1796,9 +1825,39 @@ function setupGemSelection() {
     return Math.min(2, getGemSupply(gem));
   }
 
+  function isLegalTakeSelection(mapLike) {
+    const counts = [];
+    let total = 0;
+    gemTypes.forEach((g) => {
+      if (g === "GOLD") return;
+      const n = Math.max(0, Number((mapLike && mapLike.get ? mapLike.get(g) : 0) || 0));
+      if (n > 0) {
+        counts.push(n);
+        total += n;
+      }
+    });
+    if (total > 3) return false;
+    if (counts.some((n) => n > 2)) return false;
+    const twoCount = counts.filter((n) => n === 2).length;
+    if (twoCount > 1) return false;
+    if (twoCount === 1) return counts.length === 1; // no 2+1 mix
+    return true;
+  }
+
   function setGemCount(gem, next) {
     const maxSelectable = getMaxSelectableForGem(gem);
-    const value = Math.max(0, Math.min(maxSelectable, Number(next) || 0));
+    let value = Math.max(0, Math.min(maxSelectable, Number(next) || 0));
+    if (gem !== "GOLD") {
+      const candidate = new Map(selected);
+      candidate.delete(gem);
+      while (value > 0) {
+        candidate.set(gem, value);
+        if (isLegalTakeSelection(candidate)) {
+          break;
+        }
+        value -= 1;
+      }
+    }
     if (value === 0) {
       selected.delete(gem);
     } else {
