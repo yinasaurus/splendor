@@ -427,7 +427,7 @@ const guidedSteps = [
 
   "Take Gems\n\nOpen the Take Gems row, pick a legal combination, then press \"Confirm Take Gems\". Try it once so you have tokens to spend later.\n\nTip: you cannot hold more than 10 gems total.",
 
-  "Reserve a card\n\nUse a card's \"Reserve\" button (under each visible card).\n\n• Max 3 reserved cards.\n• Gain 1 gold if available.\n• Buy it later with \"Purchase Reserved\".\n\nReserve helps you lock a card before others take it.",
+  "Reserve a card\n\nUse a card's \"Reserve\" button (under each visible card).\n\n• Max 3 reserved cards.\n• Gain 1 gold if available.\n• Buy it later with \"Buy reserved\" on your player panel.\n\nReserve helps you lock a card before others take it.",
 
   "Development cards — Level 1\n\nEach card shows its cost and a bonus gem color. After you buy a card, that color becomes a permanent discount on future purchases.",
 
@@ -477,7 +477,8 @@ function renderState(state) {
     Object.entries(state.gems).forEach(([gem, count]) => {
       const pill = document.createElement("div");
       pill.className = `pill gem-${gem}`;
-      pill.innerHTML = gemPillMarkup(gem, `${gem}: ${count}`);
+      pill.innerHTML = gemPillMarkup(gem, `${gem[0]}:${count}`);
+      pill.title = `${gem}: ${count}`;
       boardGems.appendChild(pill);
     });
   }
@@ -487,22 +488,24 @@ function renderState(state) {
   if (state.nobles) {
     state.nobles.forEach((n) => {
       const card = document.createElement("div");
-      card.className = "card-item";
+      card.className = "noble-card";
       const req = n.requirements || {};
 
-      // Title line
-      card.textContent = `${n.name} · ${n.points} pts`;
+      const head = document.createElement("div");
+      head.className = "noble-card__head";
+      head.textContent = `${n.name} · ${n.points} pts`;
 
-      // Requirement pills
       const row = document.createElement("div");
-      row.className = "pill-row";
+      row.className = "pill-row noble-card__reqs";
       Object.entries(req).forEach(([gem, count]) => {
         const pill = document.createElement("div");
         pill.className = `pill gem-${gem}`;
         pill.innerHTML = gemPillMarkup(gem, `${gem[0]}:${count}`, "stone");
+        pill.title = `${gem}: ${count}`;
         row.appendChild(pill);
       });
 
+      card.appendChild(head);
       card.appendChild(row);
       nobles.appendChild(card);
     });
@@ -588,10 +591,6 @@ function renderState(state) {
       const chrome = document.createElement("div");
       chrome.className = "dev-card__chrome";
 
-      const affordability = document.createElement("div");
-      affordability.className = "dev-card__status pill " + (card.affordable ? "affordable" : "not-affordable");
-      affordability.textContent = card.affordable ? "Affordable" : "Not yet";
-
       const cardActions = document.createElement("div");
       cardActions.className = "dev-card__actions";
       const buyBtn = document.createElement("button");
@@ -645,7 +644,6 @@ function renderState(state) {
 
       cardActions.appendChild(buyBtn);
       cardActions.appendChild(reserveBtn);
-      chrome.appendChild(affordability);
       chrome.appendChild(cardActions);
       li.appendChild(face);
       li.appendChild(chrome);
@@ -722,6 +720,71 @@ function renderState(state) {
       card.appendChild(meta);
       card.appendChild(gemsRow);
       card.appendChild(bonusesRow);
+
+      const reservedList = Array.isArray(p.reserved) ? p.reserved : [];
+      if (reservedList.length > 0) {
+        const resWrap = document.createElement("div");
+        resWrap.className = "player-reserved-row";
+        const resLabel = document.createElement("div");
+        resLabel.className = "player-reserved-label";
+        resLabel.textContent = "Reserved cards";
+        resWrap.appendChild(resLabel);
+        const resSlots = document.createElement("div");
+        resSlots.className = "player-reserved-slots";
+        reservedList.forEach((rc, rIdx) => {
+          const mini = document.createElement("div");
+          mini.className = "reserved-mini";
+          const face = document.createElement("div");
+          face.className = "reserved-mini__face";
+          const bgR = document.createElement("div");
+          bgR.className = "reserved-mini__bg";
+          const artUrl = resolveDevCardArtImageUrl(rc.level, rc);
+          if (artUrl) {
+            bgR.style.backgroundImage = `url(${JSON.stringify(artUrl)})`;
+            face.classList.add("reserved-mini__face--art");
+          } else {
+            bgR.classList.add(`reserved-mini__bg--level-${Number(rc.level) || 1}`);
+          }
+          const ptsEl = document.createElement("div");
+          ptsEl.className = "reserved-mini__pts";
+          ptsEl.textContent = Number(rc.points) > 0 ? String(rc.points) : "";
+          const bonusEl = document.createElement("div");
+          bonusEl.className = "reserved-mini__bonus";
+          bonusEl.innerHTML = gemSpriteMarkup(rc.bonusGem || "DIAMOND", "stone");
+          face.appendChild(bgR);
+          face.appendChild(ptsEl);
+          face.appendChild(bonusEl);
+          mini.appendChild(face);
+          const cap = document.createElement("div");
+          cap.className = "reserved-mini__cap";
+          cap.textContent = `L${rc.level} · ${rc.bonusAbbr || ""}`;
+          mini.appendChild(cap);
+          const buyR = document.createElement("button");
+          buyR.type = "button";
+          buyR.className = "reserved-mini__buy card-buy-btn";
+          buyR.textContent = "Buy reserved";
+          const isYou = p.name === state.currentPlayer;
+          const canBuyReserved = isHumanTurn && isYou && p.human && !!rc.affordable;
+          buyR.disabled = !canBuyReserved;
+          buyR.title = canBuyReserved
+            ? "Buy this reserved card"
+            : isYou
+              ? "Not affordable yet"
+              : "Other player’s reserve";
+          buyR.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            if (buyR.disabled) {
+              return;
+            }
+            await postPurchaseReserved(rIdx);
+          });
+          mini.appendChild(buyR);
+          resSlots.appendChild(mini);
+        });
+        resWrap.appendChild(resSlots);
+        card.appendChild(resWrap);
+      }
+
       card.appendChild(extra);
       players.appendChild(card);
     });
@@ -781,11 +844,6 @@ function renderState(state) {
   document.querySelectorAll("#take-gems-options button").forEach((btn) => {
     btn.disabled = !isHumanTurn;
   });
-  const reservedBtn = document.getElementById("purchase-reserved-btn");
-  if (reservedBtn) {
-    reservedBtn.disabled = !isHumanTurn || currentReservedCount <= 0;
-  }
-
   // Realtime popups: new action and turn changes.
   if (!suppressRealtimeToasts) {
     if (actions.length > lastSeenActionCount) {
@@ -943,30 +1001,28 @@ function setupGemSelection() {
   uiState.gemUiInitialized = true;
 }
 
+async function postPurchaseReserved(index) {
+  const msg = document.getElementById("action-message");
+  try {
+    const result = await postAction({ type: "purchaseReserved", index });
+    msg.textContent =
+      result.message || (result.success ? "Reserved card purchased." : "Purchase reserved failed.");
+    msg.className = "message " + (result.success ? "ok" : "error");
+    if (result.success) {
+      showToast("Reserved card purchased.");
+    }
+    const state = await fetchState();
+    renderState(state);
+  } catch (e) {
+    msg.textContent = "Error purchasing reserved card.";
+    msg.className = "message error";
+  }
+}
+
 function setupOtherActions() {
   if (uiState.actionUiBound) {
     return;
   }
-  const msg = document.getElementById("action-message");
-
-  document.getElementById("purchase-reserved-btn").addEventListener("click", async () => {
-    const index = parseInt(document.getElementById("purchase-reserved-index").value, 10) || 0;
-    try {
-      const result = await postAction({ type: "purchaseReserved", index });
-      msg.textContent =
-        result.message || (result.success ? "Reserved card purchased." : "Purchase reserved failed.");
-      msg.className = "message " + (result.success ? "ok" : "error");
-      if (result.success) {
-        showToast("Reserved card purchased.");
-      }
-      const state = await fetchState();
-      renderState(state);
-    } catch (e) {
-      msg.textContent = "Error purchasing reserved card.";
-      msg.className = "message error";
-    }
-  });
-
   uiState.actionUiBound = true;
 }
 

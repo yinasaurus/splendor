@@ -965,6 +965,38 @@ public class WebServer {
 			}
 			sb.append("},");
 			sb.append("\"reservedCount\":").append(p.getReservedCards().size()).append(",");
+			sb.append("\"reserved\":[");
+			List<Card> resCards = p.getReservedCards();
+			for (int ri = 0; ri < resCards.size(); ri++) {
+				if (ri > 0) {
+					sb.append(",");
+				}
+				Card rc = resCards.get(ri);
+				sb.append("{");
+				sb.append("\"id\":").append(rc.getCardId()).append(",");
+				sb.append("\"level\":").append(rc.getLevel()).append(",");
+				sb.append("\"points\":").append(rc.getPrestigePoints()).append(",");
+				sb.append("\"bonusGem\":\"").append(rc.getBonusGem().name()).append("\",");
+				sb.append("\"bonusAbbr\":\"").append(rc.getBonusGem().getAbbreviation()).append("\",");
+				boolean canBuy = (p == current)
+						&& rc.canAfford(current.getGems(), current.getBonuses());
+				sb.append("\"affordable\":").append(canBuy).append(",");
+				sb.append("\"cost\":{");
+				boolean firstRc = true;
+				for (Map.Entry<GemType, Integer> entry : rc.getCost().entrySet()) {
+					int qty = entry.getValue() == null ? 0 : entry.getValue().intValue();
+					if (qty <= 0) {
+						continue;
+					}
+					if (!firstRc) {
+						sb.append(",");
+					}
+					firstRc = false;
+					sb.append("\"").append(entry.getKey().name()).append("\":").append(qty);
+				}
+				sb.append("}}");
+			}
+			sb.append("],");
 			sb.append("\"noble\":");
 			if (p.getVisitedNoble() != null) {
 				sb.append("\"").append(escape(p.getVisitedNoble().getName())).append("\"");

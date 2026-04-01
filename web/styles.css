@@ -166,8 +166,92 @@ main {
 
 .board {
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.panel--board-strip {
+  padding: 10px 12px 12px;
+}
+
+.panel--board-strip h2 {
+  margin-bottom: 6px;
+  font-size: 0.82rem;
+  letter-spacing: 0.07em;
+}
+
+.nobles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.noble-card {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.75rem;
+}
+
+.noble-card__head {
+  flex: 1 1 88px;
+  min-width: 0;
+  font-weight: 600;
+  color: #e8eaf0;
+  line-height: 1.2;
+}
+
+.noble-card__reqs {
+  flex: 3 1 120px;
+  gap: 4px;
+  margin: 0;
+}
+
+.noble-card__reqs .pill {
+  padding: 3px 5px;
+  font-size: 0.62rem;
+  border-radius: 8px;
+}
+
+.noble-card__reqs .gem-pill-content {
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  line-height: 1.1;
+}
+
+.noble-card__reqs .gem-sprite--stone {
+  --gw: 0.98rem;
+}
+
+.pill-row--board-gems {
+  gap: 6px;
+}
+
+#board-gems .pill {
+  padding: 5px 6px 6px;
+  border-radius: 10px;
+  font-size: 0.6rem;
+}
+
+#board-gems .gem-pill-content {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+#board-gems .gem-sprite--chip {
+  --d: 1.42rem;
 }
 
 .levels {
@@ -634,9 +718,14 @@ main {
   align-items: flex-start;
   gap: 5px;
   max-height: calc(100% - 56px);
-  overflow-y: auto;
+  overflow: hidden;
   flex-wrap: nowrap;
-  padding-right: 4px;
+  padding-right: 2px;
+  scrollbar-width: none;
+}
+
+.dev-card__costs::-webkit-scrollbar {
+  display: none;
 }
 
 .dev-card__cost {
@@ -730,12 +819,6 @@ main {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.dev-card__status {
-  align-self: flex-start;
-  font-size: 0.72rem !important;
-  padding: 3px 8px !important;
-}
-
 .dev-card__actions {
   display: flex;
   gap: 6px;
@@ -775,6 +858,125 @@ main {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 10px;
+}
+
+.actions-grid-single {
+  grid-template-columns: 1fr;
+  max-width: 520px;
+}
+
+#start-screen .lobby-flow-hint {
+  margin-top: 6px;
+  margin-bottom: 12px;
+  line-height: 1.45;
+  color: #aeb8d0;
+}
+
+.player-reserved-row {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.player-reserved-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.player-reserved-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.reserved-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 92px;
+}
+
+.reserved-mini__face {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 5 / 7;
+  max-height: 124px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.reserved-mini__bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+.reserved-mini__bg--level-1 {
+  background: linear-gradient(165deg, #1a2a1f 0%, #0d1510 100%);
+}
+
+.reserved-mini__bg--level-2 {
+  background: linear-gradient(165deg, #152238 0%, #0c1422 100%);
+}
+
+.reserved-mini__bg--level-3 {
+  background: linear-gradient(165deg, #2a1810 0%, #140a08 100%);
+}
+
+.reserved-mini__face--art .reserved-mini__bg {
+  filter: saturate(1.02);
+}
+
+.reserved-mini__pts {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  z-index: 2;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+  line-height: 1;
+}
+
+.reserved-mini__bonus {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  z-index: 2;
+  line-height: 0;
+}
+
+.reserved-mini__bonus .gem-sprite--stone {
+  --gw: 1.15rem;
+}
+
+.reserved-mini__cap {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #c5cce0;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.reserved-mini__buy {
+  margin-top: 0;
+  padding: 5px 6px;
+  font-size: 0.7rem;
+  border-radius: 6px;
+  width: 100%;
+}
+
+.reserved-mini__buy:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
 }
 
 label {

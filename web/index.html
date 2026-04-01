@@ -17,6 +17,11 @@
       <section id="start-screen" class="panel">
         <h2>Lobby</h2>
         <p class="hint">Choose Create Room or Join Room.</p>
+        <p class="hint small lobby-flow-hint">
+          <strong>Create Room</strong> if you host: you’ll get a short <strong>game code</strong> in the waiting room to share with friends.
+          <strong>Join Room</strong> if you were invited: enter <em>their</em> code below so everyone loads the same match.
+          (You don’t need the code field when you’re only creating.)
+        </p>
         <label>Your name:
           <input id="player-name" type="text" value="" placeholder="Enter your name">
         </label>
@@ -248,14 +253,14 @@
       </section>
 
       <section class="board">
-        <div class="panel">
+        <div class="panel panel--board-strip">
           <h2>Board Gems</h2>
-          <div id="board-gems" class="pill-row"></div>
+          <div id="board-gems" class="pill-row pill-row--board-gems"></div>
         </div>
 
-        <div class="panel">
+        <div class="panel panel--board-strip">
           <h2>Nobles</h2>
-          <div id="nobles"></div>
+          <div id="nobles" class="nobles-list"></div>
         </div>
 
         <div class="panel levels">
@@ -284,19 +289,13 @@
 
       <section class="actions panel">
         <h2>Actions</h2>
-        <div class="actions-grid">
+        <div class="actions-grid actions-grid-single">
           <div>
             <h3>Take Gems</h3>
             <p class="hint">Select up to 3 different gems OR 2 of the same color (if rules allow).</p>
             <div id="take-gems-options" class="pill-row"></div>
             <button id="take-gems-btn">Confirm Take Gems</button>
-          </div>
-          <div>
-            <h3>Purchase Reserved</h3>
-            <label>Reserved Index:
-              <input id="purchase-reserved-index" type="number" min="0" value="0">
-            </label>
-            <button id="purchase-reserved-btn">Purchase Reserved</button>
+            <p class="hint small">Reserved cards appear on <strong>your</strong> player panel—use <strong>Buy reserved</strong> there.</p>
           </div>
         </div>
         <div id="action-message" class="message"></div>
