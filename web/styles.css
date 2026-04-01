@@ -169,10 +169,10 @@ main {
 
 @media (min-width: 1024px) {
   .gameplay-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(400px, min(500px, 42vw));
-    gap: 22px;
-    align-items: start;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: stretch;
   }
 
   /* One page scroll (body); avoids nested scrollbars on board + sidebar. */
@@ -183,9 +183,7 @@ main {
   }
 
   .gameplay-side-col {
-    position: sticky;
-    top: 7rem;
-    align-self: start;
+    position: static;
     overflow: visible;
     padding-right: 0;
   }
@@ -868,7 +866,7 @@ main {
 
 .levels-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
   align-items: start;
 }
@@ -2568,10 +2566,6 @@ button.secondary:focus-visible {
     grid-template-columns: 1fr;
   }
 
-  .levels-row {
-    grid-template-columns: 1fr;
-  }
-
   .level-col {
     grid-template-columns: 1fr;
     gap: 8px;
@@ -2623,6 +2617,19 @@ button.secondary:focus-visible {
     --gw: 1.85rem;
     --d: 1.85rem;
   }
+}
+
+/* Board order: actions (gems) under cards, then players, then assists. */
+.gameplay-side-col .actions {
+  order: 1;
+}
+
+.gameplay-side-col .players {
+  order: 2;
+}
+
+.gameplay-side-col .assist-panel {
+  order: 3;
 }
 
 @media (max-width: 520px) {

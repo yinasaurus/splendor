@@ -961,9 +961,9 @@ function renderState(state) {
       afkMeta.className = "player-afk-meta";
       const afkSec = Number.isFinite(Number(p.afkSeconds)) ? Number(p.afkSeconds) : 0;
       const forcedAi = !!p.forcedAi;
-      if (forcedAi) {
+      if (p.human && forcedAi) {
         afkMeta.textContent = "AI takeover active";
-      } else if (afkSec >= 15) {
+      } else if (p.human && afkSec >= 15) {
         afkMeta.textContent = `AFK: ${afkSec}s`;
       } else {
         afkMeta.textContent = "";
@@ -977,7 +977,7 @@ function renderState(state) {
         if (count <= 0) {
           pill.classList.add("pill--zero");
         }
-        pill.innerHTML = gemPillMarkup(gem, `${gem}: ${count}`, "stone");
+        pill.innerHTML = gemPillMarkup(gem, `${count}`, "stone");
         gemsRow.appendChild(pill);
       });
       const bonusesRow = document.createElement("div");
@@ -1430,6 +1430,44 @@ function setupGemSelection() {
     return out.length === needed ? out : null;
   }
 
+  function validateTakeGemSelection(selectedMap, state) {
+    const picks = [];
+    selectedMap.forEach((count, gem) => {
+      if (gem === "GOLD") {
+        return;
+      }
+      const n = Number(count) || 0;
+      if (n > 0) {
+        picks.push([gem, n]);
+      }
+    });
+    const total = picks.reduce((sum, [, n]) => sum + n, 0);
+    if (total === 0) {
+      return { ok: false, message: "Select some gems first." };
+    }
+    // Legal Splendor take-gems moves:
+    // 1) exactly 3 different colors (1 each), OR
+    // 2) exactly 2 of one color (only if >=4 available on board).
+    if (total === 3 && picks.length === 3 && picks.every(([, n]) => n === 1)) {
+      return { ok: true, message: "" };
+    }
+    if (total === 2 && picks.length === 1 && picks[0][1] === 2) {
+      const gem = picks[0][0];
+      const boardCount = state && state.gems ? Number(state.gems[gem] || 0) : 0;
+      if (boardCount >= 4) {
+        return { ok: true, message: "" };
+      }
+      return {
+        ok: false,
+        message: `Cannot take 2 ${gemDisplayName(gem)} gems unless 4+ are on the board.`,
+      };
+    }
+    return {
+      ok: false,
+      message: "Invalid gem pick. Choose exactly 3 different gems, or 2 of one color.",
+    };
+  }
+
   btnConfirm.addEventListener("click", async () => {
     const gems = [];
     selected.forEach((count, gem) => {
@@ -1437,9 +1475,11 @@ function setupGemSelection() {
         gems.push(gem[0]); // use abbreviation's first letter
       }
     });
-    if (gems.length === 0) {
-      messageEl.textContent = "Select some gems first.";
+    const validation = validateTakeGemSelection(selected, latestState);
+    if (!validation.ok) {
+      messageEl.textContent = validation.message;
       messageEl.className = "message error";
+      showToast(validation.message, "error");
       return;
     }
     try {
