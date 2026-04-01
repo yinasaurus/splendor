@@ -1617,6 +1617,14 @@ async function init() {
   let liveSyncTimer = null;
   let liveSyncInFlight = false;
 
+  // Safe default: always show lobby first, then auto-transition if rejoin/game restore succeeds.
+  startScreen.classList.remove("hidden");
+  waitingRoom.classList.add("hidden");
+  gameUi.classList.add("hidden");
+  if (videoPanel) {
+    videoPanel.classList.remove("hidden");
+  }
+
   let guidedIndex = 0;
   let guidedSize = "md";
   let dragState = null;

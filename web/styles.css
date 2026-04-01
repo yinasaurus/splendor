@@ -170,7 +170,7 @@ main {
 @media (min-width: 1024px) {
   .gameplay-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
     gap: 18px;
     align-items: start;
   }
@@ -1087,14 +1087,14 @@ main {
 
 .gem-sprite--chip.gem-sprite--GOLD {
   background-image: url("media/gold-coin-cropped.png");
-  background-size: contain;
+  background-size: 78% 78%;
   background-position: center;
   background-repeat: no-repeat;
 }
 
 .gem-sprite--stone.gem-sprite--GOLD {
   background-image: url("media/gold-coin-cropped.png");
-  background-size: contain;
+  background-size: 78% 78%;
   background-position: center;
   background-repeat: no-repeat;
 }
