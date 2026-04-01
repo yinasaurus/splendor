@@ -1010,7 +1010,17 @@ main {
 }
 
 .gem-sprite--chip.gem-sprite--GOLD {
-  background-position: calc(-5 * var(--d)) 0;
+  background-image: url("media/gold-coin.png");
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.gem-sprite--stone.gem-sprite--GOLD {
+  background-image: url("media/gold-coin.png");
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .gem-sprite--stone {
