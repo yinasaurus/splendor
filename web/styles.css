@@ -250,8 +250,7 @@ main {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
-    max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
   background: rgba(4, 6, 14, 0.78);
   backdrop-filter: blur(8px);
   overflow-y: auto;
@@ -390,7 +389,7 @@ main {
   padding-left: 1.25rem;
 }
 
-.rulebook-steps > li {
+.rulebook-steps>li {
   margin-bottom: 12px;
 }
 
@@ -507,8 +506,8 @@ main {
   color: #f2f4fa;
 }
 
-.panel--nobles-strip > h2,
-.levels > h2 {
+.panel--nobles-strip>h2,
+.levels>h2 {
   font-size: 1.32rem;
 }
 
@@ -756,7 +755,8 @@ main {
 }
 
 #activity-log {
-  max-height: 7.2em; /* roughly 4 lines */
+  max-height: 7.2em;
+  /* roughly 4 lines */
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -882,7 +882,7 @@ main {
   grid-column: 1 / -1;
 }
 
-.board > .actions {
+.board>.actions {
   grid-column: 1 / -1;
 }
 
@@ -1105,14 +1105,23 @@ main {
 }
 
 .level-col h3 {
-  display: none;
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: 0.78rem;
+  display: block;
+  margin: 0 0 -6px;
+  /* Tight gap to cards */
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.45rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #b8c0d4;
+  letter-spacing: 0.02em;
+  color: #fff;
+  opacity: 0.94;
+  padding-left: 2px;
+}
+
+.level-col h3 .level-num {
+  font-size: 2.1rem;
+  margin-left: 2px;
+  vertical-align: baseline;
 }
 
 .level-head-row {
@@ -1123,81 +1132,126 @@ main {
   margin: 0;
 }
 
-.level-deck-btn {
-  margin-top: 0;
+.level-deck-card {
+  position: relative;
   width: 108px;
   min-height: 150px;
   aspect-ratio: 5 / 7;
-  padding: 8px 8px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  border: 0.5px solid rgba(255, 255, 255, 0.22); /* Light edge highlight */
+  border-bottom: 1.5px solid rgba(0, 0, 0, 0.4);
+  border-right: 1.5px solid rgba(0, 0, 0, 0.4);
   background:
-    linear-gradient(165deg, rgba(24, 30, 48, 0.96), rgba(12, 16, 28, 0.96)),
-    repeating-linear-gradient(
-      90deg,
+    linear-gradient(165deg, rgba(24, 30, 48, 0.98), rgba(12, 16, 28, 0.98)),
+    repeating-linear-gradient(90deg,
       rgba(255, 255, 255, 0.03) 0 1px,
-      rgba(0, 0, 0, 0) 1px 6px
-    );
+      rgba(0, 0, 0, 0) 1px 6px);
+  /* Physical Stack of cards via multiple box-shadow layers */
   box-shadow:
-    0 4px 14px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    1px 1px 0 rgba(10, 14, 24, 1),
+    2px 2px 0 rgba(10, 14, 24, 1),
+    3px 3px 0 rgba(10, 14, 24, 1),
+    4px 4px 0 rgba(10, 14, 24, 1),
+    0 10px 20px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  color: #d7deef;
-  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  justify-content: center;
+  color: #fff;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s ease;
+  overflow: hidden;
 }
 
-.level-deck-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.26);
+.level-deck-card:hover {
+  /* Compresses the stack to make it feel interactive */
+  transform: translateY(2px) translateX(2px);
   box-shadow:
-    0 8px 18px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0.5px 0.5px 0 rgba(10, 14, 24, 1),
+    1px 1px 0 rgba(10, 14, 24, 1),
+    0 4px 12px rgba(0, 0, 0, 0.55);
 }
 
-.level-deck-btn__stack {
-  position: relative;
-  width: 72px;
-  height: 112px;
-  border-radius: 6px;
-  background: linear-gradient(165deg, rgba(58, 70, 108, 0.88), rgba(30, 38, 64, 0.92));
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow:
-    0 4px 10px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-}
-
-.level-deck-btn__stack::before,
-.level-deck-btn__stack::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(165deg, rgba(44, 54, 86, 0.85), rgba(24, 30, 52, 0.9));
-  z-index: 0;
-}
-
-.level-deck-btn__stack::before {
-  transform: translate(2px, -2px);
-  opacity: 0.65;
-}
-
-.level-deck-btn__stack::after {
-  transform: translate(4px, -4px);
-  opacity: 0.45;
-}
-
-.level-deck-btn__meta {
-  font-size: 0.68rem;
+.level-deck-card__count {
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 3.35rem;
   font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: 0.03em;
-  text-align: center;
-  color: #c8d1e7;
+  font-style: italic;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  opacity: 0.92;
+  line-height: 1.1;
+  /* Improved line-height to avoid overlap */
+  margin-top: 5px;
+  /* Slight bump for centering */
+  transition: opacity 0.22s ease;
+}
+
+.level-deck-card__label {
+  font-family: var(--font-ui, "Outfit", sans-serif);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 0;
+  /* Removed negative margin */
+  margin-bottom: 22px;
+  /* Increased space to clear the reserve button */
+  transition: color 0.22s ease;
+}
+
+.level-deck-card:hover .level-deck-card__count {
+  opacity: 1;
+}
+
+.level-deck-card:hover .level-deck-card__label {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.level-deck-card__reserve-btn {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #ffd700;
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.level-deck-card:hover .level-deck-card__reserve-btn {
+  opacity: 1;
+  background: rgba(212, 175, 55, 0.12);
+  border-color: rgba(212, 175, 55, 0.85);
+  box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
+}
+
+.level-deck-card__reserve-btn:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.22);
+  transform: translateX(-50%) translateY(-1px);
+}
+
+.level-deck-card__reserve-btn:active:not(:disabled) {
+  transform: translateX(-50%) translateY(0) scale(0.94);
+  background: rgba(212, 175, 55, 0.32);
+}
+
+.level-deck-card__reserve-btn:disabled {
+  opacity: 0.15;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.3);
+  cursor: not-allowed;
 }
 
 .dev-deck-slot {
@@ -1770,7 +1824,7 @@ main {
   gap: 8px;
   overflow-x: auto;
   overflow-y: visible;
-  padding: 4px 2px 10px;
+  padding: 0 2px 10px;
   scrollbar-width: thin;
   align-items: flex-start;
 }
@@ -2204,6 +2258,22 @@ main {
   max-width: none;
 }
 
+#pass-turn-btn {
+  margin-top: 12px;
+  width: 100%;
+  max-width: none;
+  border-color: rgba(255, 165, 0, 0.6);
+  color: rgba(255, 165, 0, 0.9);
+  background: rgba(255, 140, 0, 0.06);
+  transition: all 0.2s ease;
+}
+
+#pass-turn-btn:hover:not(:disabled) {
+  border-color: rgba(255, 165, 0, 0.9);
+  background: rgba(255, 140, 0, 0.14);
+  box-shadow: 0 0 10px rgba(255, 140, 0, 0.2);
+}
+
 .reserve-top-row {
   margin-top: 10px;
   display: flex;
@@ -2465,7 +2535,8 @@ main {
 }
 
 .reserved-mini__buy {
-  margin-top: 0;
+  margin-top: auto;
+  /* Aligns buttons across rows */
   padding: 5px 6px;
   font-size: 0.7rem;
   border-radius: 6px;
@@ -2485,12 +2556,15 @@ label {
   color: #c8cfdf;
 }
 
-input, select, button {
+input,
+select,
+button {
   font-family: inherit;
   font-size: 0.88rem;
 }
 
-input, select {
+input,
+select {
   padding: 8px 12px;
   border-radius: var(--radius-md);
   color: #f5f5f5;
@@ -2757,7 +2831,7 @@ button.secondary:focus-visible {
   margin-bottom: 8px;
 }
 
-#start-screen > .hint {
+#start-screen>.hint {
   color: #aeb8d2;
   margin-bottom: 14px;
   line-height: 1.5;
@@ -2902,6 +2976,7 @@ button.secondary:focus-visible {
 }
 
 @media (max-width: 640px) {
+
   #start-screen .start-actions-row,
   #start-screen .start-actions-row.muted-row {
     grid-template-columns: 1fr;
@@ -2939,7 +3014,8 @@ button.secondary:focus-visible {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: auto; /* required for resize handle */
+  overflow: auto;
+  /* required for resize handle */
   resize: both;
   background: rgba(14, 14, 22, 0.78);
   border-radius: 12px;
@@ -3007,7 +3083,8 @@ button.secondary:focus-visible {
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  pointer-events: auto; /* allow scrolling text inside tutorial */
+  pointer-events: auto;
+  /* allow scrolling text inside tutorial */
 }
 
 .guided-actions {
@@ -3066,7 +3143,8 @@ button.secondary:focus-visible {
   .guided-card {
     width: min(520px, calc(100vw - 16px));
     max-height: min(36vh, 270px);
-    resize: none; /* avoid awkward touch-resize on mobile */
+    resize: none;
+    /* avoid awkward touch-resize on mobile */
   }
 
   .guided-overlay .guided-card {
@@ -3309,4 +3387,3 @@ button.secondary:focus-visible {
     font-size: 1.2rem;
   }
 }
-

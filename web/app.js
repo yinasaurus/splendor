@@ -293,24 +293,24 @@ function computeLiveStateDigest(state) {
   }
   const lobbyPlayers =
     state &&
-    state.lobby &&
-    Array.isArray(state.lobby.players)
+      state.lobby &&
+      Array.isArray(state.lobby.players)
       ? state.lobby.players.map((p) => `${p && p.name ? p.name : ""}:${p && p.ready ? 1 : 0}`).join("|")
       : "";
   const players =
     Array.isArray(state.players)
       ? state.players
-          .map((p) => {
-            const name = p && p.name ? p.name : "";
-            const prestige = Number(p && p.prestige ? p.prestige : 0);
-            const reserved = Number(p && p.reservedCount ? p.reservedCount : 0);
-            const afkSeconds = Number.isFinite(Number(p && p.afkSeconds)) ? Number(p.afkSeconds) : 0;
-            const forcedAi = p && p.forcedAi ? 1 : 0;
-            const gems = p && p.gems ? JSON.stringify(p.gems) : "{}";
-            const bonuses = p && p.bonuses ? JSON.stringify(p.bonuses) : "{}";
-            return `${name}:${prestige}:${reserved}:${afkSeconds}:${forcedAi}:${gems}:${bonuses}`;
-          })
-          .join("||")
+        .map((p) => {
+          const name = p && p.name ? p.name : "";
+          const prestige = Number(p && p.prestige ? p.prestige : 0);
+          const reserved = Number(p && p.reservedCount ? p.reservedCount : 0);
+          const afkSeconds = Number.isFinite(Number(p && p.afkSeconds)) ? Number(p.afkSeconds) : 0;
+          const forcedAi = p && p.forcedAi ? 1 : 0;
+          const gems = p && p.gems ? JSON.stringify(p.gems) : "{}";
+          const bonuses = p && p.bonuses ? JSON.stringify(p.bonuses) : "{}";
+          return `${name}:${prestige}:${reserved}:${afkSeconds}:${forcedAi}:${gems}:${bonuses}`;
+        })
+        .join("||")
       : "";
   const deck = state && state.deckRemaining ? JSON.stringify(state.deckRemaining) : "{}";
   const actions = Array.isArray(state.recentActions) ? state.recentActions.slice(-8).join("||") : "";
@@ -416,8 +416,8 @@ function resolveDevCardArtImageUrl(level, card) {
     const candidatesRaw = byBonusRaw[bonus];
     const candidates = Array.isArray(candidatesRaw)
       ? candidatesRaw
-          .map((x) => (x == null ? "" : String(x).trim().replace(/^\/+/, "")))
-          .filter((x) => x.length > 0)
+        .map((x) => (x == null ? "" : String(x).trim().replace(/^\/+/, "")))
+        .filter((x) => x.length > 0)
       : [];
     if (candidates.length > 0) {
       const cardId = card && card.id != null ? Number(card.id) : NaN;
@@ -988,6 +988,54 @@ const guidedSteps = [
 
   "You're set!\n\nEnd the tutorial anytime with \"End Tutorial\", or tap \"Finish\" to return to the start screen. Have fun!"
 ];
+/**
+ * Determines if the current player has no valid action available.
+ * A player is stuck if they cannot:
+ *  (a) take any gems (bank is depleted by Splendor rules), AND
+ *  (b) buy any visible or reserved card, AND
+ *  (c) reserve a new card (reserve already full at 3)
+ *
+ * @param {object} state - The current game state.
+ * @returns {boolean} true if the player is stuck and should see "Pass Turn".
+ */
+function isPlayerStuck(state) {
+  const bankGems = state.gems || {};
+
+  // --- Gem Availability Rules ---
+  // Non-gold gem colors with at least 1 available
+  const nonGoldColors = Object.entries(bankGems)
+    .filter(([gem, count]) => gem !== "GOLD" && count > 0);
+
+  // 3-Different Rule: need >= 3 distinct colors to take 3 different gems
+  const canTake3Different = nonGoldColors.length >= 3;
+
+  // 2-of-a-Kind Rule: need at least one color with >= 4 gems to take 2 of the same
+  const canTake2OfSame = nonGoldColors.some(([, count]) => count >= 4);
+
+  const canTakeGems = canTake3Different || canTake2OfSame;
+
+  // --- Affordability Check ---
+  // Check visible board cards
+  const affordableVisible = Object.values(state.levels || {})
+    .flat()
+    .some((c) => !!c.affordable);
+
+  // Find the current player's own reserved cards and check affordability
+  const myPlayer = (state.players || []).find((p) =>
+    samePlayerName(p.name, state.currentPlayer)
+  );
+  const reservedCount = myPlayer ? (myPlayer.reserved || []).length : 0;
+  const affordableReserved = myPlayer
+    ? (myPlayer.reserved || []).some((rc) => !!rc.affordable)
+    : false;
+
+  // --- Reserve Check ---
+  // Can still reserve if slots remain (< 3 reserved)
+  const canReserve = reservedCount < 3;
+
+  // Player is stuck if NONE of the following are possible:
+  return !canTakeGems && !affordableVisible && !affordableReserved && !canReserve;
+}
 
 function renderState(state) {
   const boardColEl = document.querySelector(".gameplay-board-col");
@@ -1218,31 +1266,32 @@ function renderState(state) {
     const levelHeading = levelCol ? levelCol.querySelector("h3") : null;
     const deckLeft =
       state &&
-      state.deckRemaining &&
-      Number.isFinite(Number(state.deckRemaining[lvl]))
+        state.deckRemaining &&
+        Number.isFinite(Number(state.deckRemaining[lvl]))
         ? Number(state.deckRemaining[lvl])
         : cards.length;
     if (levelHeading) {
-      levelHeading.textContent = "";
-      levelHeading.setAttribute("aria-hidden", "true");
+      levelHeading.innerHTML = `Level <span class="level-num">${lvl}</span>`;
+      levelHeading.removeAttribute("aria-hidden");
     }
 
     const deckLi = document.createElement("li");
     deckLi.className = "dev-deck-slot";
-    const deckBtn = document.createElement("button");
-    deckBtn.type = "button";
-    deckBtn.className = "level-deck-btn";
-    deckBtn.innerHTML = `<span class="level-deck-btn__stack" aria-hidden="true"></span><span class="level-deck-btn__meta">L${lvl} · ${deckLeft} left</span>`;
-    deckBtn.title = `Reserve top Level ${lvl} card`;
-    deckBtn.disabled = actionRequestInFlight || !isMyTurn || currentReservedCount >= 3 || deckLeft <= 0;
-    deckBtn.onclick = async (e) => {
+    const deckCard = document.createElement("div");
+    deckCard.className = "level-deck-card";
+    deckCard.innerHTML = `
+      <div class="level-deck-card__count">${deckLeft}</div>
+      <div class="level-deck-card__label">${deckLeft === 1 ? 'Card' : 'Cards'}</div>
+      <button type="button" class="level-deck-card__reserve-btn" ${deckLeft <= 0 ? 'disabled' : ''}>RESERVE</button>
+    `;
+    const resBtn = deckCard.querySelector(".level-deck-card__reserve-btn");
+    resBtn.disabled = actionRequestInFlight || !isMyTurn || currentReservedCount >= 3 || deckLeft <= 0;
+    resBtn.onclick = async (e) => {
       e.stopPropagation();
-      if (deckBtn.disabled) {
-        return;
-      }
+      if (resBtn.disabled) return;
       await postReserveTop(lvl);
     };
-    deckLi.appendChild(deckBtn);
+    deckLi.appendChild(deckCard);
     ul.appendChild(deckLi);
 
     cards.forEach((card, index) => {
@@ -1340,16 +1389,16 @@ function renderState(state) {
         try {
           const result = await postAction({ type: "purchaseVisible", level: lvl, index });
           const msg = document.getElementById("action-message");
-          msg.textContent = result.message || (result.success ? "Purchased." : "Purchase failed.");
+          msg.textContent = result.message || (result.success ? "Bought." : "Buy failed.");
           msg.className = "message " + (result.success ? "ok" : "error");
           if (result.success) {
-            showToast("Card purchased.");
+            showToast("Card bought.");
           }
           const newState = await fetchState();
           renderState(newState);
         } catch (e2) {
           const msg = document.getElementById("action-message");
-          msg.textContent = "Error purchasing card.";
+          msg.textContent = "Error buying card.";
           msg.className = "message error";
         }
       });
@@ -1411,11 +1460,8 @@ function renderState(state) {
   players.innerHTML = "";
   if (state.players) {
     const basePlayers = displayPlayers.length > 0 ? displayPlayers : (state.players || []);
-    const orderedPlayers = [];
-    const startIndex = currentIdx >= 0 ? currentIdx : 0;
-    for (let i = 0; i < basePlayers.length; i++) {
-      orderedPlayers.push(basePlayers[(i + startIndex) % basePlayers.length]);
-    }
+    const orderedPlayers = basePlayers;
+
     orderedPlayers.forEach((p, idx) => {
       const card = document.createElement("div");
       card.className = "player-card";
@@ -1701,7 +1747,7 @@ function renderState(state) {
       suggestions.push(isAiTurn ? "Wait for AI turns to finish." : "Wait for the other player to finish their turn.");
     } else {
       if (currentReservedCount >= 3) {
-        suggestions.push("Reserve is full (3/3). Purchase a reserved card to free a slot.");
+        suggestions.push("Reserve is full (3/3). Buy a reserved card to free a slot.");
       }
       if (affordableVisible) {
         suggestions.push("Buy an affordable visible card to gain points and a permanent bonus.");
@@ -1709,7 +1755,7 @@ function renderState(state) {
         suggestions.push("Take gems to prepare your next purchase.");
       }
       if (currentReservedCount > 0) {
-        suggestions.push("Check 'Purchase Reserved' if one of your reserved cards is now affordable.");
+        suggestions.push("Check 'Buy Reserved' if one of your reserved cards is now affordable.");
       }
       if (Array.isArray(state.claimableNobles) && state.claimableNobles.length > 0) {
         suggestions.push("You qualify for a noble now; it will visit automatically at end of your turn.");
@@ -1754,6 +1800,41 @@ function renderState(state) {
       isMyTurn: !state.gameOver && isMyTurn,
       isHumanTurn: !state.gameOver && state.isHumanTurn,
     });
+  }
+
+  // Pass Turn button: only show when the current player is truly stuck.
+  const passTurnBtn = document.getElementById("pass-turn-btn");
+  if (passTurnBtn) {
+    const stuck = !state.gameOver && isMyTurn && isPlayerStuck(state);
+    passTurnBtn.classList.toggle("hidden", !stuck);
+    // Re-attach the click handler (remove old one first to avoid duplicates)
+    const newPassBtn = passTurnBtn.cloneNode(true);
+    passTurnBtn.parentNode.replaceChild(newPassBtn, passTurnBtn);
+    if (stuck) {
+      newPassBtn.addEventListener("click", async () => {
+        newPassBtn.disabled = true;
+        try {
+          const result = await postAction({ type: "pass" });
+          const msg = document.getElementById("action-message");
+          if (msg) {
+            msg.textContent = result.message || (result.success ? "Passed." : "Pass failed.");
+            msg.className = "message " + (result.success ? "ok" : "error");
+          }
+          if (result.success) {
+            showToast("Turn passed.");
+          }
+          const newState = await fetchState();
+          renderState(newState);
+        } catch (err) {
+          const msg = document.getElementById("action-message");
+          if (msg) {
+            msg.textContent = "Error passing turn.";
+            msg.className = "message error";
+          }
+          newPassBtn.disabled = false;
+        }
+      });
+    }
   }
   // Realtime popups: new action and turn changes.
   if (!suppressRealtimeToasts && !state.gameOver) {

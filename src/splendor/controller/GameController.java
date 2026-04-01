@@ -60,6 +60,9 @@ public class GameController {
 			players.add(new Player(name, isHuman));
 		}
 		
+		// Randomize turn order
+		Collections.shuffle(players);
+		
 		// Load game data
 		loadGameData();
 		
@@ -551,6 +554,19 @@ public class GameController {
 			player.visitNoble(noble);
 			board.removeNoble(noble);
 		}
+	}
+
+	/**
+	 * Executes a pass turn action.
+	 *
+	 * @return true if the action was successful
+	 */
+	public boolean passTurn() {
+		Player player = getCurrentPlayer();
+		statistics.recordTurn(player, "Passed turn");
+		afterSuccessfulAction(player);
+		nextTurn();
+		return true;
 	}
 
 	/**

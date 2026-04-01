@@ -1,5 +1,9 @@
 package splendor.web;
 
+import com.sun.net.httpserver.Headers;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -9,22 +13,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.HashSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
-import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
-
-import com.sun.net.httpserver.Headers;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
-
 import splendor.ai.AIPlayer;
 import splendor.ai.EasyAIStrategy;
 import splendor.ai.HardAIStrategy;
@@ -967,7 +965,7 @@ public class WebServer {
 				return;
 			}
 			name = canonicalizeLobbyName(session, name);
-			String nameKey = String(name == null ? "" : name).trim().toLowerCase();
+			String nameKey = (name == null ? "" : name).trim().toLowerCase();
 			if (!nameKey.isEmpty() && session.kickedNames.contains(nameKey)) {
 				Map<String, Object> resp = new HashMap<>();
 				resp.put("success", false);
@@ -1567,7 +1565,7 @@ public class WebServer {
 					message = vr.getMessage();
 				} else {
 					success = session.controller.purchaseVisibleCard(level, index);
-					message = success ? "Card purchased." : "Cannot purchase this card.";
+					message = success ? "Bought." : "Buy failed.";
 					if (success) {
 						actionSummary = actor + " bought a Level " + card.getLevel()
 							+ " card (+" + card.getPrestigePoints() + " prestige, +" + card.getBonusGem().getAbbreviation() + " bonus).";
@@ -1589,12 +1587,18 @@ public class WebServer {
 					message = vr.getMessage();
 				} else {
 					success = session.controller.purchaseReservedCard(index);
-					message = success ? "Reserved card purchased." : "Cannot purchase this reserved card.";
+					message = success ? "Bought." : "Buy failed.";
 					if (success) {
 						actionSummary = actor + " bought a reserved Level " + card.getLevel()
 							+ " card (+" + card.getPrestigePoints() + " prestige, +" + card.getBonusGem().getAbbreviation() + " bonus).";
 					}
 				}
+			}
+		} else if ("pass".equals(actionType) || "passturn".equals(actionType)) {
+			success = session.controller.passTurn();
+			message = success ? "Passed." : "Cannot pass.";
+			if (success) {
+				actionSummary = actor + " passed their turn.";
 			}
 		}
 
