@@ -157,66 +157,28 @@ public class GameRules {
 		Map<GemType, Integer> playerGems = player.getGems();
 		Map<GemType, Integer> playerBonuses = player.getBonuses();
 		Map<GemType, Integer> cost = card.getCost();
-		
-		// Calculate total resources (gems + bonuses)
-		Map<GemType, Integer> totalResources = new HashMap<>(playerGems);
-		for (Map.Entry<GemType, Integer> bonus : playerBonuses.entrySet()) {
-			totalResources.put(bonus.getKey(), 
-				totalResources.getOrDefault(bonus.getKey(), 0) + bonus.getValue());
-		}
-		
-		// Check if player has enough resources
-		Map<GemType, Integer> remainingCost = new HashMap<>(cost);
+
+		// Single source of truth affordability validation:
+		// bonuses + colored gems + cumulative gold coverage.
+		int goldAvailable = playerGems.getOrDefault(GemType.GOLD, 0);
 		int goldNeeded = 0;
-		
-		for (Map.Entry<GemType, Integer> costEntry : remainingCost.entrySet()) {
-			if (costEntry.getKey() == GemType.GOLD) {
-				continue; // Gold is not in card costs
-			}
-			
-			int required = costEntry.getValue();
-			int available = totalResources.getOrDefault(costEntry.getKey(), 0);
-			
-			if (available < required) {
-				goldNeeded += (required - available);
-			}
-		}
-		
-		// Check if player has enough gems to pay
-		Map<GemType, Integer> actualPayment = new HashMap<>();
-		int goldUsed = 0;
-		
 		for (Map.Entry<GemType, Integer> costEntry : cost.entrySet()) {
-			if (costEntry.getKey() == GemType.GOLD) {
+			GemType type = costEntry.getKey();
+			if (type == GemType.GOLD) {
 				continue;
 			}
-			
 			int required = costEntry.getValue();
-			int fromBonuses = playerBonuses.getOrDefault(costEntry.getKey(), 0);
-			int fromGems = Math.min(required, 
-				playerGems.getOrDefault(costEntry.getKey(), 0));
-			
-			if (fromBonuses + fromGems < required) {
-				int deficit = required - fromBonuses - fromGems;
-				if (gemsToPay.getOrDefault(GemType.GOLD, 0) < goldUsed + deficit) {
-					return new ValidationResult(false, "Insufficient gems to purchase card.");
-				}
-				goldUsed += deficit;
-			}
-			
-			actualPayment.put(costEntry.getKey(), fromGems);
-		}
-		
-		actualPayment.put(GemType.GOLD, goldUsed);
-		
-		// Verify payment matches what player wants to pay
-		for (Map.Entry<GemType, Integer> payment : gemsToPay.entrySet()) {
-			if (payment.getValue() > playerGems.getOrDefault(payment.getKey(), 0)) {
-				return new ValidationResult(false, 
-					"Player does not have enough " + payment.getKey().getName() + " gems.");
+			int bonus = playerBonuses.getOrDefault(type, 0);
+			int neededAfterBonus = Math.max(0, required - bonus);
+			int coloredGems = playerGems.getOrDefault(type, 0);
+			if (coloredGems < neededAfterBonus) {
+				goldNeeded += (neededAfterBonus - coloredGems);
 			}
 		}
-		
+		if (goldNeeded > goldAvailable) {
+			return new ValidationResult(false, "Insufficient gems to purchase card.");
+		}
+
 		return new ValidationResult(true, "Valid action.");
 	}
 

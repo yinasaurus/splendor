@@ -802,10 +802,17 @@ main {
 }
 
 .noble-card__portrait {
-  display: none;
+  width: 44px;
+  min-width: 44px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background-color: rgba(8, 10, 16, 0.6);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
-.noble-card__portrait::after {
+.noble-card__portrait--hidden {
   display: none;
 }
 

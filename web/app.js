@@ -283,6 +283,43 @@ function resolveDevCardArtImageUrl(level, card) {
   return `${base}/${file}`;
 }
 
+function resolveNobleArtImageUrl(noble) {
+  if (typeof window === "undefined" || !noble) {
+    return null;
+  }
+  const byId = window.__SPLENDOR_NOBLE_ART_BY_ID__;
+  const byName = window.__SPLENDOR_NOBLE_ART_BY_NAME__;
+  const id = Number(noble.id);
+  const name = String(noble.name || "").trim();
+  const fromId = byId && typeof byId === "object" ? byId[id] : null;
+  if (fromId && String(fromId).trim()) {
+    return String(fromId).trim();
+  }
+  const fromName = byName && typeof byName === "object" ? byName[name] : null;
+  if (fromName && String(fromName).trim()) {
+    return String(fromName).trim();
+  }
+  const baseRaw = window.__SPLENDOR_NOBLE_ART_BASE__;
+  const base = typeof baseRaw === "string" ? baseRaw.trim().replace(/\/+$/, "") : "";
+  if (!base) {
+    return null;
+  }
+  if (typeof window.__SPLENDOR_NOBLE_ART_FILENAME__ === "function") {
+    try {
+      const file = window.__SPLENDOR_NOBLE_ART_FILENAME__(noble);
+      if (file && String(file).trim()) {
+        return `${base}/${String(file).trim().replace(/^\/+/, "")}`;
+      }
+    } catch (_) {
+      // ignore fallback below
+    }
+  }
+  if (Number.isFinite(id) && id > 0) {
+    return `${base}/noble${id}.jpg`;
+  }
+  return null;
+}
+
 function showToast(message, type = "ok") {
   const toast = document.getElementById("action-toast");
   if (!toast) {
@@ -809,6 +846,12 @@ function renderState(state) {
       const portrait = document.createElement("div");
       portrait.className = "noble-card__portrait";
       portrait.setAttribute("aria-hidden", "true");
+      const nobleArt = resolveNobleArtImageUrl(n);
+      if (nobleArt) {
+        portrait.style.backgroundImage = `url(${JSON.stringify(nobleArt)})`;
+      } else {
+        portrait.classList.add("noble-card__portrait--hidden");
+      }
 
       const body = document.createElement("div");
       body.className = "noble-card__body";

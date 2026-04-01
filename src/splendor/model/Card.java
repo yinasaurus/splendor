@@ -92,18 +92,22 @@ public class Card {
 				totalResources.getOrDefault(bonus.getKey(), 0) + bonus.getValue());
 		}
 
-		// Check if player has enough resources for each gem type in cost
+		// Check if player has enough resources for each gem type in cost.
+		// Gold must be consumed cumulatively across deficits.
+		int goldRemaining = totalResources.getOrDefault(GemType.GOLD, 0);
 		for (Map.Entry<GemType, Integer> costEntry : cost.entrySet()) {
+			if (costEntry.getKey() == GemType.GOLD) {
+				continue;
+			}
 			int required = costEntry.getValue();
 			int available = totalResources.getOrDefault(costEntry.getKey(), 0);
 			
 			if (available < required) {
-				// Check if gold can cover the deficit
 				int deficit = required - available;
-				int goldAvailable = totalResources.getOrDefault(GemType.GOLD, 0);
-				if (goldAvailable < deficit) {
+				if (goldRemaining < deficit) {
 					return false;
 				}
+				goldRemaining -= deficit;
 			}
 		}
 		
