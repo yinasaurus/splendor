@@ -196,6 +196,29 @@
               </div>
             </div>
 
+            <section class="actions panel actions-panel--sticky">
+              <h2>Your actions</h2>
+              <div class="actions-grid actions-grid-single">
+                <div>
+                  <h3>Take gems</h3>
+                  <p class="hint">Use + / - to set each color to 0, 1, or 2, then confirm. Max 10 gems in hand.</p>
+                  <div id="take-gems-options" class="pill-row"></div>
+                  <button id="take-gems-btn">Confirm take gems</button>
+                  <div id="discard-gems-panel" class="discard-panel hidden" aria-live="polite">
+                    <div id="discard-gems-title" class="discard-panel__title">Discard gems</div>
+                    <p id="discard-gems-hint" class="hint small">Choose gems to discard to return to 10 total.</p>
+                    <div id="discard-gems-options" class="pill-row"></div>
+                    <div class="discard-panel__actions">
+                      <button id="discard-gems-confirm-btn" type="button">Confirm discard &amp; submit</button>
+                      <button id="discard-gems-cancel-btn" type="button" class="secondary">Cancel</button>
+                    </div>
+                  </div>
+                  <p class="hint small">Reserve / buy cards on the board. <strong>Buy reserved</strong> is on <strong>your</strong> player card.</p>
+                </div>
+              </div>
+              <div id="action-message" class="message"></div>
+            </section>
+
           </section>
         </div>
 
@@ -219,28 +242,6 @@
             <div id="players" class="players-row"></div>
           </section>
 
-          <section class="actions panel actions-panel--sticky">
-            <h2>Your actions</h2>
-            <div class="actions-grid actions-grid-single">
-              <div>
-                <h3>Take gems</h3>
-                <p class="hint">Use + / - to set each color to 0, 1, or 2, then confirm. Max 10 gems in hand.</p>
-                <div id="take-gems-options" class="pill-row"></div>
-                <button id="take-gems-btn">Confirm take gems</button>
-                <div id="discard-gems-panel" class="discard-panel hidden" aria-live="polite">
-                  <div id="discard-gems-title" class="discard-panel__title">Discard gems</div>
-                  <p id="discard-gems-hint" class="hint small">Choose gems to discard to return to 10 total.</p>
-                  <div id="discard-gems-options" class="pill-row"></div>
-                  <div class="discard-panel__actions">
-                    <button id="discard-gems-confirm-btn" type="button">Confirm discard &amp; submit</button>
-                    <button id="discard-gems-cancel-btn" type="button" class="secondary">Cancel</button>
-                  </div>
-                </div>
-                <p class="hint small">Reserve / buy cards on the board. <strong>Buy reserved</strong> is on <strong>your</strong> player card.</p>
-              </div>
-            </div>
-            <div id="action-message" class="message"></div>
-          </section>
         </aside>
       </div>
       </section>

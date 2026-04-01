@@ -1198,9 +1198,6 @@ function renderState(state) {
       reserveBtn.textContent = "Reserve";
       reserveBtn.disabled = !isMyTurn || currentReservedCount >= 3;
       const canReserve = isMyTurn && currentReservedCount < 3;
-      if (!canBuy && !canReserve) {
-        li.classList.add("dev-card--locked");
-      }
 
       buyBtn.addEventListener("click", async (e) => {
         e.stopPropagation();

@@ -2096,22 +2096,6 @@ main {
   box-shadow: none;
 }
 
-.dev-card--locked .dev-card__face::after {
-  content: "Locked";
-  position: absolute;
-  left: 8px;
-  top: 8px;
-  z-index: 4;
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 3px 6px;
-  border-radius: 999px;
-  color: #d9dde9;
-  background: rgba(4, 6, 10, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-}
 
 .dev-card__actions .card-buy-btn:not(:disabled):hover {
   filter: none;
@@ -2137,10 +2121,6 @@ main {
   background: rgba(122, 92, 34, 0.3);
   border-color: rgba(184, 140, 54, 0.72);
   color: #f0e0b6;
-}
-
-.dev-card--locked .dev-card__face {
-  filter: none;
 }
 
 /* Affordable buy stays quiet until you hover the card or the button (desktop). */
