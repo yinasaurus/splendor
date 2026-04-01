@@ -1443,6 +1443,18 @@ function setupGemSelection() {
 
   const btnConfirm = document.getElementById("take-gems-btn");
   const messageEl = document.getElementById("action-message");
+  let takeGemsSubmitting = false;
+
+  function setTakeGemsBusy(isBusy) {
+    takeGemsSubmitting = !!isBusy;
+    if (btnConfirm) {
+      btnConfirm.disabled = isBusy || !(latestState && (latestState.isMyTurn != null ? latestState.isMyTurn : latestState.isHumanTurn));
+      btnConfirm.textContent = isBusy ? "Submitting..." : "Confirm take gems";
+    }
+    container.querySelectorAll("button").forEach((btn) => {
+      btn.disabled = isBusy || !(latestState && (latestState.isMyTurn != null ? latestState.isMyTurn : latestState.isHumanTurn));
+    });
+  }
 
   function parseDiscardInput(raw, needed) {
     const text = String(raw || "").toUpperCase();
@@ -1496,6 +1508,9 @@ function setupGemSelection() {
   }
 
   btnConfirm.addEventListener("click", async () => {
+    if (takeGemsSubmitting) {
+      return;
+    }
     const gems = [];
     selected.forEach((count, gem) => {
       for (let i = 0; i < count; i++) {
@@ -1510,6 +1525,9 @@ function setupGemSelection() {
       return;
     }
     try {
+      setTakeGemsBusy(true);
+      messageEl.textContent = "Submitting gem action...";
+      messageEl.className = "message";
       const myPlayer =
         latestState && Array.isArray(latestState.players)
           ? latestState.players.find((p) => p.name === latestState.currentPlayer)
@@ -1545,6 +1563,8 @@ function setupGemSelection() {
     } catch (e) {
       messageEl.textContent = "Error sending action.";
       messageEl.className = "message error";
+    } finally {
+      setTakeGemsBusy(false);
     }
   });
 
@@ -2219,12 +2239,8 @@ async function init() {
   updateLobbyReadiness();
   startLiveSync();
   const pathRoom = roomFromUrlPath();
-  const rememberedRoom = getRememberedRoom();
   if (pathRoom) {
     rememberRoom(pathRoom);
-  } else if (rememberedRoom) {
-    // Refresh fallback: restore last known room when URL has no room segment.
-    rememberRoom(rememberedRoom);
   }
   const rememberedName = getRememberedPlayerName();
   if (rememberedName) {
@@ -2235,7 +2251,9 @@ async function init() {
   }
   updateLobbyReadiness();
   try {
-    const shouldTryAutoJoin = !!currentPlayerName && !!(pathRoom || rememberedRoom);
+    // Only auto-join when the URL explicitly contains a room code.
+    // Visiting site root should stay on Lobby.
+    const shouldTryAutoJoin = !!currentPlayerName && !!pathRoom;
     if (shouldTryAutoJoin) {
       try {
         await postJoinRoom({ room: currentRoom, name: currentPlayerName });
@@ -2261,7 +2279,7 @@ async function init() {
       } else {
         showWaitingRoom();
       }
-    } else if (pathRoom || rememberedRoom) {
+    } else if (pathRoom) {
       showHome(false);
       showToast(`Could not auto-rejoin ${currentRoom}. Enter your name, then Join Room.`, "error");
     } else {

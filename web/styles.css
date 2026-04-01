@@ -907,12 +907,13 @@ main {
 .players-row {
   display: flex;
   gap: 10px;
-  overflow-x: auto;
+  overflow-x: visible;
+  flex-wrap: wrap;
   padding-bottom: 6px;
 }
 
 .player-card {
-  min-width: 190px;
+  min-width: 170px;
   background: rgba(12, 12, 22, 0.85);
   border-radius: 12px;
   padding: 10px 12px;
@@ -2769,6 +2770,7 @@ button.secondary:focus-visible {
   .players-row {
     gap: 8px;
     overflow-x: auto;
+    flex-wrap: nowrap;
     flex-direction: row;
   }
 
