@@ -1053,7 +1053,7 @@ function renderState(state) {
       gameUiRoot.classList.add("game-over-mode");
     }
     gameOverWrap.classList.remove("hidden");
-    gameOverBanner.textContent = `Game over — ${winnerDisplay} wins`;
+    gameOverBanner.textContent = `${winnerDisplay} wins`;
     if (gameOverHint) {
       gameOverHint.textContent = "Tie-breaker: if prestige is tied, the player with fewer purchased development cards wins.";
     }
@@ -1079,7 +1079,7 @@ function renderState(state) {
       }
       const pts = Number(p.prestige) || 0;
       const cards = Number.isFinite(Number(p.purchasedCards)) ? Number(p.purchasedCards) : "—";
-      li.textContent = `${idx + 1}. ${p.name} — ${pts} prestige · ${cards} cards`;
+      li.textContent = `${p.name} — ${pts} prestige · ${cards} cards`;
       leaderboardEl.appendChild(li);
     });
     if (playAgainRoomBtn) {
