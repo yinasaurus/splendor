@@ -72,7 +72,8 @@ async function readErrorMessage(res, fallback) {
 
 async function fetchState() {
   const roomParam = encodeURIComponent(currentRoom || "Room A");
-  const res = await fetch(`${API_STATE}?room=${roomParam}`);
+  const nameParam = encodeURIComponent(currentPlayerName || "");
+  const res = await fetch(`${API_STATE}?room=${roomParam}&name=${nameParam}`);
   if (!res.ok) {
     throw new Error("Failed to load state");
   }
@@ -399,7 +400,7 @@ async function copyRoomCodeToClipboard() {
 }
 
 async function postAction(payload) {
-  const withRoom = { ...payload, room: currentRoom };
+  const withRoom = { ...payload, room: currentRoom, name: currentPlayerName };
   const res = await fetch(API_ACTION, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -568,7 +569,7 @@ function renderState(state) {
   const recommendedSteps = document.getElementById("recommended-steps");
   const activityLog = document.getElementById("activity-log");
   const currentPlayerData = (state.players || []).find((p) => p.name === state.currentPlayer) || null;
-  const isHumanTurn = !!state.isHumanTurn;
+  const isHumanTurn = !!(state.isMyTurn != null ? state.isMyTurn : state.isHumanTurn);
   const currentReservedCount = currentPlayerData ? (currentPlayerData.reservedCount || 0) : 0;
   const turnNo = Number.isFinite(state.turnNumber) ? state.turnNumber : 1;
   const roundNo = Number.isFinite(state.roundNumber) ? state.roundNumber : 1;
@@ -1189,7 +1190,7 @@ function setupGemSelection() {
 
     const preview = document.createElement("div");
     preview.className = "take-gem-option__preview";
-    preview.innerHTML = gemPillMarkup(gem, gem, "chip");
+    preview.innerHTML = gemPillMarkup(gem, gem, "stone");
 
     const controls = document.createElement("div");
     controls.className = "take-gem-option__controls";

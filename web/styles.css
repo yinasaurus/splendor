@@ -1083,8 +1083,8 @@ main {
   color: #f0f3fb;
 }
 
-.take-gem-option .gem-sprite--chip {
-  --d: 2.4rem;
+.take-gem-option .gem-sprite--stone {
+  --gw: 2rem;
 }
 
 .pill.gem-RUBY {

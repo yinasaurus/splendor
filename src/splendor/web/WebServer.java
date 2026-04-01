@@ -78,9 +78,14 @@ public class WebServer {
 	}
 
 	private static String getRoomFromQuery(HttpExchange exchange) {
+		String room = getQueryParam(exchange, "room");
+		return room == null ? DEFAULT_ROOM : cleanRoomName(room);
+	}
+
+	private static String getQueryParam(HttpExchange exchange, String keyToFind) {
 		URI uri = exchange.getRequestURI();
 		if (uri == null || uri.getQuery() == null) {
-			return DEFAULT_ROOM;
+			return null;
 		}
 		String query = uri.getQuery();
 		for (String kv : query.split("&")) {
@@ -90,15 +95,15 @@ public class WebServer {
 			}
 			String key = kv.substring(0, eq);
 			String value = kv.substring(eq + 1);
-			if ("room".equalsIgnoreCase(key)) {
+			if (keyToFind.equalsIgnoreCase(key)) {
 				try {
-					return cleanRoomName(java.net.URLDecoder.decode(value, StandardCharsets.UTF_8.name()));
+					return java.net.URLDecoder.decode(value, StandardCharsets.UTF_8.name());
 				} catch (Exception e) {
-					return cleanRoomName(value);
+					return value;
 				}
 			}
 		}
-		return DEFAULT_ROOM;
+		return null;
 	}
 
 	private static GameSession getOrCreateSession(String roomName) {
@@ -434,7 +439,8 @@ public class WebServer {
 
 			String room = getRoomFromQuery(exchange);
 			GameSession session = getOrCreateSession(room);
-			String json = buildGameStateJson(session, room);
+			String viewerName = getQueryParam(exchange, "name");
+			String json = buildGameStateJson(session, room, viewerName);
 			sendResponse(exchange, 200, json, "application/json; charset=utf-8");
 		}
 	}
@@ -518,6 +524,13 @@ public class WebServer {
 			name = name.trim();
 
 			GameSession session = getOrCreateSession(room);
+			if (!session.readyByPlayer.containsKey(name) && session.readyByPlayer.size() >= session.lobbyNumPlayers) {
+				// Room-code join should not be blocked by the original selected count.
+				// Expand capacity up to the game maximum (4 seats).
+				if (session.lobbyNumPlayers < 4) {
+					session.lobbyNumPlayers = 4;
+				}
+			}
 			if (!session.readyByPlayer.containsKey(name) && session.readyByPlayer.size() >= session.lobbyNumPlayers) {
 				Map<String, Object> resp = new HashMap<>();
 				resp.put("success", false);
@@ -781,7 +794,31 @@ public class WebServer {
 		String lower = body.toLowerCase();
 		boolean success = false;
 		String message = "Unknown action";
-		String actor = session.controller.getCurrentPlayer().getName();
+		Player currentPlayer = session.controller.getCurrentPlayer();
+		String actor = currentPlayer.getName();
+		String requesterName = extractStringField(body, "name", "");
+		if (requesterName == null) {
+			requesterName = "";
+		}
+		requesterName = requesterName.trim();
+		if (requesterName.isEmpty()) {
+			response.put("success", false);
+			response.put("message", "Missing player identity.");
+			response.put("gameOver", session.controller.isGameOver());
+			return response;
+		}
+		if (!currentPlayer.isHuman()) {
+			response.put("success", false);
+			response.put("message", "Please wait for the AI turn to finish.");
+			response.put("gameOver", session.controller.isGameOver());
+			return response;
+		}
+		if (!actor.equals(requesterName)) {
+			response.put("success", false);
+			response.put("message", "Not your turn.");
+			response.put("gameOver", session.controller.isGameOver());
+			return response;
+		}
 		String actionSummary = null;
 
 		if (lower.contains("\"type\"") && lower.contains("takegems")) {
@@ -1094,10 +1131,12 @@ public class WebServer {
 		}
 	}
 
-	private static String buildGameStateJson(GameSession session, String roomKey) {
+	private static String buildGameStateJson(GameSession session, String roomKey, String viewerName) {
 		StringBuilder sb = new StringBuilder();
 		GameBoard board = session.controller.getBoard();
 		Player current = session.controller.getCurrentPlayer();
+		String viewer = viewerName == null ? "" : viewerName.trim();
+		boolean isMyTurn = current.isHuman() && !viewer.isEmpty() && current.getName().equals(viewer);
 
 		sb.append("{");
 		sb.append("\"currentPlayer\":\"").append(escape(current.getName())).append("\",");
@@ -1106,6 +1145,7 @@ public class WebServer {
 		int roundNumber = Math.max(1, ((session.turnNumber - 1) / Math.max(1, totalPlayers)) + 1);
 		sb.append("\"roundNumber\":").append(roundNumber).append(",");
 		sb.append("\"isHumanTurn\":").append(current.isHuman()).append(",");
+		sb.append("\"isMyTurn\":").append(isMyTurn).append(",");
 		sb.append("\"endgameFinalRound\":").append(session.controller.isEndgamePending()).append(",");
 		sb.append("\"gameOver\":").append(session.controller.isGameOver()).append(",");
 		if (session.controller.isGameOver() && session.controller.getWinner() != null) {
