@@ -17,11 +17,13 @@ const API_BASE = resolveApiBase();
   if (typeof document === "undefined") {
     return;
   }
+  /* Default UI uses CSS gem dots (no white box around bitmap chips). Set __SPLENDOR_USE_IMAGE_SPRITES__ = true to use media/chips.jpg + gems.png. */
+  if (typeof window === "undefined" || window.__SPLENDOR_USE_IMAGE_SPRITES__ !== true) {
+    return;
+  }
   try {
     const base =
-      typeof window !== "undefined" && window.__SPLENDOR_MEDIA_BASE__ != null
-        ? String(window.__SPLENDOR_MEDIA_BASE__).trim().replace(/\/+$/, "")
-        : "";
+      window.__SPLENDOR_MEDIA_BASE__ != null ? String(window.__SPLENDOR_MEDIA_BASE__).trim().replace(/\/+$/, "") : "";
     const p = base ? `${base}/` : "";
     document.documentElement.style.setProperty("--splendor-chip-sprite", `url("${p}media/chips.jpg")`);
     document.documentElement.style.setProperty("--splendor-gem-sprite", `url("${p}media/gems.png")`);
@@ -97,10 +99,15 @@ let suppressRealtimeToasts = true;
 const KNOWN_GEMS = new Set(["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"]);
 
 /**
- * Sprite sheets (see web/media): chips.jpg = 6 tokens ONYX…GOLD; gems.png = 5 faceted gems ONYX…RUBY.
- * kind "chip" = table tokens (board, hand, take gems). kind "stone" = faceted gems (card bonus, costs, noble reqs). GOLD always uses chip art.
+ * CSS “gem” dots (no raster edges). If __SPLENDOR_USE_IMAGE_SPRITES__ is true, use legacy sprites via gemSpriteLegacyMarkup.
  */
-function gemSpriteMarkup(gem, kind) {
+function gemDotMarkup(gem) {
+  const raw = gem && String(gem);
+  const g = KNOWN_GEMS.has(raw) ? raw : "DIAMOND";
+  return `<span class="gem-dot gem-dot--${g}" role="img" aria-hidden="true"></span>`;
+}
+
+function gemSpriteLegacyMarkup(gem, kind) {
   const raw = gem && String(gem);
   const g = KNOWN_GEMS.has(raw) ? raw : "DIAMOND";
   const useChip = kind !== "stone" || g === "GOLD";
@@ -108,8 +115,15 @@ function gemSpriteMarkup(gem, kind) {
   return `<span class="gem-sprite gem-sprite--${type} gem-sprite--${g}" role="img" aria-hidden="true"></span>`;
 }
 
+function gemSpriteMarkup(gem, kind) {
+  if (typeof window !== "undefined" && window.__SPLENDOR_USE_IMAGE_SPRITES__ === true) {
+    return gemSpriteLegacyMarkup(gem, kind);
+  }
+  return gemDotMarkup(gem);
+}
+
 function gemPillMarkup(gem, text, kind = "chip") {
-  return `<span class="gem-pill-content">${gemSpriteMarkup(gem, kind)}<span>${text}</span></span>`;
+  return `<span class="gem-pill-content">${gemSpriteMarkup(gem, kind)}<span class="gem-pill-text">${text}</span></span>`;
 }
 
 /** Splendor-style cost column order (white → black). */
@@ -513,7 +527,10 @@ function renderState(state) {
   }
   const turnInfo = document.getElementById("turn-info");
   const roomCodeDisplay = document.getElementById("room-code-display");
-  const gameOver = document.getElementById("game-over");
+  const gameOverWrap = document.getElementById("game-over-wrap");
+  const gameOverBanner = document.getElementById("game-over");
+  const gameOverHint = document.getElementById("game-over-hint");
+  const leaderboardEl = document.getElementById("leaderboard");
   const boardGems = document.getElementById("board-gems");
   const nobles = document.getElementById("nobles");
   const players = document.getElementById("players");
@@ -525,15 +542,47 @@ function renderState(state) {
   const turnNo = Number.isFinite(state.turnNumber) ? state.turnNumber : 1;
   const actions = Array.isArray(state.recentActions) ? state.recentActions : [];
 
-  if (state.gameOver) {
-    gameOver.classList.remove("hidden");
+  if (state.gameOver && gameOverWrap && gameOverBanner && leaderboardEl) {
+    gameOverWrap.classList.remove("hidden");
     const winnerName = state.winner || "Unknown";
-    gameOver.textContent = `Game Over – Winner: ${winnerName}`;
-  } else {
-    gameOver.classList.add("hidden");
+    gameOverBanner.textContent = `Game over — ${winnerName} wins`;
+    if (gameOverHint) {
+      gameOverHint.textContent = "Ties: higher prestige wins; if tied, fewer purchased development cards wins.";
+    }
+    leaderboardEl.innerHTML = "";
+    const playersRank = Array.isArray(state.players) ? [...state.players] : [];
+    playersRank.sort((a, b) => {
+      const pa = Number(a.prestige) || 0;
+      const pb = Number(b.prestige) || 0;
+      if (pb !== pa) {
+        return pb - pa;
+      }
+      const ca = Number(a.purchasedCards);
+      const cb = Number(b.purchasedCards);
+      const ac = Number.isFinite(ca) ? ca : 999;
+      const bc = Number.isFinite(cb) ? cb : 999;
+      return ac - bc;
+    });
+    playersRank.forEach((p, idx) => {
+      const li = document.createElement("li");
+      li.className = "leaderboard__row";
+      if (p.name === state.winner) {
+        li.classList.add("leaderboard__row--winner");
+      }
+      const pts = Number(p.prestige) || 0;
+      const cards = Number.isFinite(Number(p.purchasedCards)) ? Number(p.purchasedCards) : "—";
+      li.textContent = `${idx + 1}. ${p.name} — ${pts} prestige · ${cards} cards`;
+      leaderboardEl.appendChild(li);
+    });
+  } else if (gameOverWrap) {
+    gameOverWrap.classList.add("hidden");
   }
 
-  turnInfo.textContent = `Turn ${turnNo} · Current Player: ${state.currentPlayer}${isHumanTurn ? " (Your turn)" : " (AI turn)"}`;
+  let turnLine = `Turn ${turnNo} · Current Player: ${state.currentPlayer}${isHumanTurn ? " (Your turn)" : " (AI turn)"}`;
+  if (state.endgameFinalRound) {
+    turnLine += " · Final round: each player takes one more turn";
+  }
+  turnInfo.textContent = turnLine;
   if (roomCodeDisplay) {
     roomCodeDisplay.textContent = currentRoom;
   }
@@ -558,6 +607,13 @@ function renderState(state) {
       card.className = "noble-card";
       const req = n.requirements || {};
 
+      const portrait = document.createElement("div");
+      portrait.className = "noble-card__portrait";
+      portrait.setAttribute("aria-hidden", "true");
+
+      const body = document.createElement("div");
+      body.className = "noble-card__body";
+
       const head = document.createElement("div");
       head.className = "noble-card__head";
       head.textContent = `${n.name} · ${n.points} pts`;
@@ -572,8 +628,10 @@ function renderState(state) {
         row.appendChild(pill);
       });
 
-      card.appendChild(head);
-      card.appendChild(row);
+      body.appendChild(head);
+      body.appendChild(row);
+      card.appendChild(portrait);
+      card.appendChild(body);
       nobles.appendChild(card);
     });
   }
@@ -610,11 +668,13 @@ function renderState(state) {
         typeof window !== "undefined" && window.__SPLENDOR_DEV_CARD_BG__ && typeof window.__SPLENDOR_DEV_CARD_BG__ === "object"
           ? window.__SPLENDOR_DEV_CARD_BG__
           : null;
+      bg.style.removeProperty("--dev-card-art");
       if (perCardArt) {
-        bg.style.backgroundImage = `url(${JSON.stringify(perCardArt)})`;
+        bg.style.setProperty("--dev-card-art", `url(${JSON.stringify(perCardArt)})`);
         li.classList.add("dev-card--per-card-art");
       } else if (bgMap && bgMap[lvl]) {
-        bg.style.backgroundImage = `url(${JSON.stringify(String(bgMap[lvl]))})`;
+        bg.style.setProperty("--dev-card-art", `url(${JSON.stringify(String(bgMap[lvl]))})`);
+        li.classList.add("dev-card--per-card-art");
       }
 
       const vignette = document.createElement("div");
@@ -665,6 +725,9 @@ function renderState(state) {
       buyBtn.className = "card-buy-btn";
       buyBtn.textContent = "Buy";
       buyBtn.disabled = !isHumanTurn || !card.affordable;
+      if (isHumanTurn && card.affordable) {
+        buyBtn.classList.add("card-buy-btn--affordable");
+      }
       const reserveBtn = document.createElement("button");
       reserveBtn.type = "button";
       reserveBtn.className = "secondary";

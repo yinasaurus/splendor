@@ -255,7 +255,11 @@
               <button id="copy-room-code-btn" type="button" class="secondary small-btn">Copy Code</button>
             </div>
           </div>
-          <div id="game-over" class="hidden"></div>
+          <div id="game-over-wrap" class="game-over-wrap hidden">
+            <div id="game-over" class="game-over-banner"></div>
+            <p id="game-over-hint" class="game-over-hint"></p>
+            <ol id="leaderboard" class="leaderboard" aria-label="Final standings"></ol>
+          </div>
         </div>
         <button id="open-rulebook-btn" type="button" class="secondary">Rule Book</button>
         <button id="quit-game-btn" type="button" class="secondary">Quit to menu</button>

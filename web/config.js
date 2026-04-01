@@ -9,8 +9,7 @@ window.__SPLENDOR_API_BASE__ = "https://splendor-api-hlrf.onrender.com";
 // Optional: URL prefix for chip/gem sprites (default loads web/media/chips.jpg and gems.png).
 // window.__SPLENDOR_MEDIA_BASE__ = "";
 
-// Optional: development card face art folder (local after running scripts/fetch-hexanome-dev-cards.ps1, or GitHub raw).
+// Optional: folder of jpg/png faces (e.g. "media/development-cards"). Leave unset to use built-in gradient card art only.
 // window.__SPLENDOR_DEV_CARD_ART_BASE__ = "media/development-cards";
-window.__SPLENDOR_DEV_CARD_ART_BASE__ =
-  "https://raw.githubusercontent.com/hexanome-04/splendor/d1797acf5d43c6bc512b57ef3c1d990006a49a5c/client/public/images/development-cards";
+window.__SPLENDOR_DEV_CARD_ART_BASE__ = "";
 

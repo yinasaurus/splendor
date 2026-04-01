@@ -30,6 +30,9 @@ public class GameController {
 	private int currentPlayerIndex;
 	private Player winner;
 	private GameStatistics statistics;
+	/** When someone reaches winning prestige, everyone else gets one more turn (Splendor rules). */
+	private boolean endgamePending;
+	private int endgameTurnsRemaining;
 
 	/**
 	 * Constructor for GameController.
@@ -47,6 +50,8 @@ public class GameController {
 		this.allNobles = new ArrayList<>();
 		this.currentPlayerIndex = 0;
 		this.winner = null;
+		this.endgamePending = false;
+		this.endgameTurnsRemaining = 0;
 		
 		// Initialize players
 		for (int i = 0; i < numPlayers; i++) {
@@ -193,6 +198,37 @@ public class GameController {
 	}
 
 	/**
+	 * True after someone has reached winning prestige until the last round finishes.
+	 */
+	public boolean isEndgamePending() {
+		return endgamePending && winner == null;
+	}
+
+	/**
+	 * After a successful action by {@code actor}, either start the endgame countdown
+	 * (first time someone reaches winning prestige) or count down and resolve the winner.
+	 */
+	private void afterSuccessfulAction(Player actor) {
+		if (winner != null) {
+			return;
+		}
+		if (!endgamePending) {
+			if (rules.hasWon(actor)) {
+				endgamePending = true;
+				endgameTurnsRemaining = Math.max(0, players.size() - 1);
+			}
+		} else {
+			endgameTurnsRemaining--;
+			if (endgameTurnsRemaining <= 0) {
+				winner = rules.determineWinner(players);
+				if (winner == null) {
+					winner = rules.determineWinnerByPrestige(players);
+				}
+			}
+		}
+	}
+
+	/**
 	 * Executes a take gems action.
 	 *
 	 * @param gemsToTake the gems to take
@@ -221,10 +257,7 @@ public class GameController {
 		// Check for noble visits
 		checkNobleVisits(player);
 		
-		// Check for win
-		if (rules.hasWon(player)) {
-			winner = rules.determineWinner(players);
-		}
+		afterSuccessfulAction(player);
 		
 		return true;
 	}
@@ -278,10 +311,7 @@ public class GameController {
 		// Check for noble visits
 		checkNobleVisits(player);
 		
-		// Check for win
-		if (rules.hasWon(player)) {
-			winner = rules.determineWinner(players);
-		}
+		afterSuccessfulAction(player);
 		
 		return true;
 	}
@@ -332,10 +362,7 @@ public class GameController {
 		// Check for noble visits
 		checkNobleVisits(player);
 		
-		// Check for win
-		if (rules.hasWon(player)) {
-			winner = rules.determineWinner(players);
-		}
+		afterSuccessfulAction(player);
 		
 		return true;
 	}

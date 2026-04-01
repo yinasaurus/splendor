@@ -181,9 +181,45 @@ main {
   color: #e2e6f0;
 }
 
-.status #game-over {
-  color: #ffeb3b;
-  font-weight: 600;
+.game-over-wrap {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(160deg, rgba(40, 28, 18, 0.9), rgba(22, 16, 12, 0.95));
+  border: 1px solid rgba(232, 163, 23, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.game-over-wrap.hidden {
+  display: none !important;
+}
+
+.game-over-banner {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #ffe082;
+  margin: 0 0 6px 0;
+}
+
+.game-over-hint {
+  margin: 0 0 10px 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.leaderboard {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.84rem;
+  color: #e8eaf0;
+  display: grid;
+  gap: 6px;
+}
+
+.leaderboard__row--winner {
+  color: #ffe082;
+  font-weight: 700;
 }
 
 .room-code-display {
@@ -405,28 +441,56 @@ main {
 }
 
 .noble-card {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 10px 12px;
+  align-items: stretch;
+  padding: 8px 10px;
+  background: linear-gradient(145deg, rgba(32, 28, 44, 0.85), rgba(18, 16, 28, 0.92));
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(232, 163, 23, 0.2);
   font-size: 0.75rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.noble-card__portrait {
+  border-radius: 10px;
+  min-height: 88px;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 224, 130, 0.45), transparent 45%),
+    radial-gradient(circle at 70% 80%, rgba(100, 80, 140, 0.35), transparent 50%),
+    linear-gradient(165deg, #3d2a1a 0%, #1a1210 50%, #2a2038 100%);
+  border: 1px solid rgba(232, 163, 23, 0.35);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25);
+  position: relative;
+}
+
+.noble-card__portrait::after {
+  content: "♛";
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.25rem;
+  opacity: 0.45;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.noble-card__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
 }
 
 .noble-card__head {
-  flex: 1 1 88px;
-  min-width: 0;
   font-weight: 600;
   color: #e8eaf0;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .noble-card__reqs {
-  flex: 3 1 120px;
   gap: 4px;
   margin: 0;
 }
@@ -446,6 +510,22 @@ main {
 
 .noble-card__reqs .gem-sprite--stone {
   --gw: 0.98rem;
+}
+
+@media (max-width: 520px) {
+  .noble-card {
+    grid-template-columns: 1fr;
+  }
+
+  .noble-card__portrait {
+    min-height: 52px;
+    max-height: 64px;
+  }
+
+  .noble-card__portrait::after {
+    font-size: 1rem;
+    bottom: 4px;
+  }
 }
 
 .pill-row--board-gems {
@@ -564,6 +644,76 @@ main {
   align-items: center;
   gap: 6px;
   line-height: 1;
+}
+
+/* CSS-only gems (no bitmap “white box”); default in app unless __SPLENDOR_USE_IMAGE_SPRITES__ */
+.gem-dot {
+  display: inline-block;
+  width: 1.28rem;
+  height: 1.28rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow:
+    inset 0 -4px 8px rgba(0, 0, 0, 0.5),
+    inset 0 3px 5px rgba(255, 255, 255, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.gem-dot--RUBY {
+  background: radial-gradient(circle at 32% 28%, #ffcdd2, #e53935 50%, #7f0000);
+}
+
+.gem-dot--EMERALD {
+  background: radial-gradient(circle at 32% 28%, #c8e6c9, #2e7d32 52%, #1b5e20);
+}
+
+.gem-dot--SAPPHIRE {
+  background: radial-gradient(circle at 32% 28%, #bbdefb, #1565c0 52%, #0d47a1);
+}
+
+.gem-dot--DIAMOND {
+  background: radial-gradient(circle at 32% 28%, #ffffff, #eceff1 45%, #90a4ae);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.gem-dot--ONYX {
+  background: radial-gradient(circle at 32% 28%, #78909c, #263238 55%, #102027);
+  border-color: rgba(180, 190, 200, 0.35);
+}
+
+.gem-dot--GOLD {
+  background: radial-gradient(circle at 32% 28%, #fffde7, #fbc02d 48%, #e65100);
+}
+
+#board-gems .gem-dot {
+  width: 1.55rem;
+  height: 1.55rem;
+}
+
+.take-gem-option .gem-dot {
+  width: 2.1rem;
+  height: 2.1rem;
+}
+
+.dev-card__bonus-sprite .gem-dot {
+  width: 2rem;
+  height: 2rem;
+}
+
+.dev-card__cost .gem-dot {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.noble-card__reqs .gem-dot {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.reserved-mini__bonus .gem-dot {
+  width: 1.15rem;
+  height: 1.15rem;
 }
 
 /* Sprite sheets: chips.jpg 750×125 (6×125 tokens); gems.png 450×74 (5×90 faceted), order ONYX→SAPPHIRE→DIAMOND→EMERALD→RUBY */
@@ -685,6 +835,7 @@ main {
 }
 
 /* Let chip/gem artwork read clearly (overrides solid gem-* pill fills above). */
+.pill:has(.gem-dot),
 .pill:has(.gem-sprite--chip),
 .pill:has(.gem-sprite--stone) {
   background: rgba(16, 18, 26, 0.92);
@@ -841,6 +992,23 @@ main {
   background-size: cover;
   background-position: center;
   z-index: 0;
+}
+
+/* Optional face art sits above level gradients; if URL fails, level color still shows underneath. */
+.dev-card__bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--dev-card-art, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dev-card--per-card-art .dev-card__bg::after {
+  opacity: 0.93;
 }
 
 /* Level theming when no custom image is set (original gradients, not Splendor art). */
@@ -1071,6 +1239,29 @@ main {
 
 .dev-card__actions .card-buy-btn:not(:disabled):hover {
   filter: brightness(1.06);
+}
+
+/* Affordable buy stays quiet until you hover the card or the button (desktop). */
+.dev-card__actions .card-buy-btn.card-buy-btn--affordable {
+  opacity: 0.52;
+  filter: grayscale(0.15) brightness(0.92);
+  box-shadow: none;
+}
+
+.dev-card:hover .card-buy-btn.card-buy-btn--affordable,
+.dev-card__actions .card-buy-btn.card-buy-btn--affordable:hover,
+.dev-card__actions .card-buy-btn.card-buy-btn--affordable:focus-visible {
+  opacity: 1;
+  filter: none;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(232, 163, 23, 0.4);
+}
+
+@media (hover: none) {
+  .dev-card__actions .card-buy-btn.card-buy-btn--affordable {
+    opacity: 1;
+    filter: none;
+  }
 }
 
 .actions-grid {

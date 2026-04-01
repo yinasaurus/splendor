@@ -918,6 +918,7 @@ public class WebServer {
 		sb.append("\"currentPlayer\":\"").append(escape(current.getName())).append("\",");
 		sb.append("\"turnNumber\":").append(session.turnNumber).append(",");
 		sb.append("\"isHumanTurn\":").append(current.isHuman()).append(",");
+		sb.append("\"endgameFinalRound\":").append(session.controller.isEndgamePending()).append(",");
 		sb.append("\"gameOver\":").append(session.controller.isGameOver()).append(",");
 		if (session.controller.isGameOver() && session.controller.getWinner() != null) {
 			sb.append("\"winner\":\"").append(escape(session.controller.getWinner().getName())).append("\",");
@@ -935,6 +936,7 @@ public class WebServer {
 			sb.append("\"name\":\"").append(escape(p.getName())).append("\",");
 			sb.append("\"human\":").append(p.isHuman()).append(",");
 			sb.append("\"prestige\":").append(p.getPrestigePoints()).append(",");
+			sb.append("\"purchasedCards\":").append(p.getPurchasedCards().size()).append(",");
 			sb.append("\"gems\":{");
 			boolean firstGem = true;
 			for (GemType type : GemType.values()) {

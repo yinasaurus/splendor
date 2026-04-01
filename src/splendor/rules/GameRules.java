@@ -330,6 +330,29 @@ public class GameRules {
 	}
 
 	/**
+	 * Highest prestige wins; on tie, fewer purchased development cards wins.
+	 * Used as a fallback when {@link #determineWinner(List)} finds no one at the winning threshold.
+	 */
+	public Player determineWinnerByPrestige(List<Player> players) {
+		Player winner = null;
+		int maxPoints = Integer.MIN_VALUE;
+		int minCards = Integer.MAX_VALUE;
+		for (Player player : players) {
+			int pts = player.getPrestigePoints();
+			int cards = player.getPurchasedCards().size();
+			if (winner == null || pts > maxPoints) {
+				winner = player;
+				maxPoints = pts;
+				minCards = cards;
+			} else if (pts == maxPoints && cards < minCards) {
+				winner = player;
+				minCards = cards;
+			}
+		}
+		return winner;
+	}
+
+	/**
 	 * Represents the result of a validation.
 	 */
 	public static class ValidationResult {
