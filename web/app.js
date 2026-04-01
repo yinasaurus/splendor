@@ -902,17 +902,25 @@ function renderState(state) {
       meta.textContent = `${p.human ? "Human" : "AI"} · ${p.prestige} pts · Coins: ${totalCoins}`;
       const gemsRow = document.createElement("div");
       gemsRow.className = "pill-row";
-      Object.entries(p.gems || {}).forEach(([gem, count]) => {
+      ["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"].forEach((gem) => {
+        const count = Number((p.gems || {})[gem] || 0);
         const pill = document.createElement("div");
         pill.className = `pill gem-${gem}`;
+        if (count <= 0) {
+          pill.classList.add("pill--zero");
+        }
         pill.innerHTML = gemPillMarkup(gem, `${gem}: ${count}`);
         gemsRow.appendChild(pill);
       });
       const bonusesRow = document.createElement("div");
       bonusesRow.className = "pill-row";
-      Object.entries(p.bonuses || {}).forEach(([gem, count]) => {
+      ["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX"].forEach((gem) => {
+        const count = Number((p.bonuses || {})[gem] || 0);
         const pill = document.createElement("div");
         pill.className = `pill gem-${gem}`;
+        if (count <= 0) {
+          pill.classList.add("pill--zero");
+        }
         pill.innerHTML = gemPillMarkup(gem, `+${count}`, "stone");
         bonusesRow.appendChild(pill);
       });

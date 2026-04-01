@@ -378,6 +378,82 @@ main {
   margin-top: 6px;
 }
 
+.rulebook-card-explain {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 12, 20, 0.6);
+}
+
+.rulebook-card-explain__title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffd666;
+  margin-bottom: 8px;
+}
+
+.rulebook-card-explain__sample {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.rulebook-sample-card {
+  position: relative;
+  width: 104px;
+  min-height: 136px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(165deg, #24324b 0%, #141c2f 60%, #0d1322 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 6px;
+}
+
+.rulebook-sample-card__prestige {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.rulebook-sample-card__bonus {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  font-size: 1rem;
+}
+
+.rulebook-sample-card__costs {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: grid;
+  gap: 3px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.rulebook-card-explain__notes {
+  display: grid;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #dbe2f2;
+  line-height: 1.35;
+}
+
+@media (max-width: 520px) {
+  .rulebook-card-explain__sample {
+    grid-template-columns: 1fr;
+  }
+}
+
 .panel {
   background: var(--bg-elevated);
   border-radius: var(--radius-lg);
@@ -690,6 +766,10 @@ main {
   color: #b0b8cc;
 }
 
+.panel--nobles-strip {
+  grid-column: 1 / -1;
+}
+
 .nobles-list {
   display: flex;
   flex-direction: column;
@@ -868,6 +948,11 @@ main {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pill.pill--zero {
+  opacity: 0.45;
+  filter: saturate(0.7);
 }
 
 .gem-pill-content {
