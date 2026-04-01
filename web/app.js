@@ -444,6 +444,12 @@ const guidedSteps = [
 
 function renderState(state) {
   latestState = state;
+  if (state && state.room != null && String(state.room).trim() !== "") {
+    const fromServer = String(state.room).trim();
+    if (fromServer !== currentRoom) {
+      rememberRoom(fromServer);
+    }
+  }
   const turnInfo = document.getElementById("turn-info");
   const roomCodeDisplay = document.getElementById("room-code-display");
   const gameOver = document.getElementById("game-over");
@@ -468,7 +474,7 @@ function renderState(state) {
 
   turnInfo.textContent = `Turn ${turnNo} · Current Player: ${state.currentPlayer}${isHumanTurn ? " (Your turn)" : " (AI turn)"}`;
   if (roomCodeDisplay) {
-    roomCodeDisplay.textContent = `Game Code: ${currentRoom}`;
+    roomCodeDisplay.textContent = currentRoom;
   }
 
   // Gems on board
@@ -914,10 +920,10 @@ function renderLobbyStatus(state) {
     });
   }
   if (roomCodeDisplay) {
-    roomCodeDisplay.textContent = `Game Code: ${currentRoom}`;
+    roomCodeDisplay.textContent = currentRoom;
   }
   if (waitingRoomCode) {
-    waitingRoomCode.textContent = `Game Code: ${currentRoom}`;
+    waitingRoomCode.textContent = currentRoom;
   }
   const me = (lobby.players || []).find((p) => p.name === currentPlayerName);
   currentReady = !!(me && me.ready);
@@ -1159,7 +1165,7 @@ async function init() {
     gameUi.classList.add("hidden");
     if (videoPanel) videoPanel.classList.add("hidden");
     if (waitingRoomCode) {
-      waitingRoomCode.textContent = `Game Code: ${currentRoom}`;
+      waitingRoomCode.textContent = currentRoom;
     }
     if (waitingPlayerNameInput) {
       waitingPlayerNameInput.value = currentPlayerName || "Guest";

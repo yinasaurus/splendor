@@ -95,9 +95,13 @@
       <section id="waiting-room" class="panel hidden">
         <h2>Waiting Room</h2>
         <p class="hint">Ready up and wait for host to start. Names are locked here.</p>
-        <div class="room-code-row">
-          <div id="waiting-room-code" class="room-code-display"></div>
-          <button id="copy-room-code-btn-lobby" type="button" class="secondary small-btn">Copy Code</button>
+        <div class="game-code-block">
+          <div class="game-code-block__label">Game code</div>
+          <div class="room-code-row">
+            <div id="waiting-room-code" class="game-code-block__value" title="Share this with players who join"></div>
+            <button id="copy-room-code-btn-lobby" type="button" class="secondary small-btn">Copy Code</button>
+          </div>
+          <p class="hint small game-code-block__hint">Same code appears in the match header after start. Everyone must use this exact code to join.</p>
         </div>
         <label>Your display name:
           <input id="waiting-player-name" type="text" value="" readonly>
@@ -231,9 +235,12 @@
       <section class="status">
         <div class="status-main">
           <div id="turn-info"></div>
-          <div class="room-code-row">
-            <div id="room-code-display" class="room-code-display"></div>
-            <button id="copy-room-code-btn" type="button" class="secondary small-btn">Copy Code</button>
+          <div class="game-code-block game-code-block--compact">
+            <span class="game-code-block__label">Game code</span>
+            <div class="room-code-row">
+              <span id="room-code-display" class="game-code-block__value" title="Current match code"></span>
+              <button id="copy-room-code-btn" type="button" class="secondary small-btn">Copy Code</button>
+            </div>
           </div>
           <div id="game-over" class="hidden"></div>
         </div>

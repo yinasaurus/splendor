@@ -349,7 +349,7 @@ public class WebServer {
 
 			String room = getRoomFromQuery(exchange);
 			GameSession session = getOrCreateSession(room);
-			String json = buildGameStateJson(session);
+			String json = buildGameStateJson(session, room);
 			sendResponse(exchange, 200, json, "application/json; charset=utf-8");
 		}
 	}
@@ -909,7 +909,7 @@ public class WebServer {
 		}
 	}
 
-	private static String buildGameStateJson(GameSession session) {
+	private static String buildGameStateJson(GameSession session, String roomKey) {
 		StringBuilder sb = new StringBuilder();
 		GameBoard board = session.controller.getBoard();
 		Player current = session.controller.getCurrentPlayer();
@@ -1105,7 +1105,7 @@ public class WebServer {
 		}
 		sb.append("]");
 		sb.append(",");
-		sb.append("\"room\":\"").append(escape(DEFAULT_ROOM)).append("\",");
+		sb.append("\"room\":\"").append(escape(cleanRoomName(roomKey))).append("\",");
 		sb.append("\"lobby\":{");
 		sb.append("\"owner\":\"").append(escape(session.ownerName)).append("\",");
 		sb.append("\"gameStarted\":").append(session.gameStarted).append(",");
