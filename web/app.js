@@ -2139,6 +2139,7 @@ async function init() {
   const playerNameInput = document.getElementById("player-name");
   const waitingPlayerNameInput = document.getElementById("waiting-player-name");
   const waitingRoomCode = document.getElementById("waiting-room-code");
+  const activityLogToggle = document.getElementById("activity-log-toggle");
   const reserveTopL1Btn = document.getElementById("reserve-top-l1-btn");
   const reserveTopL2Btn = document.getElementById("reserve-top-l2-btn");
   const reserveTopL3Btn = document.getElementById("reserve-top-l3-btn");
