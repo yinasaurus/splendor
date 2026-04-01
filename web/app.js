@@ -634,7 +634,7 @@ function renderState(state) {
     Object.entries(state.gems).forEach(([gem, count]) => {
       const pill = document.createElement("div");
       pill.className = `pill gem-${gem}`;
-      pill.innerHTML = gemPillMarkup(gem, `${gem[0]}:${count}`);
+      pill.innerHTML = gemPillMarkup(gem, `${gem[0]}:${count}`, "stone");
       pill.title = `${gem}: ${count}`;
       boardGems.appendChild(pill);
     });
