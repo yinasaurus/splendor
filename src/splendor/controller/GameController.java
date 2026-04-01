@@ -263,6 +263,103 @@ public class GameController {
 	}
 
 	/**
+	 * Executes take-gems with a resilient discard flow.
+	 * If discard selection is missing/partial/invalid, it auto-adjusts discard
+	 * so the action can still complete and the player ends at max gems.
+	 */
+	public GameRules.ValidationResult takeGemsWithDiscard(
+		Map<GemType, Integer> gemsToTake,
+		Map<GemType, Integer> gemsToDiscard
+	) {
+		Player player = getCurrentPlayer();
+		Map<GemType, Integer> requestedDiscard =
+			gemsToDiscard == null ? new HashMap<>() : new HashMap<>(gemsToDiscard);
+		int requestedDiscardCount = requestedDiscard.values().stream().mapToInt(Integer::intValue).sum();
+
+		// Validate take pattern/supply with discard count considered for max-gem check.
+		Map<GemType, Integer> validationPlayerGems = player.getGems();
+		if (requestedDiscardCount > 0) {
+			int target = Math.max(0, player.getTotalGemCount() - requestedDiscardCount);
+			int running = validationPlayerGems.values().stream().mapToInt(Integer::intValue).sum();
+			if (running > target) {
+				for (GemType t : GemType.values()) {
+					if (running <= target) break;
+					int have = validationPlayerGems.getOrDefault(t, 0);
+					if (have <= 0) continue;
+					int cut = Math.min(have, running - target);
+					validationPlayerGems.put(t, have - cut);
+					running -= cut;
+				}
+			}
+		}
+		GameRules.ValidationResult vr = rules.validateTakeGems(
+			gemsToTake, board.getAvailableGems(), validationPlayerGems
+		);
+		if (!vr.isValid()) {
+			return vr;
+		}
+
+		// Apply taking gems first.
+		board.removeGems(gemsToTake);
+		player.addGems(gemsToTake);
+
+		int maxGems = config.getMaxGemsPerPlayer();
+		int needDiscard = Math.max(0, player.getTotalGemCount() - maxGems);
+		Map<GemType, Integer> discardToApply = new HashMap<>();
+
+		// Keep only valid requested discard that the player currently has.
+		if (needDiscard > 0) {
+			Map<GemType, Integer> afterTake = player.getGems();
+			for (Map.Entry<GemType, Integer> e : requestedDiscard.entrySet()) {
+				int qty = e.getValue() == null ? 0 : e.getValue();
+				if (qty <= 0) continue;
+				int have = afterTake.getOrDefault(e.getKey(), 0);
+				if (have <= 0) continue;
+				discardToApply.put(e.getKey(), Math.min(qty, have));
+			}
+			int currentDiscard = discardToApply.values().stream().mapToInt(Integer::intValue).sum();
+
+			// Prefer discarding colors just taken, then any remaining colors.
+			if (currentDiscard < needDiscard) {
+				for (GemType t : gemsToTake.keySet()) {
+					if (currentDiscard >= needDiscard) break;
+					int have = afterTake.getOrDefault(t, 0);
+					int already = discardToApply.getOrDefault(t, 0);
+					int canAdd = Math.max(0, have - already);
+					if (canAdd <= 0) continue;
+					int add = Math.min(canAdd, needDiscard - currentDiscard);
+					discardToApply.put(t, already + add);
+					currentDiscard += add;
+				}
+			}
+			if (currentDiscard < needDiscard) {
+				for (GemType t : GemType.values()) {
+					if (currentDiscard >= needDiscard) break;
+					int have = afterTake.getOrDefault(t, 0);
+					int already = discardToApply.getOrDefault(t, 0);
+					int canAdd = Math.max(0, have - already);
+					if (canAdd <= 0) continue;
+					int add = Math.min(canAdd, needDiscard - currentDiscard);
+					discardToApply.put(t, already + add);
+					currentDiscard += add;
+				}
+			}
+		}
+
+		if (needDiscard > 0) {
+			player.removeGems(discardToApply);
+			board.addGems(discardToApply);
+		}
+
+		int gemCount = gemsToTake.values().stream().mapToInt(Integer::intValue).sum();
+		statistics.recordGemsTaken(player, gemCount);
+		statistics.recordTurn(player, "Took gems");
+		checkNobleVisits(player);
+		afterSuccessfulAction(player);
+		return new GameRules.ValidationResult(true, "Gems taken.");
+	}
+
+	/**
 	 * Executes a reserve card action.
 	 *
 	 * @param level the card level (1, 2, or 3)

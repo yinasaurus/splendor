@@ -1472,72 +1472,10 @@ public class WebServer {
 				}
 			}
 			if (!gemsToTake.isEmpty()) {
-				Map<GemType, Integer> validationPlayerGems = session.controller.getCurrentPlayer().getGems();
-				int declaredDiscard = gemsToDiscard.values().stream().mapToInt(Integer::intValue).sum();
-				if (declaredDiscard > 0) {
-					int target = Math.max(0,
-						session.controller.getCurrentPlayer().getTotalGemCount() - declaredDiscard);
-					int running = validationPlayerGems.values().stream().mapToInt(Integer::intValue).sum();
-					if (running > target) {
-						for (GemType t : GemType.values()) {
-							if (running <= target) {
-								break;
-							}
-							int have = validationPlayerGems.getOrDefault(t, 0);
-							if (have <= 0) {
-								continue;
-							}
-							int cut = Math.min(have, running - target);
-							validationPlayerGems.put(t, have - cut);
-							running -= cut;
-						}
-					}
-				}
-
-				GameRules.ValidationResult vr = session.controller.getRules().validateTakeGems(
-					gemsToTake,
-					session.controller.getBoard().getAvailableGems(),
-					validationPlayerGems
-				);
-				if (!vr.isValid()) {
-					success = false;
-					message = vr.getMessage();
-				} else {
-					success = session.controller.takeGems(gemsToTake);
-					message = success ? "Gems taken." : "Could not take gems.";
-					if (success) {
-						Player p = session.controller.getCurrentPlayer();
-						int maxGems = session.controller.getConfig().getMaxGemsPerPlayer();
-						int totalAfterTake = p.getTotalGemCount();
-						if (totalAfterTake > maxGems) {
-							int needDiscard = totalAfterTake - maxGems;
-							int discardCount = gemsToDiscard.values().stream().mapToInt(Integer::intValue).sum();
-							if (discardCount != needDiscard) {
-								success = false;
-								message = "Must discard exactly " + needDiscard + " gem(s).";
-							} else {
-								Map<GemType, Integer> currentGems = p.getGems();
-								boolean canDiscard = true;
-								for (Map.Entry<GemType, Integer> e : gemsToDiscard.entrySet()) {
-									if (e.getValue() <= 0) {
-										continue;
-									}
-									if (currentGems.getOrDefault(e.getKey(), 0) < e.getValue()) {
-										canDiscard = false;
-										break;
-									}
-								}
-								if (!canDiscard) {
-									success = false;
-									message = "Invalid discard selection.";
-								} else {
-									p.removeGems(gemsToDiscard);
-									session.controller.getBoard().addGems(gemsToDiscard);
-								}
-							}
-						}
-					}
-					if (success) {
+				GameRules.ValidationResult vr = session.controller.takeGemsWithDiscard(gemsToTake, gemsToDiscard);
+				success = vr.isValid();
+				message = vr.getMessage();
+				if (success) {
 						StringBuilder taken = new StringBuilder();
 						for (Map.Entry<GemType, Integer> e : gemsToTake.entrySet()) {
 							if (taken.length() > 0) {
@@ -1555,9 +1493,8 @@ public class WebServer {
 							}
 							discarded.append(e.getKey().getAbbreviation()).append("x").append(e.getValue());
 						}
-						actionSummary = actor + " took gems: " + taken
-							+ (discarded.length() > 0 ? " (discarded " + discarded + ")." : ".");
-					}
+					actionSummary = actor + " took gems: " + taken
+						+ (discarded.length() > 0 ? " (discarded " + discarded + ")." : ".");
 				}
 			} else {
 				message = "No valid gems specified";
