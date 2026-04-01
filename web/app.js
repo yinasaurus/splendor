@@ -940,26 +940,6 @@ function renderState(state) {
   const isMyTurn = !!(state.isMyTurn != null ? state.isMyTurn : state.isHumanTurn);
   const isAiTurn = state.isHumanTurn === false;
   const currentReservedCount = currentPlayerData ? (currentPlayerData.reservedCount || 0) : 0;
-  const reserveTopL1Btn = document.getElementById("reserve-top-l1-btn");
-  const reserveTopL2Btn = document.getElementById("reserve-top-l2-btn");
-  const reserveTopL3Btn = document.getElementById("reserve-top-l3-btn");
-  const reserveTopButtons = [
-    [1, reserveTopL1Btn],
-    [2, reserveTopL2Btn],
-    [3, reserveTopL3Btn],
-  ];
-  reserveTopButtons.forEach(([level, btn]) => {
-    if (!btn) {
-      return;
-    }
-    const deckLeft =
-      state &&
-      state.deckRemaining &&
-      Number.isFinite(Number(state.deckRemaining[level]))
-        ? Number(state.deckRemaining[level])
-        : 0;
-    btn.disabled = !isMyTurn || currentReservedCount >= 3 || deckLeft <= 0;
-  });
   const turnNo = Number.isFinite(state.turnNumber) ? state.turnNumber : 1;
   const roundNo = Number.isFinite(state.roundNumber) ? state.roundNumber : 1;
   const actions = Array.isArray(state.recentActions) ? state.recentActions : [];
@@ -1082,6 +1062,13 @@ function renderState(state) {
     const cards = state.levels?.[lvl] || [];
     const levelCol = ul.closest(".level-col");
     const levelHeading = levelCol ? levelCol.querySelector("h3") : null;
+    let levelHeadRow = levelCol ? levelCol.querySelector(".level-head-row") : null;
+    if (levelCol && levelHeading && !levelHeadRow) {
+      levelHeadRow = document.createElement("div");
+      levelHeadRow.className = "level-head-row";
+      levelCol.insertBefore(levelHeadRow, levelHeading);
+      levelHeadRow.appendChild(levelHeading);
+    }
     if (levelHeading) {
       const baseLabel = `LEVEL ${lvl}`;
       const deckLeft =
@@ -1091,6 +1078,26 @@ function renderState(state) {
           ? Number(state.deckRemaining[lvl])
           : cards.length;
       levelHeading.textContent = `${baseLabel} · ${deckLeft} left`;
+
+      if (levelHeadRow) {
+        let deckBtn = levelHeadRow.querySelector(".level-deck-btn");
+        if (!deckBtn) {
+          deckBtn = document.createElement("button");
+          deckBtn.type = "button";
+          deckBtn.className = "level-deck-btn";
+          levelHeadRow.insertBefore(deckBtn, levelHeading);
+        }
+        deckBtn.innerHTML = `<span class="level-deck-btn__stack" aria-hidden="true"></span><span class="level-deck-btn__meta">L${lvl} · ${deckLeft} left</span>`;
+        deckBtn.title = `Reserve top Level ${lvl} card`;
+        deckBtn.disabled = !isMyTurn || currentReservedCount >= 3 || deckLeft <= 0;
+        deckBtn.onclick = async (e) => {
+          e.stopPropagation();
+          if (deckBtn.disabled) {
+            return;
+          }
+          await postReserveTop(lvl);
+        };
+      }
     }
     cards.forEach((card, index) => {
       const li = document.createElement("li");
@@ -2194,9 +2201,6 @@ async function init() {
   const waitingPlayerNameInput = document.getElementById("waiting-player-name");
   const waitingRoomCode = document.getElementById("waiting-room-code");
   const activityLogToggle = document.getElementById("activity-log-toggle");
-  const reserveTopL1Btn = document.getElementById("reserve-top-l1-btn");
-  const reserveTopL2Btn = document.getElementById("reserve-top-l2-btn");
-  const reserveTopL3Btn = document.getElementById("reserve-top-l3-btn");
   const rulebookOverlay = document.getElementById("rulebook-overlay");
   const rulebookBody = document.getElementById("rulebook-body");
   const openTutorialBtn = document.getElementById("open-tutorial-btn");
@@ -2736,15 +2740,6 @@ async function init() {
       }
     });
   }
-  if (reserveTopL1Btn) {
-    reserveTopL1Btn.addEventListener("click", () => postReserveTop(1));
-  }
-  if (reserveTopL2Btn) {
-    reserveTopL2Btn.addEventListener("click", () => postReserveTop(2));
-  }
-  if (reserveTopL3Btn) {
-    reserveTopL3Btn.addEventListener("click", () => postReserveTop(3));
-  }
   if (createDialogCancel) {
     createDialogCancel.addEventListener("click", () => closeCreateRoomDialog());
   }
@@ -2909,11 +2904,9 @@ async function init() {
   updateLobbyReadiness();
   startLiveSync();
   const pathRoom = roomFromUrlPath();
-  const autoRejoinIntent = getAutoRejoinIntent();
+  const autoRejoinIntent = pathRoom ? getAutoRejoinIntent() : null;
   if (pathRoom) {
     rememberRoom(pathRoom);
-  } else if (autoRejoinIntent && autoRejoinIntent.room) {
-    rememberRoom(autoRejoinIntent.room);
   }
   const rememberedName = getRememberedPlayerName();
   if (rememberedName) {
@@ -2925,8 +2918,8 @@ async function init() {
   currentSessionToken = getRememberedSeatToken(currentRoom, currentPlayerName);
   updateLobbyReadiness();
   try {
-    // Auto-join when URL has room code OR this is a recent refresh of an active session.
-    const shouldTryAutoJoin = !!currentPlayerName && !!(pathRoom || (autoRejoinIntent && autoRejoinIntent.room));
+    // Auto-join only when URL has an explicit room code.
+    const shouldTryAutoJoin = !!currentPlayerName && !!pathRoom;
     if (shouldTryAutoJoin) {
       try {
         await postJoinRoom({ room: currentRoom, name: currentPlayerName });
@@ -2947,13 +2940,13 @@ async function init() {
       state.lobby &&
       Array.isArray(state.lobby.players) &&
       state.lobby.players.some((p) => samePlayerName(p && p.name, currentPlayerName));
-    if (inRoom) {
+    if (inRoom && pathRoom) {
       if (state.lobby.gameStarted) {
         enterGameUiFromState(state, true);
       } else {
         showWaitingRoom();
       }
-    } else if (pathRoom || (autoRejoinIntent && autoRejoinIntent.room)) {
+    } else if (pathRoom) {
       clearAutoRejoinIntent();
       clearRememberedSeatToken(currentRoom, currentPlayerName);
       currentSessionToken = "";

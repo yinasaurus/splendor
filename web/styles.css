@@ -1059,6 +1059,79 @@ main {
   color: #b8c0d4;
 }
 
+.level-head-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.level-head-row h3 {
+  margin: 0;
+}
+
+.level-deck-btn {
+  margin-top: 0;
+  width: 66px;
+  min-height: 88px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(165deg, rgba(24, 30, 48, 0.96), rgba(12, 16, 28, 0.96)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 0 1px,
+      rgba(0, 0, 0, 0) 1px 6px
+    );
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: #d7deef;
+}
+
+.level-deck-btn__stack {
+  position: relative;
+  width: 34px;
+  height: 44px;
+  border-radius: 6px;
+  background: linear-gradient(165deg, rgba(58, 70, 108, 0.88), rgba(30, 38, 64, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+}
+
+.level-deck-btn__stack::before,
+.level-deck-btn__stack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(165deg, rgba(44, 54, 86, 0.85), rgba(24, 30, 52, 0.9));
+  z-index: -1;
+}
+
+.level-deck-btn__stack::before {
+  transform: translate(4px, -4px);
+}
+
+.level-deck-btn__stack::after {
+  transform: translate(8px, -8px);
+}
+
+.level-deck-btn__meta {
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  text-align: center;
+  color: #c8d1e7;
+}
+
 .players {
   overflow-x: auto;
 }
@@ -1857,18 +1930,15 @@ main {
 
 .dev-card__chrome {
   position: absolute;
-  left: 0;
-  bottom: 0;
-  right: 0;
+  inset: 0;
   z-index: 3;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  align-items: center;
   justify-content: center;
-  padding: 8px 6px 6px;
-  background: linear-gradient(to top, rgba(8, 10, 16, 0.86) 0%, rgba(8, 10, 16, 0.45) 55%, rgba(8, 10, 16, 0) 100%);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(2px);
+  padding: 8px;
+  background: linear-gradient(to bottom, rgba(8, 10, 16, 0.08) 0%, rgba(8, 10, 16, 0.3) 46%, rgba(8, 10, 16, 0.08) 100%);
+  backdrop-filter: blur(1px);
   opacity: 0;
   transform: translateY(8px);
   pointer-events: none;
@@ -1888,6 +1958,9 @@ main {
   gap: 6px;
   flex-wrap: nowrap;
   align-items: stretch;
+  justify-content: center;
+  width: 100%;
+  max-width: 96px;
 }
 
 .dev-card__actions button {
