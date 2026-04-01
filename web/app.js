@@ -909,7 +909,7 @@ function renderState(state) {
         if (count <= 0) {
           pill.classList.add("pill--zero");
         }
-        pill.innerHTML = gemPillMarkup(gem, `${gem}: ${count}`);
+        pill.innerHTML = gemPillMarkup(gem, `${gem}: ${count}`, "stone");
         gemsRow.appendChild(pill);
       });
       const bonusesRow = document.createElement("div");
