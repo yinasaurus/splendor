@@ -61,9 +61,8 @@ http://localhost:8080
 
 - Enter a room name (default `Room A`) on the start screen.
 - **Start Game** creates/resets that room.
-- **Join Room** joins an existing room without resetting it.
-- **Rejoin Last Room** appears if a room was used before on this browser.
-- Multiple clients can join the same room name to share one game state.
+- **Join Room** opens a dialog to enter the host’s game code.
+- Multiple clients can join the same room code to share one game state.
 
 ## Deploy (Vercel + Java Backend)
 

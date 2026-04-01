@@ -1377,7 +1377,6 @@ button.secondary:hover:not(:disabled) {
 }
 
 #start-screen #join-room-btn,
-#start-screen #rejoin-room-btn,
 #start-screen #ready-btn,
 #start-screen #start-guided-btn,
 #start-screen #open-tutorial-btn {
