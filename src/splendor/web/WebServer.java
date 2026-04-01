@@ -163,6 +163,31 @@ public class WebServer {
 		return true;
 	}
 
+	private static void ensureLobbyOwner(GameSession session, String preferredName) {
+		if (session == null) {
+			return;
+		}
+		if (session.ownerName != null && session.readyByPlayer.containsKey(session.ownerName)) {
+			return;
+		}
+		String preferred = preferredName == null ? "" : preferredName.trim();
+		if (!preferred.isEmpty() && session.readyByPlayer.containsKey(preferred)) {
+			session.ownerName = preferred;
+			return;
+		}
+		// Prefer a human player as owner when recovering from stale owner state.
+		for (String name : session.readyByPlayer.keySet()) {
+			if (!session.aiByName.containsKey(name)) {
+				session.ownerName = name;
+				return;
+			}
+		}
+		for (String name : session.readyByPlayer.keySet()) {
+			session.ownerName = name;
+			return;
+		}
+	}
+
 	public static void main(String[] args) throws IOException {
 		int port = 8080;
 		String envPort = System.getenv("PORT");
@@ -546,11 +571,13 @@ public class WebServer {
 				return;
 			}
 			session.readyByPlayer.putIfAbsent(name, false);
+			ensureLobbyOwner(session, name);
 			addActionLog(session, name + " joined lobby.");
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
 			resp.put("room", room);
 			resp.put("name", name);
+			resp.put("owner", session.ownerName);
 			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 		}
 	}
@@ -599,6 +626,7 @@ public class WebServer {
 			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
 			String owner = extractStringField(body, "ownerName", "");
 			GameSession session = getOrCreateSession(room);
+			ensureLobbyOwner(session, owner);
 			if (!session.ownerName.equals(owner)) {
 				Map<String, Object> resp = new HashMap<>();
 				resp.put("success", false);
@@ -1135,6 +1163,7 @@ public class WebServer {
 		StringBuilder sb = new StringBuilder();
 		GameBoard board = session.controller.getBoard();
 		Player current = session.controller.getCurrentPlayer();
+		ensureLobbyOwner(session, null);
 		String viewer = viewerName == null ? "" : viewerName.trim();
 		boolean isMyTurn = current.isHuman() && !viewer.isEmpty() && current.getName().equals(viewer);
 
