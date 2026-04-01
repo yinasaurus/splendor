@@ -785,28 +785,35 @@ main {
 
 .nobles-list {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 10px;
+  padding-bottom: 2px;
 }
 
 .noble-card {
+  position: relative;
   display: flex;
-  gap: 8px;
-  align-items: stretch;
-  padding: 9px 10px;
-  background: linear-gradient(145deg, rgba(32, 28, 44, 0.85), rgba(18, 16, 28, 0.92));
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(232, 163, 23, 0.2);
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 0 auto;
+  width: 178px;
+  padding: 8px;
+  background: linear-gradient(155deg, rgba(18, 20, 34, 0.98), rgba(12, 14, 24, 0.98));
+  border-radius: 14px;
+  border: 1px solid rgba(232, 163, 23, 0.24);
   font-size: 0.75rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .noble-card__portrait {
-  width: 44px;
-  min-width: 44px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background-color: rgba(8, 10, 16, 0.6);
+  width: 100%;
+  min-width: 0;
+  height: 96px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background-color: rgba(8, 10, 16, 0.85);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -820,15 +827,38 @@ main {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  justify-content: center;
+  gap: 5px;
 }
 
 .noble-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-weight: 600;
   color: #e8eaf0;
   line-height: 1.25;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
+}
+
+.noble-card__title {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.noble-card__pts {
+  flex: 0 0 auto;
+  min-width: 34px;
+  text-align: center;
+  font-weight: 800;
+  color: #fff4d6;
+  background: linear-gradient(180deg, #ffcf4d 0%, var(--accent) 45%, #b3740a 100%);
+  border: 1px solid rgba(255, 233, 180, 0.45);
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 0.68rem;
 }
 
 .noble-card__reqs {
@@ -851,6 +881,20 @@ main {
 
 .noble-card__reqs .gem-sprite--stone {
   --gw: 0.98rem;
+}
+
+.nobles-list::-webkit-scrollbar {
+  height: 8px;
+}
+
+.nobles-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.nobles-list::-webkit-scrollbar-thumb {
+  background: rgba(232, 163, 23, 0.45);
+  border-radius: 999px;
 }
 
 @media (max-width: 520px) {
@@ -958,6 +1002,16 @@ main {
 .player-meta {
   font-size: 0.8rem;
   color: #c8e6c9;
+}
+
+.player-resource-label {
+  margin-top: 4px;
+  margin-bottom: 2px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c9d2ea;
 }
 
 .player-afk-meta {
@@ -1100,6 +1154,7 @@ main {
 
 .gem-sprite--chip.gem-sprite--ONYX {
   background-position: 0 0;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.55));
 }
 
 .gem-sprite--chip.gem-sprite--SAPPHIRE {
@@ -1143,6 +1198,7 @@ main {
 
 .gem-sprite--stone.gem-sprite--ONYX {
   background-position: 0 0;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.55));
 }
 
 .gem-sprite--stone.gem-sprite--SAPPHIRE {
@@ -1217,6 +1273,55 @@ main {
   color: #f0f3fb;
 }
 
+.discard-panel {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(232, 163, 23, 0.24);
+  background: rgba(10, 12, 20, 0.6);
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: max-height 0.22s ease, opacity 0.18s ease, transform 0.18s ease;
+}
+
+.discard-panel.discard-panel--open {
+  max-height: 320px;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.discard-panel__title {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffdca0;
+  margin-bottom: 4px;
+}
+
+#discard-gems-options {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.discard-panel__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#discard-gems-confirm-btn,
+#discard-gems-cancel-btn {
+  min-height: 36px;
+  font-size: 0.82rem;
+}
+
 .take-gem-option .gem-sprite--stone {
   --gw: 2rem;
 }
@@ -1259,6 +1364,13 @@ main {
   background: rgba(16, 18, 26, 0.92);
   border-color: rgba(255, 255, 255, 0.14);
   color: #eef1f8;
+}
+
+/* Give black/onyx gems a lighter pill so the icon is visible. */
+.pill:has(.gem-sprite--ONYX),
+.pill:has(.gem-dot--ONYX) {
+  background: rgba(68, 76, 94, 0.96);
+  border-color: rgba(255, 255, 255, 0.32);
 }
 
 .card-list {
@@ -1585,6 +1697,10 @@ main {
   font-size: 0.72rem;
   line-height: 1;
   font-weight: 800;
+  min-width: 1.25ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 .dev-card__cost--DIAMOND {

@@ -47,8 +47,10 @@ let currentRoom = "Room A";
 const LAST_ROOM_KEY = "splendor.lastRoom";
 const LAST_NAME_KEY = "splendor.playerName";
 const AUTO_REJOIN_KEY = "splendor.autoRejoin";
+const SEAT_TOKEN_KEY_PREFIX = "splendor.seatToken";
 let playerViewOffset = 0;
 let currentPlayerName = "";
+let currentSessionToken = "";
 let currentReady = false;
 let currentOwner = "";
 
@@ -76,7 +78,8 @@ async function readErrorMessage(res, fallback) {
 async function fetchState() {
   const roomParam = encodeURIComponent(currentRoom || "Room A");
   const nameParam = encodeURIComponent(currentPlayerName || "");
-  const res = await fetch(`${API_STATE}?room=${roomParam}&name=${nameParam}`);
+  const tokenParam = encodeURIComponent(currentSessionToken || "");
+  const res = await fetch(`${API_STATE}?room=${roomParam}&name=${nameParam}&sessionToken=${tokenParam}`);
   if (!res.ok) {
     throw new Error("Failed to load state");
   }
@@ -183,6 +186,23 @@ function resolveCanonicalLobbyName(state, rawName) {
   }
   const match = state.lobby.players.find((p) => samePlayerName(p && p.name, target));
   return match && match.name ? String(match.name) : target;
+}
+
+function replaceGenericSeatNames(text, lobbyNames) {
+  if (!text || !Array.isArray(lobbyNames) || lobbyNames.length === 0) {
+    return text;
+  }
+  let out = String(text);
+  lobbyNames.forEach((name, idx) => {
+    const seatNo = idx + 1;
+    const safeName = String(name || "").trim();
+    if (!safeName) {
+      return;
+    }
+    const re = new RegExp(`\\bPlayer\\s*${seatNo}\\b`, "g");
+    out = out.replace(re, safeName);
+  });
+  return out;
 }
 
 function devCardCostEntries(cost) {
@@ -355,6 +375,7 @@ function clearTransientUi() {
 function rememberRoom(room) {
   const safeRoom = (room || "Room A").trim() || "Room A";
   currentRoom = safeRoom;
+  currentSessionToken = getRememberedSeatToken(currentRoom, currentPlayerName);
   try {
     window.localStorage.setItem(LAST_ROOM_KEY, safeRoom);
   } catch (_) {
@@ -376,8 +397,56 @@ function rememberPlayerName(name) {
   if (!safeName) {
     return;
   }
+  currentSessionToken = getRememberedSeatToken(currentRoom, safeName);
   try {
     window.localStorage.setItem(LAST_NAME_KEY, safeName);
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
+function seatTokenStorageKey(room, name) {
+  const r = String(room || "").trim().toLowerCase();
+  const n = String(name || "").trim().toLowerCase();
+  if (!r || !n) {
+    return null;
+  }
+  return `${SEAT_TOKEN_KEY_PREFIX}:${r}:${n}`;
+}
+
+function rememberSeatToken(room, name, token) {
+  const key = seatTokenStorageKey(room, name);
+  const value = String(token || "").trim();
+  if (!key || !value) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(key, value);
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
+function getRememberedSeatToken(room, name) {
+  const key = seatTokenStorageKey(room, name);
+  if (!key) {
+    return "";
+  }
+  try {
+    const saved = window.localStorage.getItem(key);
+    return saved && saved.trim() ? saved.trim() : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function clearRememberedSeatToken(room, name) {
+  const key = seatTokenStorageKey(room, name);
+  if (!key) {
+    return;
+  }
+  try {
+    window.localStorage.removeItem(key);
   } catch (_) {
     // ignore storage errors
   }
@@ -556,7 +625,7 @@ async function copyRoomCodeToClipboard() {
 }
 
 async function postAction(payload) {
-  const withRoom = { ...payload, room: currentRoom, name: currentPlayerName };
+  const withRoom = { ...payload, room: currentRoom, name: currentPlayerName, sessionToken: currentSessionToken };
   const res = await fetch(API_ACTION, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -617,26 +686,44 @@ async function postCreateRoom(payload) {
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, "Create room failed"));
   }
-  return res.json();
+  const data = await res.json();
+  if (data && data.success && data.sessionToken) {
+    currentSessionToken = String(data.sessionToken);
+    const ownerName = String(payload.ownerName || currentPlayerName || "").trim();
+    if (ownerName) {
+      rememberSeatToken(data.room || currentRoom, ownerName, currentSessionToken);
+    }
+  }
+  return data;
 }
 
 async function postJoinRoom(payload) {
+  const withToken = { ...payload, sessionToken: payload.sessionToken || currentSessionToken || "" };
   const res = await fetch(API_ROOM_JOIN, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(withToken),
   });
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, "Join room failed"));
   }
-  return res.json();
+  const data = await res.json();
+  if (data && data.success && data.sessionToken) {
+    currentSessionToken = String(data.sessionToken);
+    const tokenName = String(data.name || payload.name || currentPlayerName || "").trim();
+    if (tokenName) {
+      rememberSeatToken(currentRoom, tokenName, currentSessionToken);
+    }
+  }
+  return data;
 }
 
 async function postReady(payload) {
+  const withToken = { ...payload, sessionToken: currentSessionToken };
   const res = await fetch(API_ROOM_READY, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(withToken),
   });
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, "Ready failed"));
@@ -645,10 +732,11 @@ async function postReady(payload) {
 }
 
 async function postStartRoom(payload) {
+  const withToken = { ...payload, sessionToken: currentSessionToken };
   const res = await fetch(API_ROOM_START, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(withToken),
   });
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, "Start room failed"));
@@ -657,10 +745,11 @@ async function postStartRoom(payload) {
 }
 
 async function postAddAi(payload) {
+  const withToken = { ...payload, sessionToken: currentSessionToken };
   const res = await fetch(API_ROOM_ADDAI, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(withToken),
   });
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, "Add AI failed"));
@@ -669,10 +758,11 @@ async function postAddAi(payload) {
 }
 
 async function postKick(payload) {
+  const withToken = { ...payload, sessionToken: currentSessionToken };
   const res = await fetch(API_ROOM_KICK, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(withToken),
   });
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, "Kick failed"));
@@ -681,10 +771,11 @@ async function postKick(payload) {
 }
 
 async function postAfkAi(payload) {
+  const withToken = { ...payload, sessionToken: currentSessionToken };
   const res = await fetch(API_ROOM_AFK_AI, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(withToken),
   });
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, "AFK AI update failed"));
@@ -758,10 +849,10 @@ function renderState(state) {
   const roundNo = Number.isFinite(state.roundNumber) ? state.roundNumber : 1;
   const actions = Array.isArray(state.recentActions) ? state.recentActions : [];
 
+  const winnerDisplay = replaceGenericSeatNames(state.winner || "Unknown", lobbyNames);
   if (state.gameOver && gameOverWrap && gameOverBanner && leaderboardEl) {
     gameOverWrap.classList.remove("hidden");
-    const winnerName = state.winner || "Unknown";
-    gameOverBanner.textContent = `Game over — ${winnerName} wins`;
+    gameOverBanner.textContent = `Game over — ${winnerDisplay} wins`;
     if (gameOverHint) {
       gameOverHint.textContent = "Ties: higher prestige wins; if tied, fewer purchased development cards wins.";
     }
@@ -782,7 +873,7 @@ function renderState(state) {
     playersRank.forEach((p, idx) => {
       const li = document.createElement("li");
       li.className = "leaderboard__row";
-      if (p.name === state.winner) {
+      if (samePlayerName(p.name, winnerDisplay)) {
         li.classList.add("leaderboard__row--winner");
       }
       const pts = Number(p.prestige) || 0;
@@ -858,7 +949,14 @@ function renderState(state) {
 
       const head = document.createElement("div");
       head.className = "noble-card__head";
-      head.textContent = `${n.name} · ${n.points} prestige`;
+      const title = document.createElement("span");
+      title.className = "noble-card__title";
+      title.textContent = n.name || "Noble";
+      const pts = document.createElement("span");
+      pts.className = "noble-card__pts";
+      pts.textContent = `+${Number(n.points) || 0}`;
+      head.appendChild(title);
+      head.appendChild(pts);
 
       const row = document.createElement("div");
       row.className = "pill-row noble-card__reqs";
@@ -1177,8 +1275,16 @@ function renderState(state) {
         card.appendChild(afkBtn);
       }
       if (bonusesRow.childElementCount > 0) {
+        const bonusesLabel = document.createElement("div");
+        bonusesLabel.className = "player-resource-label";
+        bonusesLabel.textContent = "Bonuses:";
+        card.appendChild(bonusesLabel);
         card.appendChild(bonusesRow);
       }
+      const gemsLabel = document.createElement("div");
+      gemsLabel.className = "player-resource-label";
+      gemsLabel.textContent = "Gems:";
+      card.appendChild(gemsLabel);
       card.appendChild(gemsRow);
 
       const boughtList = Array.isArray(p.boughtCards) ? p.boughtCards : [];
@@ -1302,7 +1408,7 @@ function renderState(state) {
           buyR.type = "button";
           buyR.className = "reserved-mini__buy card-buy-btn";
           buyR.textContent = "Buy reserved";
-          const isYou = samePlayerName(p.name, currentDisplayName);
+          const isYou = samePlayerName(p.name, currentPlayerName);
           const canBuyReserved = isMyTurn && isYou && p.human && !!rc.affordable;
           buyR.disabled = !canBuyReserved;
           buyR.title = canBuyReserved
@@ -1372,7 +1478,7 @@ function renderState(state) {
     } else {
       actions.slice(-6).reverse().forEach((entry) => {
         const li = document.createElement("li");
-        li.textContent = entry;
+        li.textContent = replaceGenericSeatNames(entry, lobbyNames);
         activityLog.appendChild(li);
       });
     }
@@ -1465,6 +1571,7 @@ function renderLobbyStatus(state) {
   if (me && me.name && me.name !== currentPlayerName) {
     currentPlayerName = String(me.name);
     rememberPlayerName(currentPlayerName);
+    currentSessionToken = getRememberedSeatToken(currentRoom, currentPlayerName) || currentSessionToken;
   }
   currentReady = !!(me && me.ready);
   if (waitingPlayerNameInput) {
@@ -1561,7 +1668,17 @@ function setupGemSelection() {
 
   const btnConfirm = document.getElementById("take-gems-btn");
   const messageEl = document.getElementById("action-message");
+  const discardPanel = document.getElementById("discard-gems-panel");
+  const discardTitle = document.getElementById("discard-gems-title");
+  const discardHint = document.getElementById("discard-gems-hint");
+  const discardOptions = document.getElementById("discard-gems-options");
+  const discardConfirmBtn = document.getElementById("discard-gems-confirm-btn");
+  const discardCancelBtn = document.getElementById("discard-gems-cancel-btn");
   let takeGemsSubmitting = false;
+  let pendingTakeGems = null;
+  let requiredDiscardCount = 0;
+  const discardSelected = new Map();
+  let discardCollapseTimer = null;
 
   function setTakeGemsBusy(isBusy) {
     takeGemsSubmitting = !!isBusy;
@@ -1572,19 +1689,164 @@ function setupGemSelection() {
     container.querySelectorAll("button").forEach((btn) => {
       btn.disabled = isBusy || !(latestState && (latestState.isMyTurn != null ? latestState.isMyTurn : latestState.isHumanTurn));
     });
+    if (discardConfirmBtn) {
+      discardConfirmBtn.disabled = isBusy || !pendingTakeGems;
+    }
+    if (discardCancelBtn) {
+      discardCancelBtn.disabled = isBusy;
+    }
   }
 
-  function parseDiscardInput(raw, needed) {
-    const text = String(raw || "").toUpperCase();
-    const tokens = text.split(/[^A-Z]+/).filter(Boolean);
-    const out = [];
-    for (const token of tokens) {
-      const ch = token.charAt(0);
-      if (GEM_ABBR_TO_NAME[ch]) {
-        out.push(ch);
-      }
+  function closeDiscardPanel(animated = false) {
+    if (discardCollapseTimer) {
+      window.clearTimeout(discardCollapseTimer);
+      discardCollapseTimer = null;
     }
-    return out.length === needed ? out : null;
+    pendingTakeGems = null;
+    requiredDiscardCount = 0;
+    discardSelected.clear();
+    const finalize = () => {
+      if (discardOptions) {
+        discardOptions.innerHTML = "";
+      }
+      if (discardPanel) {
+        discardPanel.classList.remove("discard-panel--open");
+        discardPanel.classList.add("hidden");
+      }
+    };
+    if (!discardPanel) {
+      finalize();
+      return;
+    }
+    if (animated && !discardPanel.classList.contains("hidden")) {
+      discardPanel.classList.remove("discard-panel--open");
+      discardCollapseTimer = window.setTimeout(() => {
+        discardCollapseTimer = null;
+        finalize();
+      }, 220);
+      return;
+    }
+    finalize();
+  }
+
+  function collectDiscardAbbr() {
+    const out = [];
+    discardSelected.forEach((count, gem) => {
+      for (let i = 0; i < count; i++) {
+        out.push(gem[0]);
+      }
+    });
+    return out;
+  }
+
+  function updateDiscardConfirmState() {
+    if (!discardConfirmBtn) {
+      return;
+    }
+    const picked = collectDiscardAbbr().length;
+    discardConfirmBtn.disabled = takeGemsSubmitting || !pendingTakeGems || picked !== requiredDiscardCount;
+    if (discardHint && requiredDiscardCount > 0) {
+      discardHint.textContent = `Pick exactly ${requiredDiscardCount} gem(s) to discard.`;
+    }
+  }
+
+  async function submitTakeGems(gems, discard) {
+    try {
+      setTakeGemsBusy(true);
+      messageEl.textContent = "Submitting gem action...";
+      messageEl.className = "message";
+      const result = await postAction({ type: "takeGems", gems, discard });
+      messageEl.textContent = result.message || (result.success ? "Action done." : "Action failed.");
+      messageEl.className = "message " + (result.success ? "ok" : "error");
+      const state = await fetchState();
+      renderState(state);
+      gemTypes.forEach((gem) => setGemCount(gem, 0));
+      closeDiscardPanel(true);
+    } catch (e) {
+      messageEl.textContent = "Error sending action.";
+      messageEl.className = "message error";
+    } finally {
+      setTakeGemsBusy(false);
+    }
+  }
+
+  function openDiscardPanel(required, myGems, gemsToTake) {
+    if (!discardPanel || !discardOptions) {
+      return false;
+    }
+    pendingTakeGems = Array.isArray(gemsToTake) ? [...gemsToTake] : [];
+    requiredDiscardCount = Math.max(0, Number(required) || 0);
+    discardSelected.clear();
+    discardOptions.innerHTML = "";
+    if (discardTitle) {
+      discardTitle.textContent = `Discard ${requiredDiscardCount} gem${requiredDiscardCount === 1 ? "" : "s"}`;
+    }
+    const gemTypesLocal = ["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"];
+    gemTypesLocal.forEach((gem) => {
+      const have = Number((myGems && myGems[gem]) || 0);
+      if (have <= 0) {
+        return;
+      }
+      discardSelected.set(gem, 0);
+      const row = document.createElement("div");
+      row.className = "take-gem-option";
+      row.setAttribute("data-gem", gem);
+
+      const preview = document.createElement("div");
+      preview.className = "take-gem-option__preview";
+      preview.innerHTML = `${gemSpriteMarkup(gem, "stone")}<span class="take-gem-option__supply">Have: ${have}</span>`;
+
+      const controls = document.createElement("div");
+      controls.className = "take-gem-option__controls";
+      const minusBtn = document.createElement("button");
+      minusBtn.type = "button";
+      minusBtn.className = "secondary small-btn take-gem-option__btn";
+      minusBtn.textContent = "-";
+      const countEl = document.createElement("span");
+      countEl.className = "take-gem-option__count";
+      countEl.textContent = "0";
+      const plusBtn = document.createElement("button");
+      plusBtn.type = "button";
+      plusBtn.className = "secondary small-btn take-gem-option__btn";
+      plusBtn.textContent = "+";
+
+      const renderCount = () => {
+        countEl.textContent = String(discardSelected.get(gem) || 0);
+        updateDiscardConfirmState();
+      };
+      minusBtn.addEventListener("click", () => {
+        const current = discardSelected.get(gem) || 0;
+        discardSelected.set(gem, Math.max(0, current - 1));
+        renderCount();
+      });
+      plusBtn.addEventListener("click", () => {
+        const current = discardSelected.get(gem) || 0;
+        const totalPicked = collectDiscardAbbr().length;
+        if (current >= have || totalPicked >= requiredDiscardCount) {
+          return;
+        }
+        discardSelected.set(gem, current + 1);
+        renderCount();
+      });
+      controls.appendChild(minusBtn);
+      controls.appendChild(countEl);
+      controls.appendChild(plusBtn);
+      row.appendChild(preview);
+      row.appendChild(controls);
+      discardOptions.appendChild(row);
+    });
+    if (discardOptions.childElementCount === 0) {
+      return false;
+    }
+    discardPanel.classList.remove("hidden");
+    discardPanel.classList.remove("discard-panel--open");
+    window.requestAnimationFrame(() => {
+      if (discardPanel && !discardPanel.classList.contains("hidden")) {
+        discardPanel.classList.add("discard-panel--open");
+      }
+    });
+    updateDiscardConfirmState();
+    return true;
   }
 
   function validateTakeGemSelection(selectedMap, state) {
@@ -1643,48 +1905,51 @@ function setupGemSelection() {
       return;
     }
     try {
-      setTakeGemsBusy(true);
-      messageEl.textContent = "Submitting gem action...";
-      messageEl.className = "message";
       const myPlayer =
         latestState && Array.isArray(latestState.players)
           ? latestState.players.find((p) => p.name === latestState.currentPlayer)
           : null;
       const currentTotal = myPlayer && myPlayer.gems ? Object.values(myPlayer.gems).reduce((s, n) => s + Number(n || 0), 0) : 0;
       const overflow = Math.max(0, currentTotal + gems.length - 10);
-      let discard = [];
       if (overflow > 0) {
-        const reply = window.prompt(
-          `You must discard ${overflow} gem(s). Type letters separated by spaces/commas (R E S D O G).`,
-          ""
-        );
-        if (reply == null) {
-          messageEl.textContent = "Take gems cancelled.";
+        const opened = openDiscardPanel(overflow, myPlayer ? myPlayer.gems : {}, gems);
+        if (!opened) {
+          messageEl.textContent = "Cannot open discard picker right now.";
           messageEl.className = "message error";
           return;
         }
-        const parsed = parseDiscardInput(reply, overflow);
-        if (!parsed) {
-          messageEl.textContent = `Invalid discard input. Enter exactly ${overflow} gem letter(s).`;
-          messageEl.className = "message error";
-          return;
-        }
-        discard = parsed;
+        messageEl.textContent = `Discard ${overflow} gem(s) below, then confirm.`;
+        messageEl.className = "message";
+        return;
       }
-      const result = await postAction({ type: "takeGems", gems, discard });
-      messageEl.textContent = result.message || (result.success ? "Action done." : "Action failed.");
-      messageEl.className = "message " + (result.success ? "ok" : "error");
-      const state = await fetchState();
-      renderState(state);
-      // Clear previous selection to avoid accidental repeated submits.
-      gemTypes.forEach((gem) => setGemCount(gem, 0));
+      await submitTakeGems(gems, []);
     } catch (e) {
-      messageEl.textContent = "Error sending action.";
+      messageEl.textContent = "Error preparing action.";
       messageEl.className = "message error";
-    } finally {
-      setTakeGemsBusy(false);
     }
   });
+
+  if (discardConfirmBtn) {
+    discardConfirmBtn.addEventListener("click", async () => {
+      if (!pendingTakeGems || takeGemsSubmitting) {
+        return;
+      }
+      const discard = collectDiscardAbbr();
+      if (discard.length !== requiredDiscardCount) {
+        messageEl.textContent = `Pick exactly ${requiredDiscardCount} gem(s) to discard.`;
+        messageEl.className = "message error";
+        return;
+      }
+      await submitTakeGems(pendingTakeGems, discard);
+    });
+  }
+  if (discardCancelBtn) {
+    discardCancelBtn.addEventListener("click", () => {
+      closeDiscardPanel();
+      messageEl.textContent = "Take gems cancelled.";
+      messageEl.className = "message error";
+    });
+  }
 
   uiState.gemUiInitialized = true;
 }
@@ -1983,18 +2248,15 @@ async function init() {
       const now = Date.now();
       if ((inWaitingRoom || inGame) && currentPlayerName && !inLobbyList && now - lastAutoRejoinAt > 7000) {
         lastAutoRejoinAt = now;
-        try {
-          const rejoin = await postJoinRoom({ room: currentRoom, name: currentPlayerName });
-          if (rejoin && rejoin.success && now - lastRecoveryToastAt > 15000) {
-            lastRecoveryToastAt = now;
-            showToast("Session recovered after idle restart.");
-          }
-          state = await fetchState();
-          currentPlayerName = resolveCanonicalLobbyName(state, currentPlayerName);
-          rememberPlayerName(currentPlayerName);
-        } catch (_) {
-          // Ignore and retry later; prevents UI from being stuck after backend idles/restarts.
-        }
+        // If your name is no longer in the room list, treat it as removed/kicked.
+        // Do not auto-rejoin, otherwise a kicked player can silently re-enter.
+        showToast("You were removed from this room.", "error");
+        clearAutoRejoinIntent();
+        clearRememberedSeatToken(currentRoom, currentPlayerName);
+        currentSessionToken = "";
+        showStartScreen();
+        stopLiveSync();
+        return;
       }
       if (inWaitingRoom) {
         renderLobbyStatus(state);
@@ -2272,7 +2534,7 @@ async function init() {
         await postReady({ room: currentRoom, name: currentPlayerName, ready: nextReady });
         const state = await fetchState();
         renderLobbyStatus(state);
-        showToast(nextReady ? "You are ready." : "You are not ready.");
+        showToast(nextReady ? "You are ready." : "You are not ready.", nextReady ? "ok" : "error");
       } catch (_) {
         alert("Could not update ready status.");
       }
@@ -2394,6 +2656,7 @@ async function init() {
       playerNameInput.value = rememberedName;
     }
   }
+  currentSessionToken = getRememberedSeatToken(currentRoom, currentPlayerName);
   updateLobbyReadiness();
   try {
     // Auto-join when URL has room code OR this is a recent refresh of an active session.
@@ -2409,6 +2672,7 @@ async function init() {
     currentPlayerName = resolveCanonicalLobbyName(state, currentPlayerName);
     if (currentPlayerName) {
       rememberPlayerName(currentPlayerName);
+      currentSessionToken = getRememberedSeatToken(currentRoom, currentPlayerName) || currentSessionToken;
     }
     renderLobbyStatus(state);
     const inRoom =
@@ -2425,6 +2689,8 @@ async function init() {
       }
     } else if (pathRoom || (autoRejoinIntent && autoRejoinIntent.room)) {
       clearAutoRejoinIntent();
+      clearRememberedSeatToken(currentRoom, currentPlayerName);
+      currentSessionToken = "";
       showHome(false);
       showToast(`Could not auto-rejoin ${currentRoom}. Enter your name, then Join Room.`, "error");
     } else {

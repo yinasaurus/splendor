@@ -66,6 +66,7 @@ public class WebServer {
 		String[] lobbyTypes = new String[] { "human", "human", "human", "human" };
 		Map<String, Boolean> readyByPlayer = new LinkedHashMap<>();
 		Map<String, String> aiByName = new LinkedHashMap<>();
+		Map<String, String> seatTokenByPlayer = new HashMap<>();
 		Map<String, Long> lastSeenByPlayer = new HashMap<>();
 		Set<String> forcedAiByName = new HashSet<>();
 		Map<String, String> forcedAiDifficultyByName = new HashMap<>();
@@ -256,6 +257,39 @@ public class WebServer {
 		return name;
 	}
 
+	private static String issueSeatToken(GameSession session, String playerName) {
+		if (session == null || playerName == null) {
+			return "";
+		}
+		String name = playerName.trim();
+		if (name.isEmpty()) {
+			return "";
+		}
+		String existing = session.seatTokenByPlayer.get(name);
+		if (existing != null && !existing.trim().isEmpty()) {
+			return existing;
+		}
+		String token = UUID.randomUUID().toString();
+		session.seatTokenByPlayer.put(name, token);
+		return token;
+	}
+
+	private static boolean hasValidSeatToken(GameSession session, String playerName, String token) {
+		if (session == null || playerName == null) {
+			return false;
+		}
+		String name = playerName.trim();
+		if (name.isEmpty()) {
+			return false;
+		}
+		String expected = session.seatTokenByPlayer.get(name);
+		if (expected == null || expected.trim().isEmpty()) {
+			// Backward-compatible fallback: if no token was issued yet, allow.
+			return true;
+		}
+		return expected.equals(token == null ? "" : token.trim());
+	}
+
 	private static String cleanRoomName(String room) {
 		if (room == null) {
 			return DEFAULT_ROOM;
@@ -358,6 +392,8 @@ public class WebServer {
 		};
 		session.readyByPlayer.clear();
 		session.readyByPlayer.put(session.ownerName, false);
+		session.seatTokenByPlayer.clear();
+		issueSeatToken(session, session.ownerName);
 		session.lastSeenByPlayer.clear();
 		session.lastSeenByPlayer.put(session.ownerName, System.currentTimeMillis());
 		session.aiByName.clear();
@@ -756,6 +792,16 @@ public class WebServer {
 				return;
 			}
 			String viewerName = canonicalizeLobbyName(session, getQueryParam(exchange, "name"));
+			String sessionToken = getQueryParam(exchange, "sessionToken");
+			if (viewerName != null && !viewerName.trim().isEmpty() && session.readyByPlayer.containsKey(viewerName)
+					&& !hasValidSeatToken(session, viewerName, sessionToken)) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("message", "This player seat is already active in another browser.");
+				resp.put("room", room);
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			markPlayerSeen(session, viewerName);
 			String json = buildGameStateJson(session, room, viewerName);
 			sendResponse(exchange, 200, json, "application/json; charset=utf-8");
@@ -837,6 +883,7 @@ public class WebServer {
 			resp.put("success", true);
 			resp.put("room", room);
 			resp.put("owner", session.ownerName);
+			resp.put("sessionToken", issueSeatToken(session, session.ownerName));
 			resp.put("numPlayers", session.lobbyNumPlayers);
 			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 		}
@@ -855,6 +902,7 @@ public class WebServer {
 			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
 			String name = extractStringField(body, "name", "Guest");
+			String sessionToken = extractStringField(body, "sessionToken", "");
 			if (name == null || name.trim().isEmpty()) {
 				name = "Guest";
 			}
@@ -889,6 +937,16 @@ public class WebServer {
 				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 				return;
 			}
+			boolean exists = session.readyByPlayer.containsKey(name);
+			String existingToken = session.seatTokenByPlayer.get(name);
+			if (exists && existingToken != null && !existingToken.trim().isEmpty()
+					&& !existingToken.equals(sessionToken == null ? "" : sessionToken.trim())) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("message", "This seat is already in use on another browser.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			session.readyByPlayer.putIfAbsent(name, false);
 			markPlayerSeen(session, name);
 			ensureLobbyOwner(session, name);
@@ -899,6 +957,7 @@ public class WebServer {
 			resp.put("room", room);
 			resp.put("name", name);
 			resp.put("owner", session.ownerName);
+			resp.put("sessionToken", issueSeatToken(session, name));
 			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
 		}
 	}
@@ -916,9 +975,17 @@ public class WebServer {
 			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
 			String name = extractStringField(body, "name", "Guest");
+			String sessionToken = extractStringField(body, "sessionToken", "");
 			boolean ready = extractBooleanField(body, "ready", false);
 			GameSession session = getOrCreateSession(room);
 			name = canonicalizeLobbyName(session, name);
+			if (!hasValidSeatToken(session, name, sessionToken)) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("message", "Seat locked by another browser session.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			if (!session.readyByPlayer.containsKey(name)) {
 				session.readyByPlayer.put(name, false);
 			}
@@ -949,8 +1016,16 @@ public class WebServer {
 			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
 			String owner = extractStringField(body, "ownerName", "");
+			String sessionToken = extractStringField(body, "sessionToken", "");
 			GameSession session = getOrCreateSession(room);
 			owner = canonicalizeLobbyName(session, owner);
+			if (!hasValidSeatToken(session, owner, sessionToken)) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("message", "Owner seat locked by another browser session.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			ensureLobbyOwner(session, owner);
 			if (!session.ownerName.equals(owner)) {
 				Map<String, Object> resp = new HashMap<>();
@@ -1011,6 +1086,7 @@ public class WebServer {
 			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
 			String owner = extractStringField(body, "ownerName", "");
+			String sessionToken = extractStringField(body, "sessionToken", "");
 			String target = extractStringField(body, "targetName", "");
 			boolean enable = extractBooleanField(body, "enable", true);
 			String difficulty = extractStringField(body, "difficulty", "medium").toLowerCase();
@@ -1018,8 +1094,15 @@ public class WebServer {
 				difficulty = "medium";
 			}
 			GameSession session = getOrCreateSession(room);
+			owner = canonicalizeLobbyName(session, owner);
 			ensureLobbyOwner(session, owner);
 			Map<String, Object> resp = new HashMap<>();
+			if (!hasValidSeatToken(session, owner, sessionToken)) {
+				resp.put("success", false);
+				resp.put("message", "Owner seat locked by another browser session.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			if (!session.ownerName.equals(owner)) {
 				resp.put("success", false);
 				resp.put("message", "Only owner can manage AFK AI takeover.");
@@ -1070,12 +1153,20 @@ public class WebServer {
 			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
 			String owner = extractStringField(body, "ownerName", "");
+			String sessionToken = extractStringField(body, "sessionToken", "");
 			String difficulty = extractStringField(body, "difficulty", "easy").toLowerCase();
 			if (!difficulty.equals("easy") && !difficulty.equals("medium") && !difficulty.equals("hard")) {
 				difficulty = "easy";
 			}
 			GameSession session = getOrCreateSession(room);
+			owner = canonicalizeLobbyName(session, owner);
 			Map<String, Object> resp = new HashMap<>();
+			if (!hasValidSeatToken(session, owner, sessionToken)) {
+				resp.put("success", false);
+				resp.put("message", "Owner seat locked by another browser session.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			if (!session.ownerName.equals(owner)) {
 				resp.put("success", false);
 				resp.put("message", "Only owner can add AI.");
@@ -1116,9 +1207,17 @@ public class WebServer {
 			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
 			String owner = extractStringField(body, "ownerName", "");
+			String sessionToken = extractStringField(body, "sessionToken", "");
 			String target = extractStringField(body, "targetName", "");
 			GameSession session = getOrCreateSession(room);
+			owner = canonicalizeLobbyName(session, owner);
 			Map<String, Object> resp = new HashMap<>();
+			if (!hasValidSeatToken(session, owner, sessionToken)) {
+				resp.put("success", false);
+				resp.put("message", "Owner seat locked by another browser session.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			if (!session.ownerName.equals(owner)) {
 				resp.put("success", false);
 				resp.put("message", "Only owner can kick.");
@@ -1139,6 +1238,7 @@ public class WebServer {
 			}
 			session.readyByPlayer.remove(target);
 			session.aiByName.remove(target);
+			session.seatTokenByPlayer.remove(target);
 			addActionLog(session, target + " was removed from lobby.");
 			saveSnapshots();
 			resp.put("success", true);
@@ -1184,6 +1284,10 @@ public class WebServer {
 				oldReady = Boolean.TRUE.equals(session.readyByPlayer.remove(oldName));
 			}
 			session.readyByPlayer.put(newName, oldReady);
+			String seatToken = session.seatTokenByPlayer.remove(oldName);
+			if (seatToken != null && !seatToken.trim().isEmpty()) {
+				session.seatTokenByPlayer.put(newName, seatToken);
+			}
 			if (session.ownerName.equals(oldName)) {
 				session.ownerName = newName;
 			}
@@ -1213,6 +1317,7 @@ public class WebServer {
 		Player currentPlayer = session.controller.getCurrentPlayer();
 		String actor = currentPlayer.getName();
 		String requesterName = extractStringField(body, "name", "");
+		String sessionToken = extractStringField(body, "sessionToken", "");
 		if (requesterName == null) {
 			requesterName = "";
 		}
@@ -1220,6 +1325,12 @@ public class WebServer {
 		if (requesterName.isEmpty()) {
 			response.put("success", false);
 			response.put("message", "Missing player identity.");
+			response.put("gameOver", session.controller.isGameOver());
+			return response;
+		}
+		if (!hasValidSeatToken(session, requesterName, sessionToken)) {
+			response.put("success", false);
+			response.put("message", "Seat locked by another browser session.");
 			response.put("gameOver", session.controller.isGameOver());
 			return response;
 		}
