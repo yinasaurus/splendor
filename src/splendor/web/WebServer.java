@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
@@ -44,7 +46,7 @@ public class WebServer {
 	private static final String DEFAULT_ROOM = "Room A";
 	private static final int ACTION_LOG_LIMIT = 12;
 	private static final int AFK_AI_THRESHOLD_SECONDS = 90;
-	private static final Map<String, GameSession> sessions = new HashMap<>();
+	private static final Map<String, GameSession> sessions = new ConcurrentHashMap<>();
 	private static final Path LOBBY_SNAPSHOT_FILE = Paths.get("data", "web_lobbies.properties");
 
 	private static class LobbySnapshot {
@@ -546,7 +548,8 @@ public class WebServer {
 		server.createContext("/api/room/start", new RoomStartHandler());
 		server.createContext("/api/room/afkai", new RoomAfkAiHandler());
 
-		server.setExecutor(null);
+		// Serialize requests to avoid race conditions when users spam actions quickly.
+		server.setExecutor(Executors.newSingleThreadExecutor());
 		server.start();
 	}
 
