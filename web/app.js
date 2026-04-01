@@ -46,6 +46,7 @@ const API_ROOM_AFK_AI = `${API_BASE}/api/room/afkai`;
 let currentRoom = "Room A";
 const LAST_ROOM_KEY = "splendor.lastRoom";
 const LAST_NAME_KEY = "splendor.playerName";
+const AUTO_REJOIN_KEY = "splendor.autoRejoin";
 let playerViewOffset = 0;
 let currentPlayerName = "";
 let currentReady = false;
@@ -104,6 +105,7 @@ let lastSeenActionCount = 0;
 let suppressRealtimeToasts = true;
 let lastAutoRejoinAt = 0;
 let lastRecoveryToastAt = 0;
+const expandedBoughtByPlayer = new Set();
 
 const KNOWN_GEMS = new Set(["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"]);
 const GEM_ABBR_TO_NAME = {
@@ -350,6 +352,60 @@ function getRememberedPlayerName() {
     return saved && saved.trim() ? saved.trim() : "";
   } catch (_) {
     return "";
+  }
+}
+
+function rememberAutoRejoinIntent(room, name) {
+  const safeRoom = String(room || "").trim();
+  const safeName = String(name || "").trim();
+  if (!safeRoom || !safeName) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      AUTO_REJOIN_KEY,
+      JSON.stringify({
+        room: safeRoom,
+        name: safeName,
+        at: Date.now(),
+      })
+    );
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
+function getAutoRejoinIntent() {
+  try {
+    const raw = window.localStorage.getItem(AUTO_REJOIN_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+    const room = String(parsed.room || "").trim();
+    const name = String(parsed.name || "").trim();
+    const at = Number(parsed.at || 0);
+    if (!room || !name || !Number.isFinite(at)) {
+      return null;
+    }
+    // Refresh window: short-lived so normal fresh visits still land on lobby.
+    if (Date.now() - at > 2 * 60 * 1000) {
+      return null;
+    }
+    return { room, name, at };
+  } catch (_) {
+    return null;
+  }
+}
+
+function clearAutoRejoinIntent() {
+  try {
+    window.localStorage.removeItem(AUTO_REJOIN_KEY);
+  } catch (_) {
+    // ignore storage errors
   }
 }
 
@@ -993,7 +1049,7 @@ function renderState(state) {
         afkMeta.textContent = "AI takeover active";
       } else if (p.human && afkSec >= 15) {
         const left = Math.max(0, afkThreshold - afkSec);
-        afkMeta.textContent = left > 0 ? `AFK takeover in: ${left}s` : "AFK takeover available";
+        afkMeta.textContent = left > 0 ? `AI takeover in: ${left}s` : "AI takeover available";
       } else {
         afkMeta.textContent = "";
       }
@@ -1048,7 +1104,7 @@ function renderState(state) {
         const afkBtn = document.createElement("button");
         afkBtn.type = "button";
         afkBtn.className = "secondary small-btn player-afk-btn";
-        afkBtn.textContent = "Switch AFK to AI";
+        afkBtn.textContent = "Enable AI takeover";
         afkBtn.addEventListener("click", async () => {
           const ok = window.confirm(
             `${p.name} has been AFK for ${afkSec}s. Switch to AI takeover? They can resume control when they return.`
@@ -1100,9 +1156,20 @@ function renderState(state) {
         boughtWrap.appendChild(boughtHeader);
         const boughtSlots = document.createElement("div");
         boughtSlots.className = "player-bought-slots";
-        boughtSlots.classList.add("hidden");
+        const boughtKey = String(p.name || "").trim().toLowerCase();
+        const isExpanded = expandedBoughtByPlayer.has(boughtKey);
+        if (!isExpanded) {
+          boughtSlots.classList.add("hidden");
+        } else {
+          boughtToggle.textContent = "Hide";
+        }
         boughtToggle.addEventListener("click", () => {
           const hidden = boughtSlots.classList.toggle("hidden");
+          if (hidden) {
+            expandedBoughtByPlayer.delete(boughtKey);
+          } else {
+            expandedBoughtByPlayer.add(boughtKey);
+          }
           boughtToggle.textContent = hidden ? "Show" : "Hide";
         });
         boughtList.forEach((bc) => {
@@ -1822,6 +1889,7 @@ async function init() {
     if (waitingPlayerNameInput) {
       waitingPlayerNameInput.value = currentPlayerName || "Guest";
     }
+    rememberAutoRejoinIntent(currentRoom, currentPlayerName);
   }
 
   function showGameUi() {
@@ -1829,6 +1897,7 @@ async function init() {
     waitingRoom.classList.add("hidden");
     gameUi.classList.remove("hidden");
     if (videoPanel) videoPanel.classList.add("hidden");
+    rememberAutoRejoinIntent(currentRoom, currentPlayerName);
   }
 
   function enterGameUiFromState(state, resetPerspective) {
@@ -1924,6 +1993,7 @@ async function init() {
       stopLiveSync();
       clearRoomFromBrowserUrl();
       rememberRoom("Room A");
+      clearAutoRejoinIntent();
       updateLobbyReadiness();
     }
   }
@@ -2268,8 +2338,11 @@ async function init() {
   updateLobbyReadiness();
   startLiveSync();
   const pathRoom = roomFromUrlPath();
+  const autoRejoinIntent = getAutoRejoinIntent();
   if (pathRoom) {
     rememberRoom(pathRoom);
+  } else if (autoRejoinIntent && autoRejoinIntent.room) {
+    rememberRoom(autoRejoinIntent.room);
   }
   const rememberedName = getRememberedPlayerName();
   if (rememberedName) {
@@ -2280,9 +2353,8 @@ async function init() {
   }
   updateLobbyReadiness();
   try {
-    // Only auto-join when the URL explicitly contains a room code.
-    // Visiting site root should stay on Lobby.
-    const shouldTryAutoJoin = !!currentPlayerName && !!pathRoom;
+    // Auto-join when URL has room code OR this is a recent refresh of an active session.
+    const shouldTryAutoJoin = !!currentPlayerName && !!(pathRoom || (autoRejoinIntent && autoRejoinIntent.room));
     if (shouldTryAutoJoin) {
       try {
         await postJoinRoom({ room: currentRoom, name: currentPlayerName });
@@ -2308,7 +2380,8 @@ async function init() {
       } else {
         showWaitingRoom();
       }
-    } else if (pathRoom) {
+    } else if (pathRoom || (autoRejoinIntent && autoRejoinIntent.room)) {
+      clearAutoRejoinIntent();
       showHome(false);
       showToast(`Could not auto-rejoin ${currentRoom}. Enter your name, then Join Room.`, "error");
     } else {

@@ -297,7 +297,8 @@ public class GameController {
 		}
 		
 		// Give player a gold gem if available
-		if (board.getGemCount(GemType.GOLD) > 0) {
+		int currentTotalGems = player.getTotalGemCount();
+		if (board.getGemCount(GemType.GOLD) > 0 && currentTotalGems < config.getMaxGemsPerPlayer()) {
 			Map<GemType, Integer> gold = new HashMap<>();
 			gold.put(GemType.GOLD, 1);
 			board.removeGems(gold);
