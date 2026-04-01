@@ -622,13 +622,33 @@ public class WebServer {
 			String room = cleanRoomName((requested == null || requested.trim().isEmpty()) ? generateRoomCode() : requested);
 			String owner = extractStringField(body, "ownerName", "Host");
 			int numPlayers = extractIntField(body, "numPlayers", 2);
+			boolean forceReset = extractBooleanField(body, "forceReset", false);
 			String[] types = new String[4];
 			types[0] = extractStringField(body, "p1Type", "human");
 			types[1] = extractStringField(body, "p2Type", "human");
 			types[2] = extractStringField(body, "p3Type", "human");
 			types[3] = extractStringField(body, "p4Type", "human");
 
-			GameSession session = getOrCreateSession(room);
+			GameSession session = sessions.get(room);
+			boolean hasActiveMatch = session != null
+				&& session.gameStarted
+				&& session.controller != null
+				&& !session.controller.isGameOver();
+			if (hasActiveMatch && !forceReset) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("room", room);
+				resp.put("requiresForceReset", true);
+				resp.put("message", "An active match already exists in this room. Confirm reset to replace it.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
+			if (session == null) {
+				session = getOrCreateSession(room);
+			}
+			if (hasActiveMatch && forceReset) {
+				addActionLog(session, owner + " force-reset the room and started a new lobby.");
+			}
 			initializeLobby(session, owner, numPlayers, types);
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);

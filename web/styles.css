@@ -957,6 +957,18 @@ main {
   gap: 8px;
 }
 
+.player-card .pill-row {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 6px;
+  padding-bottom: 2px;
+}
+
+.player-card .pill {
+  flex: 0 0 auto;
+}
+
 .pill {
   padding: 4px 10px;
   border-radius: 999px;
@@ -1631,6 +1643,8 @@ main {
   border-radius: 6px;
   width: 50%;
   min-width: 0;
+  min-height: 30px;
+  font-weight: 700;
 }
 
 .dev-card__actions button:focus-visible {
@@ -1683,6 +1697,19 @@ main {
 
 .dev-card__actions .card-buy-btn:not(:disabled):hover {
   filter: brightness(1.06);
+}
+
+.dev-card__actions button.secondary {
+  background: rgba(20, 24, 36, 0.92);
+  color: #ffe7a8;
+  border: 1px solid rgba(232, 163, 23, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.dev-card__actions button.secondary:hover:not(:disabled) {
+  background: rgba(232, 163, 23, 0.2);
+  border-color: rgba(232, 163, 23, 0.68);
+  color: #fff2ca;
 }
 
 .dev-card--locked .dev-card__face {

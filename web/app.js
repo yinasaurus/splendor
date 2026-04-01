@@ -1069,10 +1069,10 @@ function renderState(state) {
         });
         card.appendChild(afkBtn);
       }
-      card.appendChild(gemsRow);
       if (bonusesRow.childElementCount > 0) {
         card.appendChild(bonusesRow);
       }
+      card.appendChild(gemsRow);
 
       const boughtList = Array.isArray(p.boughtCards) ? p.boughtCards : [];
       if (boughtList.length > 0) {
@@ -2028,7 +2028,7 @@ async function init() {
         currentPlayerName = ensureCurrentPlayerName("Host");
         const numPlayers = parseInt(numPlayersSelect.value, 10);
         const roomInput = "";
-        const created = await postCreateRoom({
+        let created = await postCreateRoom({
           room: roomInput,
           ownerName: currentPlayerName,
           numPlayers,
@@ -2037,6 +2037,27 @@ async function init() {
           p3Type: "human",
           p4Type: "human",
         });
+        if (!created.success && created.requiresForceReset) {
+          const ok = window.confirm(
+            created.message || "An active match exists. Reset room and create a new lobby?"
+          );
+          if (!ok) {
+            return;
+          }
+          created = await postCreateRoom({
+            room: created.room || roomInput,
+            ownerName: currentPlayerName,
+            numPlayers,
+            p1Type: "human",
+            p2Type: "human",
+            p3Type: "human",
+            p4Type: "human",
+            forceReset: true,
+          });
+        }
+        if (!created.success) {
+          throw new Error(created.message || "Could not create room.");
+        }
         rememberRoom(created.room || roomInput || "Room A");
         syncRoomToBrowserUrl(currentRoom);
         updateLobbyReadiness();
