@@ -209,6 +209,23 @@ function replaceGenericSeatNames(text, lobbyNames) {
   return out;
 }
 
+function ordinalLabel(n) {
+  const x = Number(n) || 0;
+  if (x % 100 >= 11 && x % 100 <= 13) {
+    return `${x}th`;
+  }
+  if (x % 10 === 1) {
+    return `${x}st`;
+  }
+  if (x % 10 === 2) {
+    return `${x}nd`;
+  }
+  if (x % 10 === 3) {
+    return `${x}rd`;
+  }
+  return `${x}th`;
+}
+
 function devCardCostEntries(cost) {
   const c = cost || {};
   const ordered = DEV_CARD_COST_ORDER.filter((g) => Number(c[g]) > 0).map((g) => [g, Number(c[g])]);
@@ -1177,12 +1194,15 @@ function renderState(state) {
     for (let i = 0; i < basePlayers.length; i++) {
       orderedPlayers.push(basePlayers[(i + playerViewOffset) % basePlayers.length]);
     }
-    orderedPlayers.forEach((p) => {
+    orderedPlayers.forEach((p, idx) => {
       const card = document.createElement("div");
       card.className = "player-card";
       if (p.name === currentDisplayName) {
         card.classList.add("current");
       }
+      const orderBadge = document.createElement("div");
+      orderBadge.className = "player-order-badge";
+      orderBadge.textContent = ordinalLabel(idx + 1);
       const name = document.createElement("div");
       name.className = "player-name";
       name.textContent = p.name;
@@ -1240,6 +1260,7 @@ function renderState(state) {
           : Object.values(p.bonuses || {}).reduce((sum, n) => sum + Number(n || 0), 0);
       extra.textContent = `${nobleText} · Reserved: ${p.reservedCount} · Bought: ${boughtCount} cards`;
 
+      card.appendChild(orderBadge);
       card.appendChild(name);
       card.appendChild(meta);
       if (afkMeta.textContent) {

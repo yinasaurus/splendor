@@ -1004,6 +1004,23 @@ main {
   margin-bottom: 2px;
 }
 
+.player-order-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 2.1rem;
+  margin-bottom: 3px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #fff4d6;
+  background: linear-gradient(180deg, #ffcf4d 0%, var(--accent) 50%, #b3740a 100%);
+  border: 1px solid rgba(255, 233, 180, 0.42);
+}
+
 .player-meta {
   font-size: 0.8rem;
   color: #c8e6c9;
