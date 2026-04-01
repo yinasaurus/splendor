@@ -785,7 +785,13 @@ function renderState(state) {
     const levelHeading = levelCol ? levelCol.querySelector("h3") : null;
     if (levelHeading) {
       const baseLabel = `LEVEL ${lvl}`;
-      levelHeading.textContent = `${baseLabel} · ${cards.length} left`;
+      const deckLeft =
+        state &&
+        state.deckRemaining &&
+        Number.isFinite(Number(state.deckRemaining[lvl]))
+          ? Number(state.deckRemaining[lvl])
+          : cards.length;
+      levelHeading.textContent = `${baseLabel} · ${deckLeft} left`;
     }
     cards.forEach((card, index) => {
       const li = document.createElement("li");
@@ -999,11 +1005,11 @@ function renderState(state) {
       bonusesRow.className = "pill-row";
       ["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX"].forEach((gem) => {
         const count = Number((p.bonuses || {})[gem] || 0);
+        if (count <= 0) {
+          return;
+        }
         const pill = document.createElement("div");
         pill.className = `pill gem-${gem}`;
-        if (count <= 0) {
-          pill.classList.add("pill--zero");
-        }
         pill.innerHTML = gemPillMarkup(gem, `+${count}`, "stone");
         bonusesRow.appendChild(pill);
       });
@@ -1064,7 +1070,9 @@ function renderState(state) {
         card.appendChild(afkBtn);
       }
       card.appendChild(gemsRow);
-      card.appendChild(bonusesRow);
+      if (bonusesRow.childElementCount > 0) {
+        card.appendChild(bonusesRow);
+      }
 
       const boughtList = Array.isArray(p.boughtCards) ? p.boughtCards : [];
       if (boughtList.length > 0) {
