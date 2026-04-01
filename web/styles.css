@@ -1659,7 +1659,20 @@ main {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #c8e6c9;
+}
+
+.player-bought-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 8px;
+}
+
+.player-bought-toggle {
+  margin-top: 0;
+  padding: 3px 8px;
+  font-size: 0.7rem;
 }
 
 .player-bought-slots {

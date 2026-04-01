@@ -44,6 +44,7 @@ const API_ROOM_ADDAI = `${API_BASE}/api/room/addai`;
 const API_ROOM_KICK = `${API_BASE}/api/room/kick`;
 let currentRoom = "Room A";
 const LAST_ROOM_KEY = "splendor.lastRoom";
+const LAST_NAME_KEY = "splendor.playerName";
 let playerViewOffset = 0;
 let currentPlayerName = "";
 let currentReady = false;
@@ -287,6 +288,27 @@ function getRememberedRoom() {
     return saved && saved.trim() ? saved.trim() : null;
   } catch (_) {
     return null;
+  }
+}
+
+function rememberPlayerName(name) {
+  const safeName = (name || "").trim();
+  if (!safeName) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(LAST_NAME_KEY, safeName);
+  } catch (_) {
+    // ignore storage errors
+  }
+}
+
+function getRememberedPlayerName() {
+  try {
+    const saved = window.localStorage.getItem(LAST_NAME_KEY);
+    return saved && saved.trim() ? saved.trim() : "";
+  } catch (_) {
+    return "";
   }
 }
 
@@ -913,12 +935,25 @@ function renderState(state) {
       if (boughtList.length > 0) {
         const boughtWrap = document.createElement("div");
         boughtWrap.className = "player-bought-row";
+        const boughtHeader = document.createElement("div");
+        boughtHeader.className = "player-bought-header";
         const boughtLabel = document.createElement("div");
         boughtLabel.className = "player-bought-label";
-        boughtLabel.textContent = "Bought cards";
-        boughtWrap.appendChild(boughtLabel);
+        boughtLabel.textContent = `Bought cards (${boughtList.length})`;
+        const boughtToggle = document.createElement("button");
+        boughtToggle.type = "button";
+        boughtToggle.className = "secondary small-btn player-bought-toggle";
+        boughtToggle.textContent = "Show";
+        boughtHeader.appendChild(boughtLabel);
+        boughtHeader.appendChild(boughtToggle);
+        boughtWrap.appendChild(boughtHeader);
         const boughtSlots = document.createElement("div");
         boughtSlots.className = "player-bought-slots";
+        boughtSlots.classList.add("hidden");
+        boughtToggle.addEventListener("click", () => {
+          const hidden = boughtSlots.classList.toggle("hidden");
+          boughtToggle.textContent = hidden ? "Show" : "Hide";
+        });
         boughtList.forEach((bc) => {
           const mini = document.createElement("div");
           mini.className = "purchased-mini";
@@ -1524,10 +1559,14 @@ async function init() {
       clearTransientUi();
       closeGuided();
       closeRulebook();
-      showWaitingRoom();
       startLiveSync();
       const state = await fetchState();
-      renderLobbyStatus(state);
+      if (state && state.lobby && state.lobby.gameStarted) {
+        enterGameUiFromState(state, true);
+      } else {
+        showWaitingRoom();
+        renderLobbyStatus(state);
+      }
       suppressRealtimeToasts = true;
       lastSeenActionCount = 0;
       lastSeenTurnNumber = null;
@@ -1644,6 +1683,15 @@ async function init() {
     const enteredName = getEnteredName();
     if (enteredName) {
       currentPlayerName = enteredName;
+      rememberPlayerName(currentPlayerName);
+      return currentPlayerName;
+    }
+    const remembered = getRememberedPlayerName();
+    if (remembered) {
+      currentPlayerName = remembered;
+      if (playerNameInput) {
+        playerNameInput.value = remembered;
+      }
       return currentPlayerName;
     }
     const fallback = generateFallbackName(preferredPrefix || "Guest");
@@ -1651,6 +1699,7 @@ async function init() {
     if (playerNameInput) {
       playerNameInput.value = fallback;
     }
+    rememberPlayerName(fallback);
     showToast(`Using temporary name: ${fallback}`);
     return currentPlayerName;
   }
@@ -1925,7 +1974,17 @@ async function init() {
 
   numPlayersSelect.addEventListener("change", updateLobbyReadiness);
   if (playerNameInput) {
-    playerNameInput.addEventListener("input", updateLobbyReadiness);
+    const remembered = getRememberedPlayerName();
+    if (remembered && !playerNameInput.value.trim()) {
+      playerNameInput.value = remembered;
+    }
+    playerNameInput.addEventListener("input", () => {
+      const v = (playerNameInput.value || "").trim();
+      if (v) {
+        rememberPlayerName(v);
+      }
+      updateLobbyReadiness();
+    });
   }
 
   // Initial state

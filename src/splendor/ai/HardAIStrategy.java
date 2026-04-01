@@ -37,6 +37,23 @@ public class HardAIStrategy implements AIStrategy {
 				}
 			}
 		}
+
+		// Block opponents from taking dangerous cards (especially potential winning buys).
+		Card blockingTarget = findBestBlockingCard(controller, aiPlayer);
+		if (blockingTarget != null) {
+			if (canAffordCard(blockingTarget, aiPlayer) && controller.purchaseCard(blockingTarget)) {
+				return "AI (Hard) blocked by purchasing: " + blockingTarget.toString();
+			}
+			if (aiPlayer.getReservedCards().size() < 3) {
+				for (int level = 1; level <= 3; level++) {
+					List<Card> visible = controller.getBoard().getVisibleCards(level);
+					int index = visible.indexOf(blockingTarget);
+					if (index >= 0 && controller.reserveCard(level, index)) {
+						return "AI (Hard) blocked by reserving: " + blockingTarget.toString();
+					}
+				}
+			}
+		}
 		
 		// Find best card considering long-term strategy
 		Card bestCard = findBestStrategicCard(controller, aiPlayer);
@@ -258,5 +275,53 @@ public class HardAIStrategy implements AIStrategy {
 		
 		// Fallback
 		return "AI (Hard) passed turn";
+	}
+
+	private Card findBestBlockingCard(GameController controller, Player aiPlayer) {
+		List<Player> all = controller.getPlayers();
+		List<Player> opponents = new ArrayList<>();
+		for (Player p : all) {
+			if (p != aiPlayer) {
+				opponents.add(p);
+			}
+		}
+		if (opponents.isEmpty()) {
+			return null;
+		}
+
+		double bestThreat = 0.0;
+		Card best = null;
+		int winningPoints = controller.getConfig().getWinningPoints();
+
+		for (int level = 1; level <= 3; level++) {
+			for (Card card : controller.getBoard().getVisibleCards(level)) {
+				double threat = 0.0;
+				for (Player opp : opponents) {
+					if (!canAffordCard(card, opp)) {
+						continue;
+					}
+					double thisOppThreat = card.getPrestigePoints() * 3.0 + evaluateCard(card, opp);
+					// Huge danger if opponent can win immediately by buying this card.
+					if (opp.getPrestigePoints() + card.getPrestigePoints() >= winningPoints) {
+						thisOppThreat += 100.0;
+					}
+					if (thisOppThreat > threat) {
+						threat = thisOppThreat;
+					}
+				}
+				if (threat <= 0.0) {
+					continue;
+				}
+				// Slightly prefer blocking cards that still help us.
+				double myValue = evaluateCard(card, aiPlayer);
+				double combined = threat + (myValue * 0.35);
+				if (combined > bestThreat) {
+					bestThreat = combined;
+					best = card;
+				}
+			}
+		}
+
+		return bestThreat > 8.0 ? best : null;
 	}
 }
