@@ -1070,8 +1070,9 @@ main {
 
 .level-deck-btn {
   margin-top: 0;
-  width: 84px;
-  min-height: 130px;
+  width: 108px;
+  min-height: 150px;
+  aspect-ratio: 5 / 7;
   padding: 8px 6px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -1149,6 +1150,7 @@ main {
   margin: 0;
   padding: 0;
   flex: 0 0 auto;
+  width: 108px;
 }
 
 .players {

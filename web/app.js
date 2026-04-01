@@ -2211,6 +2211,12 @@ async function init() {
   let liveSyncTimer = null;
   let liveSyncInFlight = false;
 
+  function isInActiveMatchUi() {
+    const inWaiting = waitingRoom && !waitingRoom.classList.contains("hidden");
+    const inGame = gameUi && !gameUi.classList.contains("hidden");
+    return !!(currentRoom && currentPlayerName && (inWaiting || inGame));
+  }
+
   // Safe default: always show lobby first, then auto-transition if rejoin/game restore succeeds.
   startScreen.classList.remove("hidden");
   waitingRoom.classList.add("hidden");
@@ -2847,6 +2853,12 @@ async function init() {
   }
   if (backToHomeBtn) {
     backToHomeBtn.addEventListener("click", () => {
+      if (isInActiveMatchUi()) {
+        const ok = window.confirm("Leave this room and return to lobby?");
+        if (!ok) {
+          return;
+        }
+      }
       showHome();
     });
   }
@@ -3015,7 +3027,20 @@ async function init() {
   window.addEventListener("mouseup", endGuidedDrag);
 
   document.getElementById("quit-game-btn").addEventListener("click", () => {
+    const ok = window.confirm("Quit this match and go back to menu?");
+    if (!ok) {
+      return;
+    }
     returnToMenu();
+  });
+
+  // Protect against accidental tab close/refresh while in waiting room or game.
+  window.addEventListener("beforeunload", (e) => {
+    if (!isInActiveMatchUi()) {
+      return;
+    }
+    e.preventDefault();
+    e.returnValue = "";
   });
 }
 

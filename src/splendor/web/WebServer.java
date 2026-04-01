@@ -829,7 +829,16 @@ public class WebServer {
 
 			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 			String room = extractStringField(body, "room", DEFAULT_ROOM);
-			GameSession session = getOrCreateSession(room);
+			GameSession session = getExistingSession(room);
+			if (session == null) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("sessionMissing", true);
+				resp.put("message", "Session expired. Please rejoin or create a new room.");
+				resp.put("room", cleanRoomName(room));
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			Map<String, Object> result = handleAction(session, body);
 			String json = toJson(result);
 			sendResponse(exchange, 200, json, "application/json; charset=utf-8");
