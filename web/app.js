@@ -639,6 +639,19 @@ function renderState(state) {
       boardGems.appendChild(pill);
     });
   }
+  // Mirror board supply counts into the Take Gems controls.
+  document.querySelectorAll(".take-gem-option").forEach((row) => {
+    const gem = row.getAttribute("data-gem");
+    if (!gem) {
+      return;
+    }
+    const supplyEl = row.querySelector(".take-gem-option__supply");
+    if (!supplyEl) {
+      return;
+    }
+    const count = state.gems && Number.isFinite(Number(state.gems[gem])) ? Number(state.gems[gem]) : 0;
+    supplyEl.textContent = `Board: ${count}`;
+  });
 
   // Nobles
   nobles.innerHTML = "";
@@ -1195,10 +1208,11 @@ function setupGemSelection() {
   gemTypes.forEach((gem) => {
     const row = document.createElement("div");
     row.className = `pill gem-${gem} take-gem-option`;
+    row.setAttribute("data-gem", gem);
 
     const preview = document.createElement("div");
     preview.className = "take-gem-option__preview";
-    preview.innerHTML = gemPillMarkup(gem, gem, "stone");
+    preview.innerHTML = `${gemPillMarkup(gem, gem, "stone")}<span class="take-gem-option__supply">Board: 0</span>`;
 
     const controls = document.createElement("div");
     controls.className = "take-gem-option__controls";

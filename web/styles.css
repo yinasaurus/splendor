@@ -1059,6 +1059,17 @@ main {
 
 .take-gem-option__preview {
   min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.take-gem-option__supply {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #b7c4e8;
+  letter-spacing: 0.01em;
 }
 
 .take-gem-option__controls {
