@@ -1053,7 +1053,10 @@ async function init() {
   const p2Type = document.getElementById("player2-type");
   const p3Type = document.getElementById("player3-type");
   const p4Type = document.getElementById("player4-type");
-  const roomNameInput = document.getElementById("room-name");
+  const joinRoomDialog = document.getElementById("join-room-dialog");
+  const joinRoomCodeInput = document.getElementById("join-room-code-input");
+  const joinDialogCancel = document.getElementById("join-dialog-cancel");
+  const joinDialogConfirm = document.getElementById("join-dialog-confirm");
   const playerNameInput = document.getElementById("player-name");
   const waitingPlayerNameInput = document.getElementById("waiting-player-name");
   const waitingRoomCode = document.getElementById("waiting-room-code");
@@ -1142,7 +1145,7 @@ async function init() {
   }
 
   function updateLobbyReadiness() {
-    const roomSet = !roomNameInput || roomNameInput.value.trim().length > 0;
+    const nameOk = playerNameInput && playerNameInput.value.trim().length > 0;
     startBtn.disabled = true;
     startGuidedBtn.disabled = false;
     if (createRoomBtn) {
@@ -1152,10 +1155,59 @@ async function init() {
       readyBtn.disabled = !currentRoom;
     }
     if (joinRoomBtn) {
-      joinRoomBtn.disabled = !roomSet;
+      joinRoomBtn.disabled = !nameOk;
     }
     if (rejoinRoomBtn) {
-      rejoinRoomBtn.disabled = !roomSet;
+      rejoinRoomBtn.disabled = !getRememberedRoom();
+    }
+  }
+
+  function openJoinRoomDialog() {
+    if (!joinRoomDialog || !joinRoomCodeInput) {
+      return;
+    }
+    joinRoomCodeInput.value = getRememberedRoom() || "";
+    joinRoomDialog.classList.remove("hidden");
+    joinRoomCodeInput.focus();
+    joinRoomCodeInput.select();
+  }
+
+  function closeJoinRoomDialog() {
+    joinRoomDialog?.classList.add("hidden");
+  }
+
+  async function submitJoinFromDialog() {
+    const code = joinRoomCodeInput ? String(joinRoomCodeInput.value || "").trim() : "";
+    if (!code) {
+      showToast("Enter the host’s game code.", "error");
+      return;
+    }
+    try {
+      rememberRoom(code);
+      const joined = await postJoinRoom({ room: currentRoom, name: currentPlayerName });
+      if (!joined.success) {
+        alert(joined.message || "Could not join room.");
+        return;
+      }
+      closeJoinRoomDialog();
+      clearTransientUi();
+      closeGuided();
+      tutorialPanel.classList.add("hidden");
+      showWaitingRoom();
+      const state = await fetchState();
+      renderLobbyStatus(state);
+      suppressRealtimeToasts = true;
+      lastSeenActionCount = 0;
+      lastSeenTurnNumber = null;
+      randomizePlayerView(state);
+      showToast(`Joined game code: ${currentRoom}`);
+      if (rejoinRoomBtn) {
+        rejoinRoomBtn.classList.remove("hidden");
+      }
+    } catch (e) {
+      const message = e && e.message ? e.message : "Could not join room.";
+      showToast(message, "error");
+      alert(message);
     }
   }
 
@@ -1277,9 +1329,10 @@ async function init() {
           p4Type: p4Type.value,
         });
         rememberRoom(created.room || roomInput || "Room A");
-        if (roomNameInput) {
-          roomNameInput.value = currentRoom;
+        if (rejoinRoomBtn) {
+          rejoinRoomBtn.classList.remove("hidden");
         }
+        updateLobbyReadiness();
         showWaitingRoom();
         showToast(`Room created: ${currentRoom}`);
         const state = await fetchState();
@@ -1294,7 +1347,7 @@ async function init() {
 
   startGuidedBtn.addEventListener("click", async () => {
     try {
-      rememberRoom(roomNameInput && roomNameInput.value.trim() ? roomNameInput.value.trim() : "Room A");
+      rememberRoom(getRememberedRoom() || "Room A");
       clearTransientUi();
       closeGuided();
       tutorialPanel.classList.add("hidden");
@@ -1332,38 +1385,43 @@ async function init() {
   });
 
   if (joinRoomBtn) {
-    joinRoomBtn.addEventListener("click", async () => {
-      try {
-        const enteredName = getEnteredName();
-        if (!enteredName) {
-          showToast("Please enter your name first.", "error");
-          return;
-        }
-        currentPlayerName = enteredName;
-        rememberRoom(roomNameInput && roomNameInput.value.trim() ? roomNameInput.value.trim() : "Room A");
-        const joined = await postJoinRoom({ room: currentRoom, name: currentPlayerName });
-        if (!joined.success) {
-          alert(joined.message || "Could not join room.");
-          return;
-        }
-        clearTransientUi();
-        closeGuided();
-        tutorialPanel.classList.add("hidden");
-        showWaitingRoom();
-        const state = await fetchState();
-        renderLobbyStatus(state);
-        suppressRealtimeToasts = true;
-        lastSeenActionCount = 0;
-        lastSeenTurnNumber = null;
-        randomizePlayerView(state);
-        showToast(`Joined game code: ${currentRoom}`);
-      } catch (e) {
-        const message = e && e.message ? e.message : "Could not join room.";
-        showToast(message, "error");
-        alert(message);
+    joinRoomBtn.addEventListener("click", () => {
+      const enteredName = getEnteredName();
+      if (!enteredName) {
+        showToast("Please enter your name first.", "error");
+        return;
+      }
+      currentPlayerName = enteredName;
+      openJoinRoomDialog();
+    });
+  }
+
+  if (joinDialogCancel) {
+    joinDialogCancel.addEventListener("click", () => closeJoinRoomDialog());
+  }
+  if (joinDialogConfirm) {
+    joinDialogConfirm.addEventListener("click", () => submitJoinFromDialog());
+  }
+  if (joinRoomDialog) {
+    joinRoomDialog.addEventListener("click", (e) => {
+      if (e.target === joinRoomDialog) {
+        closeJoinRoomDialog();
       }
     });
   }
+  if (joinRoomCodeInput) {
+    joinRoomCodeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        submitJoinFromDialog();
+      }
+    });
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && joinRoomDialog && !joinRoomDialog.classList.contains("hidden")) {
+      closeJoinRoomDialog();
+    }
+  });
 
   if (readyBtn) {
     readyBtn.addEventListener("click", async () => {
@@ -1444,9 +1502,6 @@ async function init() {
         return;
       }
       rememberRoom(remembered);
-      if (roomNameInput) {
-        roomNameInput.value = remembered;
-      }
       try {
         const state = await fetchState();
         showWaitingRoom();
@@ -1490,18 +1545,12 @@ async function init() {
   });
 
   numPlayersSelect.addEventListener("change", updatePlayerRows);
-  if (roomNameInput) {
-    roomNameInput.addEventListener("input", updateLobbyReadiness);
-  }
   if (playerNameInput) {
     playerNameInput.addEventListener("input", updateLobbyReadiness);
   }
 
   // Initial state
   const remembered = getRememberedRoom();
-  if (remembered && roomNameInput) {
-    roomNameInput.value = remembered;
-  }
   if (rejoinRoomBtn) {
     rejoinRoomBtn.classList.toggle("hidden", !remembered);
   }

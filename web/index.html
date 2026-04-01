@@ -18,9 +18,8 @@
         <h2>Lobby</h2>
         <p class="hint">Choose Create Room or Join Room.</p>
         <p class="hint small lobby-flow-hint">
-          <strong>Create Room</strong> if you host: you’ll get a short <strong>game code</strong> in the waiting room to share with friends.
-          <strong>Join Room</strong> if you were invited: enter <em>their</em> code below so everyone loads the same match.
-          (You don’t need the code field when you’re only creating.)
+          <strong>Create Room</strong> if you host—you’ll see the game code in the <strong>waiting room</strong> to share.
+          <strong>Join Room</strong> opens a prompt to type the host’s code (nothing to fill on this screen for joining).
         </p>
         <label>Your name:
           <input id="player-name" type="text" value="" placeholder="Enter your name">
@@ -33,12 +32,6 @@
             <option value="4">4 players</option>
           </select>
         </label>
-        </div>
-        <div id="join-room-fields">
-        <label>Game Code:
-          <input id="room-name" type="text" value="" placeholder="Join only: enter host code (e.g. SP-ABC123)">
-        </label>
-        <p class="hint small">Host shares this code. Friends enter the same code to join the same match.</p>
         </div>
         <div class="player-types">
           <div class="player-type-row">
@@ -91,6 +84,20 @@
           </div>
         </div>
       </section>
+
+      <div id="join-room-dialog" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="join-dialog-title">
+        <div class="modal-panel">
+          <h3 id="join-dialog-title">Join a game</h3>
+          <p class="hint small">Enter the code the host shared (from their waiting room).</p>
+          <label class="modal-field">Game code
+            <input id="join-room-code-input" type="text" autocomplete="off" placeholder="e.g. SP-ABC123">
+          </label>
+          <div class="modal-actions">
+            <button id="join-dialog-cancel" type="button" class="secondary">Cancel</button>
+            <button id="join-dialog-confirm" type="button">Join</button>
+          </div>
+        </div>
+      </div>
 
       <section id="waiting-room" class="panel hidden">
         <h2>Waiting Room</h2>
