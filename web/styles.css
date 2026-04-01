@@ -1554,7 +1554,9 @@ main {
   border-radius: 12px;
   border: 1px solid rgba(232, 163, 23, 0.24);
   background: rgba(10, 12, 20, 0.6);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   max-height: 0;
   opacity: 0;
   transform: translateY(-4px);
@@ -1583,6 +1585,12 @@ main {
   margin-top: 8px;
   margin-bottom: 8px;
   gap: 8px;
+}
+
+@media (max-width: 639px) {
+  .discard-panel.discard-panel--open {
+    max-height: 56vh;
+  }
 }
 
 .discard-panel__actions {
