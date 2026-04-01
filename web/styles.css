@@ -9,6 +9,9 @@
   --accent: #f9a825;
   --accent-dim: rgba(249, 168, 37, 0.35);
   --text-muted: #9aa0b4;
+  /* Overridden in app.js when window.__SPLENDOR_MEDIA_BASE__ is set */
+  --splendor-chip-sprite: url("media/chips.jpg");
+  --splendor-gem-sprite: url("media/gems.png");
 }
 
 body {
@@ -259,11 +262,91 @@ main {
   line-height: 1;
 }
 
-.gem-pill-icon {
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
+/* Sprite sheets: chips.jpg 750×125 (6×125 tokens); gems.png 450×74 (5×90 faceted), order ONYX→SAPPHIRE→DIAMOND→EMERALD→RUBY */
+.gem-sprite {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+.gem-sprite--chip {
+  --d: 1.7rem;
+  width: var(--d);
+  height: var(--d);
+  background-image: var(--splendor-chip-sprite);
+  background-size: calc(var(--d) * 6) var(--d);
+}
+
+.gem-sprite--chip.gem-sprite--ONYX {
+  background-position: 0 0;
+}
+
+.gem-sprite--chip.gem-sprite--SAPPHIRE {
+  background-position: calc(-1 * var(--d)) 0;
+}
+
+.gem-sprite--chip.gem-sprite--DIAMOND {
+  background-position: calc(-2 * var(--d)) 0;
+}
+
+.gem-sprite--chip.gem-sprite--EMERALD {
+  background-position: calc(-3 * var(--d)) 0;
+}
+
+.gem-sprite--chip.gem-sprite--RUBY {
+  background-position: calc(-4 * var(--d)) 0;
+}
+
+.gem-sprite--chip.gem-sprite--GOLD {
+  background-position: calc(-5 * var(--d)) 0;
+}
+
+.gem-sprite--stone {
+  --gw: 1.45rem;
+  --gh: calc(var(--gw) * 74 / 90);
+  width: var(--gw);
+  height: var(--gh);
+  background-image: var(--splendor-gem-sprite);
+  background-size: calc(var(--gw) * 5) var(--gh);
+}
+
+.gem-sprite--stone.gem-sprite--ONYX {
+  background-position: 0 0;
+}
+
+.gem-sprite--stone.gem-sprite--SAPPHIRE {
+  background-position: calc(-1 * var(--gw)) 0;
+}
+
+.gem-sprite--stone.gem-sprite--DIAMOND {
+  background-position: calc(-2 * var(--gw)) 0;
+}
+
+.gem-sprite--stone.gem-sprite--EMERALD {
+  background-position: calc(-3 * var(--gw)) 0;
+}
+
+.gem-sprite--stone.gem-sprite--RUBY {
+  background-position: calc(-4 * var(--gw)) 0;
+}
+
+#board-gems .gem-sprite--chip {
+  --d: 2rem;
+}
+
+.take-gem-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  padding: 10px 14px;
+  min-width: 5.75rem;
+}
+
+.take-gem-option .gem-sprite--chip {
+  --d: 2.4rem;
 }
 
 .pill.gem-RUBY {
@@ -295,6 +378,14 @@ main {
 .pill.gem-GOLD {
   background: #fbc02d;
   color: #111;
+}
+
+/* Let chip/gem artwork read clearly (overrides solid gem-* pill fills above). */
+.pill:has(.gem-sprite--chip),
+.pill:has(.gem-sprite--stone) {
+  background: rgba(16, 18, 26, 0.92);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #eef1f8;
 }
 
 .card-list {
@@ -395,6 +486,287 @@ main {
 }
 
 .card-actions .card-buy-btn:not(:disabled):hover {
+  filter: brightness(1.06);
+}
+
+/* —— Development cards (Splendor-style face) —— */
+.dev-card-list {
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 12px;
+}
+
+.dev-card {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(6, 8, 14, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.dev-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.dev-card__face {
+  position: relative;
+  flex: 1;
+  min-height: 168px;
+  aspect-ratio: 5 / 7;
+  border-radius: 10px 10px 0 0;
+  overflow: hidden;
+}
+
+.dev-card__bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+}
+
+/* Level theming when no custom image is set (original gradients, not Splendor art). */
+.dev-card--level-1 .dev-card__bg {
+  background-image:
+    radial-gradient(ellipse 120% 80% at 20% 20%, rgba(255, 253, 231, 0.22), transparent 55%),
+    radial-gradient(ellipse 90% 70% at 80% 75%, rgba(129, 199, 132, 0.35), transparent 50%),
+    linear-gradient(165deg, #1a2a1f 0%, #0d1510 45%, #1e3d2a 100%);
+}
+
+.dev-card--level-2 .dev-card__bg {
+  background-image:
+    radial-gradient(ellipse 100% 70% at 15% 30%, rgba(144, 202, 249, 0.28), transparent 50%),
+    radial-gradient(ellipse 80% 60% at 85% 80%, rgba(66, 165, 245, 0.2), transparent 45%),
+    linear-gradient(165deg, #152238 0%, #0c1422 50%, #1a3050 100%);
+}
+
+.dev-card--level-3 .dev-card__bg {
+  background-image:
+    radial-gradient(ellipse 90% 70% at 25% 25%, rgba(255, 183, 77, 0.35), transparent 48%),
+    radial-gradient(ellipse 100% 80% at 75% 70%, rgba(229, 57, 53, 0.22), transparent 52%),
+    linear-gradient(165deg, #2a1810 0%, #140a08 45%, #3d1e18 100%);
+}
+
+.dev-card__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.55) 0%, transparent 38%, transparent 58%, rgba(0, 0, 0, 0.65) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0.35) 0%, transparent 45%);
+}
+
+.dev-card--per-card-art .dev-card__vignette {
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.38) 0%, transparent 36%, transparent 60%, rgba(0, 0, 0, 0.52) 100%),
+    linear-gradient(to right, rgba(0, 0, 0, 0.22) 0%, transparent 42%);
+}
+
+.dev-card__prestige {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  z-index: 2;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.75rem, 5vw, 2.35rem);
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  text-shadow:
+    0 0 12px rgba(0, 0, 0, 0.85),
+    0 2px 4px rgba(0, 0, 0, 0.9);
+  min-height: 1em;
+}
+
+.dev-card__bonus {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.dev-card__bonus-sprite {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.dev-card__bonus-sprite .gem-sprite--stone,
+.dev-card__bonus-sprite .gem-sprite--chip {
+  --gw: 2.05rem;
+  --d: 2.05rem;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.65));
+}
+
+.dev-card__costs {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  max-height: calc(100% - 56px);
+  overflow-y: auto;
+  flex-wrap: nowrap;
+  padding-right: 4px;
+}
+
+.dev-card__cost {
+  flex-shrink: 0;
+  width: 34px;
+  min-height: 48px;
+  padding: 4px 2px 5px;
+  border-radius: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.dev-card__cost .gem-sprite--stone,
+.dev-card__cost .gem-sprite--chip {
+  --gw: 1.05rem;
+  --d: 1.05rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+}
+
+.dev-card__cost-num {
+  font-size: 0.78rem;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.dev-card__cost--DIAMOND {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    inset 0 0 14px rgba(236, 239, 241, 0.2);
+}
+
+.dev-card__cost--SAPPHIRE {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    inset 0 0 14px rgba(66, 165, 245, 0.22);
+}
+
+.dev-card__cost--EMERALD {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    inset 0 0 14px rgba(102, 187, 106, 0.22);
+}
+
+.dev-card__cost--RUBY {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    inset 0 0 14px rgba(239, 83, 80, 0.22);
+}
+
+.dev-card__cost--ONYX {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    inset 0 0 14px rgba(120, 144, 156, 0.12);
+}
+
+.dev-card__cost--GOLD {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    inset 0 0 14px rgba(255, 213, 79, 0.2);
+}
+
+.dev-card__slot {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 2;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.dev-card__chrome {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 8px 10px;
+  background: rgba(10, 12, 18, 0.98);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dev-card__status {
+  align-self: flex-start;
+  font-size: 0.72rem !important;
+  padding: 3px 8px !important;
+}
+
+.dev-card__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dev-card__actions button {
+  margin-top: 0;
+  padding: 5px 10px;
+  font-size: 0.76rem;
+  border-radius: 6px;
+  flex: 1 1 auto;
+  min-width: 64px;
+}
+
+.dev-card__actions .card-buy-btn:disabled,
+.dev-card__actions button.card-buy-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+  box-shadow: none;
+}
+
+.dev-card__actions .card-buy-btn:disabled:hover,
+.dev-card__actions button.card-buy-btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+  opacity: 0.38;
+}
+
+.dev-card__actions .card-buy-btn:not(:disabled):hover {
   filter: brightness(1.06);
 }
 
@@ -893,11 +1265,83 @@ button.secondary:hover:not(:disabled) {
     max-height: min(28vh, 210px);
   }
 
+  .dev-card-list {
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+    gap: 10px;
+  }
+
+  .dev-card__face {
+    min-height: 152px;
+  }
+
+  .dev-card__bonus {
+    min-width: 38px;
+    min-height: 38px;
+    padding: 3px;
+  }
+
+  .dev-card__bonus-sprite .gem-sprite--stone,
+  .dev-card__bonus-sprite .gem-sprite--chip {
+    --gw: 1.85rem;
+    --d: 1.85rem;
+  }
 }
 
 @media (max-width: 520px) {
   header h1 {
     font-size: 1.65rem;
+  }
+
+  .dev-card-list {
+    grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+    gap: 8px;
+  }
+
+  .dev-card__face {
+    min-height: 140px;
+    aspect-ratio: 5 / 7;
+  }
+
+  .dev-card__prestige {
+    font-size: clamp(1.45rem, 6vw, 1.9rem);
+    top: 6px;
+    left: 8px;
+  }
+
+  .dev-card__cost {
+    width: 30px;
+    min-height: 42px;
+    padding: 3px 2px 4px;
+  }
+
+  .dev-card__cost .gem-sprite--stone,
+  .dev-card__cost .gem-sprite--chip {
+    --gw: 0.92rem;
+    --d: 0.92rem;
+  }
+
+  .dev-card__cost-num {
+    font-size: 0.7rem;
+  }
+
+  .dev-card__costs {
+    gap: 4px;
+    left: 6px;
+    bottom: 6px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    max-width: calc(100% - 52px);
+    max-height: none;
+    align-content: flex-end;
+  }
+
+  .dev-card__actions {
+    flex-direction: column;
+  }
+
+  .dev-card__actions button {
+    width: 100%;
+    min-width: 0;
   }
 }
 

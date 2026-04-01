@@ -12,6 +12,24 @@ function resolveApiBase() {
 }
 
 const API_BASE = resolveApiBase();
+
+(function splendorApplyMediaSpriteCss() {
+  if (typeof document === "undefined") {
+    return;
+  }
+  try {
+    const base =
+      typeof window !== "undefined" && window.__SPLENDOR_MEDIA_BASE__ != null
+        ? String(window.__SPLENDOR_MEDIA_BASE__).trim().replace(/\/+$/, "")
+        : "";
+    const p = base ? `${base}/` : "";
+    document.documentElement.style.setProperty("--splendor-chip-sprite", `url("${p}media/chips.jpg")`);
+    document.documentElement.style.setProperty("--splendor-gem-sprite", `url("${p}media/gems.png")`);
+  } catch (_) {
+    /* ignore */
+  }
+})();
+
 const API_STATE = `${API_BASE}/api/state`;
 const API_ACTION = `${API_BASE}/api/action`;
 const API_NEW_GAME = `${API_BASE}/api/newgame`;
@@ -76,30 +94,108 @@ let lastSeenTurnNumber = null;
 let lastSeenActionCount = 0;
 let suppressRealtimeToasts = true;
 
-const GEM_ICON_URI = {
-  RUBY:
-    "data:image/svg+xml;utf8," +
-    encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polygon points='12,2 20,9 16,21 8,21 4,9' fill='%23ef5350' stroke='%23b71c1c' stroke-width='1.8'/><polygon points='12,4.8 17.2,9.4 14.7,18.7 9.3,18.7 6.8,9.4' fill='%23ffcdd2' opacity='0.35'/></svg>"),
-  EMERALD:
-    "data:image/svg+xml;utf8," +
-    encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polygon points='12,2 20,9 16,21 8,21 4,9' fill='%2366bb6a' stroke='%231b5e20' stroke-width='1.8'/><polygon points='12,4.8 17.2,9.4 14.7,18.7 9.3,18.7 6.8,9.4' fill='%23e8f5e9' opacity='0.35'/></svg>"),
-  SAPPHIRE:
-    "data:image/svg+xml;utf8," +
-    encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polygon points='12,2 20,9 16,21 8,21 4,9' fill='%2342a5f5' stroke='%230d47a1' stroke-width='1.8'/><polygon points='12,4.8 17.2,9.4 14.7,18.7 9.3,18.7 6.8,9.4' fill='%23e3f2fd' opacity='0.35'/></svg>"),
-  DIAMOND:
-    "data:image/svg+xml;utf8," +
-    encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polygon points='12,2 20,9 16,21 8,21 4,9' fill='%23eceff1' stroke='%2390a4ae' stroke-width='1.8'/><polygon points='12,4.8 17.2,9.4 14.7,18.7 9.3,18.7 6.8,9.4' fill='%23ffffff' opacity='0.55'/></svg>"),
-  ONYX:
-    "data:image/svg+xml;utf8," +
-    encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polygon points='12,2 20,9 16,21 8,21 4,9' fill='%23263238' stroke='%23000000' stroke-width='1.8'/><polygon points='12,4.8 17.2,9.4 14.7,18.7 9.3,18.7 6.8,9.4' fill='%23b0bec5' opacity='0.2'/></svg>"),
-  GOLD:
-    "data:image/svg+xml;utf8," +
-    encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><polygon points='12,2 20,9 16,21 8,21 4,9' fill='%23ffd54f' stroke='%23f57f17' stroke-width='1.8'/><polygon points='12,4.8 17.2,9.4 14.7,18.7 9.3,18.7 6.8,9.4' fill='%23fff8e1' opacity='0.4'/></svg>"),
-};
+const KNOWN_GEMS = new Set(["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"]);
 
-function gemPillMarkup(gem, text) {
-  const icon = GEM_ICON_URI[gem] || GEM_ICON_URI.DIAMOND;
-  return `<span class="gem-pill-content"><img class="gem-pill-icon" src="${icon}" alt="${gem} gem" /><span>${text}</span></span>`;
+/**
+ * Sprite sheets (see web/media): chips.jpg = 6 tokens ONYX…GOLD; gems.png = 5 faceted gems ONYX…RUBY.
+ * kind "chip" = table tokens (board, hand, take gems). kind "stone" = faceted gems (card bonus, costs, noble reqs). GOLD always uses chip art.
+ */
+function gemSpriteMarkup(gem, kind) {
+  const raw = gem && String(gem);
+  const g = KNOWN_GEMS.has(raw) ? raw : "DIAMOND";
+  const useChip = kind !== "stone" || g === "GOLD";
+  const type = useChip ? "chip" : "stone";
+  return `<span class="gem-sprite gem-sprite--${type} gem-sprite--${g}" role="img" aria-hidden="true"></span>`;
+}
+
+function gemPillMarkup(gem, text, kind = "chip") {
+  return `<span class="gem-pill-content">${gemSpriteMarkup(gem, kind)}<span>${text}</span></span>`;
+}
+
+/** Splendor-style cost column order (white → black). */
+const DEV_CARD_COST_ORDER = ["DIAMOND", "SAPPHIRE", "EMERALD", "RUBY", "ONYX"];
+
+function gemDisplayName(gemEnum) {
+  switch (gemEnum) {
+    case "RUBY":
+      return "Ruby";
+    case "EMERALD":
+      return "Emerald";
+    case "SAPPHIRE":
+      return "Sapphire";
+    case "DIAMOND":
+      return "Diamond";
+    case "ONYX":
+      return "Onyx";
+    case "GOLD":
+      return "Gold";
+    default:
+      return gemEnum || "";
+  }
+}
+
+function devCardCostEntries(cost) {
+  const c = cost || {};
+  const ordered = DEV_CARD_COST_ORDER.filter((g) => Number(c[g]) > 0).map((g) => [g, Number(c[g])]);
+  const extras = Object.entries(c)
+    .filter(([g, n]) => Number(n) > 0 && !DEV_CARD_COST_ORDER.includes(g))
+    .map(([g, n]) => [g, Number(n)]);
+  return ordered.concat(extras);
+}
+
+/**
+ * Filename pattern used in hexanome-04/splendor development-cards (01.jpg … 09.jpg, 010.jpg … 099.jpg, 100.jpg).
+ * See https://github.com/hexanome-04/splendor/tree/d1797acf5d43c6bc512b57ef3c1d990006a49a5c/client/public/images/development-cards
+ */
+function splendorHexanomeDevCardFilename(globalIndex) {
+  const x = Math.max(1, Math.min(999, Math.floor(Number(globalIndex)) || 1));
+  if (x < 10) {
+    return `0${x}.jpg`;
+  }
+  if (x < 100) {
+    return `0${String(x).padStart(2, "0")}.jpg`;
+  }
+  return `${x}.jpg`;
+}
+
+/**
+ * Maps our loader ids (level*1000 + rowInLevel) to a global art index 1–90 like standard Splendor (40 + 30 + 20).
+ * Override with window.__SPLENDOR_DEV_CARD_ART_INDEX__(level, cardId, seqInLevel) if your CSV order differs.
+ */
+function splendorDefaultDevCardGlobalIndex(level, cardId) {
+  const cid = Number(cardId);
+  const seq = Number.isFinite(cid) && cid > 0 ? cid % 1000 : 1;
+  if (level === 1) {
+    return seq;
+  }
+  if (level === 2) {
+    return 40 + seq;
+  }
+  return 70 + seq;
+}
+
+function resolveDevCardArtImageUrl(level, card) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const rawBase = window.__SPLENDOR_DEV_CARD_ART_BASE__;
+  const base = typeof rawBase === "string" ? rawBase.trim().replace(/\/+$/, "") : "";
+  if (!base) {
+    return null;
+  }
+  const cardId = card && card.id != null ? Number(card.id) : NaN;
+  const seqInLevel = Number.isFinite(cardId) && cardId > 0 ? cardId % 1000 : 1;
+  let globalIdx;
+  if (typeof window.__SPLENDOR_DEV_CARD_ART_INDEX__ === "function") {
+    globalIdx = window.__SPLENDOR_DEV_CARD_ART_INDEX__(level, cardId, seqInLevel);
+  } else {
+    globalIdx = splendorDefaultDevCardGlobalIndex(level, cardId);
+  }
+  if (!Number.isFinite(globalIdx) || globalIdx < 1) {
+    globalIdx = 1;
+  }
+  const file = splendorHexanomeDevCardFilename(globalIdx);
+  return `${base}/${file}`;
 }
 
 function showToast(message, type = "ok") {
@@ -403,7 +499,7 @@ function renderState(state) {
       Object.entries(req).forEach(([gem, count]) => {
         const pill = document.createElement("div");
         pill.className = `pill gem-${gem}`;
-        pill.innerHTML = gemPillMarkup(gem, `${gem[0]}:${count}`);
+        pill.innerHTML = gemPillMarkup(gem, `${gem[0]}:${count}`, "stone");
         row.appendChild(pill);
       });
 
@@ -419,73 +515,85 @@ function renderState(state) {
     const cards = state.levels?.[lvl] || [];
     cards.forEach((card, index) => {
       const li = document.createElement("li");
-      li.className = "card-item";
+      li.className = `dev-card dev-card--level-${lvl}`;
       li.style.cursor = "pointer";
 
       const cost = card.cost || {};
-      const bonusAbbr = card.bonusAbbr || "";
       const bonusGem = card.bonusGem || "";
+      const bonusName = gemDisplayName(bonusGem);
+      const pts = Number(card.points) || 0;
+      const costDesc = devCardCostEntries(cost)
+        .map(([g, n]) => `${n} ${gemDisplayName(g)}`)
+        .join(", ");
+      li.setAttribute(
+        "aria-label",
+        `Level ${lvl} development card, ${pts} prestige, ${bonusName} bonus. Cost: ${costDesc || "none"}.`
+      );
 
-      function gemName(gemEnum) {
-        switch (gemEnum) {
-          case "RUBY":
-            return "Ruby";
-          case "EMERALD":
-            return "Emerald";
-          case "SAPPHIRE":
-            return "Sapphire";
-          case "DIAMOND":
-            return "Diamond";
-          case "ONYX":
-            return "Onyx";
-          default:
-            return gemEnum || "";
-        }
+      const face = document.createElement("div");
+      face.className = "dev-card__face";
+
+      const bg = document.createElement("div");
+      bg.className = "dev-card__bg";
+      const perCardArt = resolveDevCardArtImageUrl(lvl, card);
+      const bgMap =
+        typeof window !== "undefined" && window.__SPLENDOR_DEV_CARD_BG__ && typeof window.__SPLENDOR_DEV_CARD_BG__ === "object"
+          ? window.__SPLENDOR_DEV_CARD_BG__
+          : null;
+      if (perCardArt) {
+        bg.style.backgroundImage = `url(${JSON.stringify(perCardArt)})`;
+        li.classList.add("dev-card--per-card-art");
+      } else if (bgMap && bgMap[lvl]) {
+        bg.style.backgroundImage = `url(${JSON.stringify(String(bgMap[lvl]))})`;
       }
 
-      li.innerHTML = `
-        <div class="card-header">
-          <span class="card-index">[${index}]</span>
-          <span>Level ${lvl}</span>
-          <span class="card-points">+${card.points} pts</span>
-        </div>
-      `;
+      const vignette = document.createElement("div");
+      vignette.className = "dev-card__vignette";
+      vignette.setAttribute("aria-hidden", "true");
 
-      const statusRow = document.createElement("div");
-      statusRow.className = "pill-row";
-      const affordability = document.createElement("div");
-      affordability.className = "pill " + (card.affordable ? "affordable" : "not-affordable");
-      affordability.textContent = card.affordable ? "Affordable now" : "Need more gems";
-      statusRow.appendChild(affordability);
+      const prestige = document.createElement("div");
+      prestige.className = "dev-card__prestige";
+      prestige.textContent = pts > 0 ? String(pts) : "";
+      prestige.setAttribute("aria-hidden", "true");
 
-      // Bonus pill
-      const bonusRow = document.createElement("div");
-      bonusRow.className = "pill-row card-bonus-row";
-      const bonusPill = document.createElement("div");
-      bonusPill.className = `pill gem-${bonusGem}`;
-      bonusPill.innerHTML = gemPillMarkup(bonusGem, `Bonus: ${bonusAbbr} (${gemName(bonusGem)} discount)`);
-      bonusRow.appendChild(bonusPill);
+      const bonusWrap = document.createElement("div");
+      bonusWrap.className = "dev-card__bonus";
+      const bonusSprite = document.createElement("span");
+      bonusSprite.className = "dev-card__bonus-sprite";
+      bonusSprite.innerHTML = gemSpriteMarkup(bonusGem || "DIAMOND", "stone");
+      bonusSprite.setAttribute("title", `${bonusName} bonus`);
+      bonusWrap.appendChild(bonusSprite);
 
-      // Cost pills
-      const costRow = document.createElement("div");
-      costRow.className = "pill-row card-cost-row";
-      const costLabel = document.createElement("div");
-      costLabel.className = "card-label";
-      costLabel.textContent = "Cost:";
-      costRow.appendChild(costLabel);
-      Object.entries(cost).forEach(([gem, count]) => {
-        const pill = document.createElement("div");
-        pill.className = `pill gem-${gem}`;
-        pill.innerHTML = gemPillMarkup(gem, `${gem[0]}:${count}`);
-        costRow.appendChild(pill);
+      const costsCol = document.createElement("div");
+      costsCol.className = "dev-card__costs";
+      devCardCostEntries(cost).forEach(([gem, count]) => {
+        const chip = document.createElement("div");
+        chip.className = `dev-card__cost dev-card__cost--${gem}`;
+        chip.innerHTML = `${gemSpriteMarkup(gem, "stone")}<span class="dev-card__cost-num">${count}</span>`;
+        chip.title = `${count} ${gemDisplayName(gem)}`;
+        costsCol.appendChild(chip);
       });
 
-      li.appendChild(bonusRow);
-      li.appendChild(costRow);
-      li.appendChild(statusRow);
+      const slotHint = document.createElement("span");
+      slotHint.className = "dev-card__slot";
+      slotHint.textContent = String(index);
+
+      face.appendChild(bg);
+      face.appendChild(vignette);
+      face.appendChild(prestige);
+      face.appendChild(bonusWrap);
+      face.appendChild(costsCol);
+      face.appendChild(slotHint);
+
+      const chrome = document.createElement("div");
+      chrome.className = "dev-card__chrome";
+
+      const affordability = document.createElement("div");
+      affordability.className = "dev-card__status pill " + (card.affordable ? "affordable" : "not-affordable");
+      affordability.textContent = card.affordable ? "Affordable" : "Not yet";
 
       const cardActions = document.createElement("div");
-      cardActions.className = "card-actions";
+      cardActions.className = "dev-card__actions";
       const buyBtn = document.createElement("button");
       buyBtn.type = "button";
       buyBtn.className = "card-buy-btn";
@@ -537,7 +645,10 @@ function renderState(state) {
 
       cardActions.appendChild(buyBtn);
       cardActions.appendChild(reserveBtn);
-      li.appendChild(cardActions);
+      chrome.appendChild(affordability);
+      chrome.appendChild(cardActions);
+      li.appendChild(face);
+      li.appendChild(chrome);
 
       li.addEventListener("click", async () => {
         if (!isHumanTurn) {
@@ -597,7 +708,7 @@ function renderState(state) {
       Object.entries(p.bonuses || {}).forEach(([gem, count]) => {
         const pill = document.createElement("div");
         pill.className = `pill gem-${gem}`;
-        pill.innerHTML = gemPillMarkup(gem, `+${count} ${gem}`);
+        pill.innerHTML = gemPillMarkup(gem, `+${count}`, "stone");
         bonusesRow.appendChild(pill);
       });
       const extra = document.createElement("div");
@@ -778,8 +889,9 @@ function setupGemSelection() {
   gemTypes.forEach((gem) => {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = `pill gem-${gem}`;
-    btn.textContent = gem;
+    btn.className = `pill gem-${gem} take-gem-option`;
+    btn.setAttribute("aria-label", `Toggle ${gem} for taking gems`);
+    btn.innerHTML = gemPillMarkup(gem, gem, "chip");
     btn.addEventListener("click", () => {
       const current = selected.get(gem) || 0;
       if (current === 0) {
@@ -1003,13 +1115,6 @@ async function init() {
     startScreen.classList.remove("hidden");
     gameUi.classList.add("hidden");
     if (videoPanel) videoPanel.classList.remove("hidden");
-  }
-
-  function getEnteredName() {
-    if (!playerNameInput) {
-      return "";
-    }
-    return (playerNameInput.value || "").trim();
   }
 
   function getEnteredName() {
