@@ -64,15 +64,17 @@ window.__SPLENDOR_DEV_CARD_ART_FILENAME__ = function (globalIdx) {
 // Noble portraits (optional): set a base folder + either id map/name map, or a filename function.
 // Example files: media/noble1.jpg, media/noble2.jpg, ...
 window.__SPLENDOR_NOBLE_ART_BASE__ = "media";
-window.__SPLENDOR_NOBLE_ART_FILENAME__ = function (noble) {
-  const id = Math.floor(Number(noble && noble.id));
-  if (!Number.isFinite(id) || id <= 0) {
-    return null;
-  }
-  if (id >= 1 && id <= 10) {
-    return `noble${id}.jpg`;
-  }
-  return "noble1.jpg";
+window.__SPLENDOR_NOBLE_ART_BY_ID__ = {
+  1: "media/noble1.jpg?v=2",
+  2: "media/noble2.jpg?v=2",
+  3: "media/noble3.jpg?v=2",
+  4: "media/noble4.jpg?v=2",
+  5: "media/noble5.jpg?v=2",
+  6: "media/noble6.jpg?v=2",
+  7: "media/noble7.jpg?v=2",
+  8: "media/noble8.jpg?v=2",
+  9: "media/noble9.jpg?v=2",
+  10: "media/noble10.jpg?v=2",
 };
 // Optional explicit mapping (overrides filename function when present):
 // window.__SPLENDOR_NOBLE_ART_BY_ID__ = { 1: "media/noble1.jpg", 2: "media/noble2.jpg" };

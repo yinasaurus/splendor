@@ -111,6 +111,7 @@ let lastSeenActionCount = 0;
 let suppressRealtimeToasts = true;
 let lastAutoRejoinAt = 0;
 let lastRecoveryToastAt = 0;
+let suppressRemovedToastUntil = 0;
 const expandedBoughtByPlayer = new Set();
 
 const KNOWN_GEMS = new Set(["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"]);
@@ -344,6 +345,13 @@ function resolveNobleArtImageUrl(noble) {
 }
 
 function showToast(message, type = "ok") {
+  const txt = String(message || "");
+  if (
+    txt === "You were removed from this room." &&
+    (tutorialFlags.active || Date.now() < suppressRemovedToastUntil)
+  ) {
+    return;
+  }
   const toast = document.getElementById("action-toast");
   if (!toast) {
     return;
@@ -791,15 +799,15 @@ const guidedSteps = [
 
   "Status bar (top)\n\nHere you see whose turn it is and whether the game has ended. When it is your turn, the Actions section below is yours to use.",
 
-  "Board Gems\n\nThese chips are the supply. On your turn you can take gems from here (rules: 3 different colors, or 2 of the same if enough remain). You cannot take gold directly by \"taking gems\"—gold usually comes from reserving.",
+  "Board Gems\n\nThese chips are the supply. Take either (1) 3 different colors, or (2) 2 of the same color only if at least 4 of that color are available. Gold is not taken via normal gem-taking.",
 
   "Take Gems\n\nOpen the Take Gems row, pick a legal combination, then press \"Confirm Take Gems\". Try it once so you have tokens to spend later.\n\nTip: you cannot hold more than 10 gems total.",
 
-  "Reserve a card\n\nUse a card's \"Reserve\" button (under each visible card).\n\n• Max 3 reserved cards.\n• Gain 1 gold if available.\n• Buy it later with \"Buy reserved\" on your player panel.\n\nReserve helps you lock a card before others take it.",
+  "Reserve a card\n\nUse a card's \"Reserve\" button (under each visible card).\n\n• Max 3 reserved cards.\n• Gain 1 gold token (joker) if available.\n• Buy it later with \"Buy reserved\" on your player panel.\n\nReserve helps you lock a card before others take it.",
 
   "Development cards — Level 1\n\nEach card shows its cost and a bonus gem color. After you buy a card, that color becomes a permanent discount on future purchases.",
 
-  "Purchase a visible card\n\nUse a card's \"Buy\" button (or click the card) when it is affordable. You pay with gems in hand plus permanent discounts from your bonuses. Try to buy one Level 1 card early.",
+  "Purchase a card\n\nUse a card's \"Buy\" button (or click the card) when it is affordable. You can buy from face-up cards or your reserved cards. Pay with gems in hand plus permanent bonuses; gold can be used as a joker for missing colors.",
 
   "Players panel\n\nWatch bonuses (permanent discounts), gems in hand, reserved cards, and prestige. Bonuses stack and make expensive cards easier over time.",
 
@@ -926,7 +934,7 @@ function renderState(state) {
       return;
     }
     const count = state.gems && Number.isFinite(Number(state.gems[gem])) ? Number(state.gems[gem]) : 0;
-    supplyEl.textContent = `Board: ${count}`;
+    supplyEl.textContent = `${count}`;
   });
 
   // Nobles
@@ -1622,7 +1630,7 @@ function setupGemSelection() {
 
     const preview = document.createElement("div");
     preview.className = "take-gem-option__preview";
-    preview.innerHTML = `${gemSpriteMarkup(gem, "stone")}<span class="take-gem-option__supply">Board: 0</span>`;
+    preview.innerHTML = `${gemSpriteMarkup(gem, "stone")}<span class="take-gem-option__supply">0</span>`;
 
     const controls = document.createElement("div");
     controls.className = "take-gem-option__controls";
@@ -2315,7 +2323,7 @@ async function init() {
           state.lobby.players.some((p) => samePlayerName(p && p.name, currentPlayerName))
         );
       const now = Date.now();
-      if ((inWaitingRoom || inGame) && currentPlayerName && hasLobbyList && !inLobbyList && now - lastAutoRejoinAt > 7000) {
+      if (!tutorialFlags.active && (inWaitingRoom || inGame) && currentPlayerName && hasLobbyList && !inLobbyList && now - lastAutoRejoinAt > 7000) {
         lastAutoRejoinAt = now;
         // If your name is no longer in the room list, treat it as removed/kicked.
         // Do not auto-rejoin, otherwise a kicked player can silently re-enter.
@@ -2482,6 +2490,8 @@ async function init() {
 
   startGuidedBtn.addEventListener("click", async () => {
     try {
+      suppressRemovedToastUntil = Date.now() + 20000;
+      tutorialFlags.active = true;
       rememberRoom(getRememberedRoom() || "Room A");
       clearTransientUi();
       closeGuided();
@@ -2509,6 +2519,7 @@ async function init() {
       renderState(state);
       openGuided();
     } catch (e) {
+      tutorialFlags.active = false;
       alert("Failed to start tutorial. Is the server running?");
     }
   });

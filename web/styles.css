@@ -4,9 +4,10 @@
 
 :root {
   color-scheme: dark;
-  --bg-deep: #171b2a;
-  --bg-elevated: rgba(40, 46, 70, 0.86);
+  --bg-deep: #242c45;
+  --bg-elevated: rgba(66, 78, 116, 0.86);
   --border-subtle: rgba(255, 255, 255, 0.16);
+  --surface-1: rgba(78, 90, 128, 0.86);
   --accent: #e8a317;
   --accent-bright: #ffd666;
   --accent-dim: rgba(232, 163, 23, 0.32);
@@ -29,10 +30,10 @@ body {
   font-family: var(--font-ui);
   background: var(--bg-deep);
   background-image:
-    radial-gradient(ellipse 100% 70% at 50% -15%, rgba(122, 88, 170, 0.3), transparent 52%),
-    radial-gradient(ellipse 70% 45% at 100% 0%, rgba(78, 146, 214, 0.22), transparent 48%),
-    radial-gradient(ellipse 60% 40% at 0% 100%, rgba(190, 126, 78, 0.2), transparent 45%),
-    linear-gradient(180deg, #1d2236 0%, #252a44 50%, #1b2035 100%);
+    radial-gradient(ellipse 100% 70% at 50% -15%, rgba(138, 112, 198, 0.28), transparent 52%),
+    radial-gradient(ellipse 70% 45% at 100% 0%, rgba(102, 170, 234, 0.26), transparent 48%),
+    radial-gradient(ellipse 60% 40% at 0% 100%, rgba(220, 150, 95, 0.18), transparent 45%),
+    linear-gradient(180deg, #2b3453 0%, #303a5f 50%, #263050 100%);
   color: #f3f6ff;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -468,7 +469,7 @@ main {
 }
 
 .panel {
-  background: var(--bg-elevated);
+  background: var(--surface-1);
   border-radius: var(--radius-lg);
   padding: 16px 18px;
   box-shadow: var(--shadow-panel);
@@ -507,7 +508,7 @@ main {
   gap: 12px;
   flex-wrap: wrap;
   padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.14);
   border-radius: 12px;
   border: 1px solid var(--border-subtle);
 }
@@ -704,7 +705,7 @@ main {
 
 .modal-panel {
   width: min(100%, 400px);
-  background: linear-gradient(165deg, rgba(46, 52, 78, 0.96), rgba(34, 40, 64, 0.97));
+  background: linear-gradient(165deg, rgba(78, 90, 128, 0.96), rgba(58, 68, 102, 0.97));
   border: 1px solid rgba(232, 163, 23, 0.22);
   border-radius: var(--radius-lg);
   padding: 22px 22px 18px;
@@ -800,7 +801,7 @@ main {
   flex: 0 0 auto;
   width: 210px;
   padding: 10px;
-  background: linear-gradient(155deg, rgba(18, 20, 34, 0.98), rgba(12, 14, 24, 0.98));
+  background: linear-gradient(155deg, rgba(62, 72, 108, 0.96), rgba(48, 58, 90, 0.98));
   border-radius: 18px;
   border: 1px solid rgba(232, 163, 23, 0.24);
   font-size: 0.75rem;
@@ -1224,26 +1225,29 @@ main {
 .take-gem-option {
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   border-radius: 14px;
-  padding: 11px 16px;
+  padding: 8px 10px;
   min-width: 0;
   width: 100%;
-  gap: 10px;
+  gap: 8px;
 }
 
 .take-gem-option__preview {
   min-width: 0;
+  flex: 1;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  flex-wrap: nowrap;
 }
 
 .take-gem-option__supply {
-  font-size: 0.75rem;
+  min-width: 1.1rem;
+  text-align: center;
+  font-size: 0.8rem;
   font-weight: 700;
-  color: #b7c4e8;
+  color: #d6def5;
   letter-spacing: 0.01em;
 }
 
@@ -1254,14 +1258,15 @@ main {
 .take-gem-option__controls {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  margin-left: auto;
 }
 
 .take-gem-option__btn {
-  min-width: 34px;
-  min-height: 30px;
-  padding: 3px 8px;
-  font-size: 1rem;
+  min-width: 30px;
+  min-height: 28px;
+  padding: 2px 7px;
+  font-size: 0.95rem;
   line-height: 1;
 }
 
@@ -1323,7 +1328,7 @@ main {
 }
 
 .take-gem-option .gem-sprite--stone {
-  --gw: 2rem;
+  --gw: 1.6rem;
 }
 
 .pill.gem-RUBY {
@@ -1925,13 +1930,13 @@ main {
 /* Full-width gem picks: easier to read than squeezed wrap in a narrow column */
 #take-gems-options.pill-row {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
-@media (min-width: 640px) and (max-width: 1023px) {
+@media (max-width: 639px) {
   #take-gems-options.pill-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 }
 
