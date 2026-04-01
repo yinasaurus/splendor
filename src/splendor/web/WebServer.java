@@ -1030,7 +1030,16 @@ public class WebServer {
 			String name = extractStringField(body, "name", "Guest");
 			String sessionToken = extractStringField(body, "sessionToken", "");
 			boolean ready = extractBooleanField(body, "ready", false);
-			GameSession session = getOrCreateSession(room);
+			GameSession session = getExistingOrRecoveredSession(room);
+			if (session == null) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("sessionMissing", true);
+				resp.put("room", room);
+				resp.put("message", "Room not found or session expired. Ask the host to recreate the room.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			name = canonicalizeLobbyName(session, name);
 			if (!hasValidSeatToken(session, name, sessionToken)) {
 				Map<String, Object> resp = new HashMap<>();
@@ -1070,7 +1079,16 @@ public class WebServer {
 			String room = cleanRoomName(extractStringField(body, "room", DEFAULT_ROOM));
 			String owner = extractStringField(body, "ownerName", "");
 			String sessionToken = extractStringField(body, "sessionToken", "");
-			GameSession session = getOrCreateSession(room);
+			GameSession session = getExistingOrRecoveredSession(room);
+			if (session == null) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("sessionMissing", true);
+				resp.put("room", room);
+				resp.put("message", "Room not found or session expired. Ask the host to recreate the room.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			owner = canonicalizeLobbyName(session, owner);
 			if (!hasValidSeatToken(session, owner, sessionToken)) {
 				Map<String, Object> resp = new HashMap<>();
@@ -1781,8 +1799,7 @@ public class WebServer {
 		boolean isMyTurn = current.isHuman()
 			&& !viewer.isEmpty()
 			&& (current.getName().equals(viewer)
-				|| currentDisplayName.equals(viewer)
-				|| (isGenericSeatName(current.getName()) && session.readyByPlayer.containsKey(viewer)));
+				|| currentDisplayName.equals(viewer));
 		if (session.forcedAiByName.contains(current.getName()) && current.getName().equals(viewer)) {
 			isMyTurn = false;
 		}

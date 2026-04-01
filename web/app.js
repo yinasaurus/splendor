@@ -1986,6 +1986,29 @@ function setupGemSelection() {
       messageEl.textContent = result.message || (result.success ? "Action done." : "Action failed.");
       messageEl.className = "message " + (result.success ? "ok" : "error");
       if (!result.success) {
+        const msg = String(result.message || "");
+        const mustDiscardMatch = msg.match(/Must discard exactly\s+(\d+)\s+gem/i);
+        if (mustDiscardMatch && Array.isArray(gems)) {
+          try {
+            const synced = await fetchState();
+            const me =
+              synced && Array.isArray(synced.players)
+                ? synced.players.find((p) => samePlayerName(p && p.name, currentPlayerName))
+                : null;
+            const baseGems = me && me.gems ? { ...me.gems } : {};
+            gems.forEach((abbr) => {
+              const gem = GEM_ABBR_TO_NAME[String(abbr || "").toUpperCase()];
+              if (!gem) return;
+              baseGems[gem] = Number(baseGems[gem] || 0) + 1;
+            });
+            const needed = Math.max(0, Number(mustDiscardMatch[1] || 0));
+            if (needed > 0) {
+              openDiscardPanel(needed, baseGems, gems);
+            }
+          } catch (_) {
+            // Keep original failure message if resync fails.
+          }
+        }
         showToast(result.message || "Could not take gems.", "error");
         return;
       }
