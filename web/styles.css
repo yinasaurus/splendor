@@ -2007,30 +2007,6 @@ button.secondary:focus-visible {
   border: 0;
 }
 
-.player-types {
-  margin-top: 8px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 12px;
-}
-
-.player-type-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  flex-wrap: wrap;
-}
-
-.player-type-row span {
-  white-space: nowrap;
-}
-
-.player-type-row.hidden {
-  display: none;
-}
-
-
 /* --- Lobby (start + waiting) --- */
 #start-screen {
   max-width: 980px;
@@ -2077,32 +2053,11 @@ button.secondary:focus-visible {
   background: rgba(8, 10, 22, 0.92);
 }
 
-#start-screen .player-types {
-  margin-top: 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 14px;
-  padding: 14px;
-  background: rgba(6, 8, 18, 0.45);
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-#start-screen .player-type-row {
-  background: rgba(12, 14, 28, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  transition: border-color 0.15s ease;
-}
-
-#start-screen .player-type-row:hover {
-  border-color: rgba(232, 163, 23, 0.15);
-}
-
-#start-screen .hint.small {
-  margin-top: 6px;
+#start-screen #create-room-fields .hint.small {
+  margin-top: 10px;
+  margin-bottom: 0;
   color: #93a0c3;
-  grid-column: 1 / -1;
+  line-height: 1.45;
 }
 
 #start-screen .start-actions {
@@ -2362,10 +2317,6 @@ button.secondary:focus-visible {
   }
 
   .actions-grid {
-    grid-template-columns: 1fr;
-  }
-
-  #start-screen .player-types {
     grid-template-columns: 1fr;
   }
 

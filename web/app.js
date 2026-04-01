@@ -1216,10 +1216,6 @@ async function init() {
   const copyRoomCodeLobbyBtn = document.getElementById("copy-room-code-btn-lobby");
   const startGuidedBtn = document.getElementById("start-guided-btn");
   const numPlayersSelect = document.getElementById("start-num-players");
-  const p1Type = document.getElementById("player1-type");
-  const p2Type = document.getElementById("player2-type");
-  const p3Type = document.getElementById("player3-type");
-  const p4Type = document.getElementById("player4-type");
   const joinRoomDialog = document.getElementById("join-room-dialog");
   const joinRoomCodeInput = document.getElementById("join-room-code-input");
   const joinDialogCancel = document.getElementById("join-dialog-cancel");
@@ -1227,10 +1223,6 @@ async function init() {
   const playerNameInput = document.getElementById("player-name");
   const waitingPlayerNameInput = document.getElementById("waiting-player-name");
   const waitingRoomCode = document.getElementById("waiting-room-code");
-  const p1Row = p1Type.closest(".player-type-row");
-  const p2Row = p2Type.closest(".player-type-row");
-  const p3Row = p3Type.closest(".player-type-row");
-  const p4Row = p4Type.closest(".player-type-row");
   const rulebookOverlay = document.getElementById("rulebook-overlay");
   const rulebookBody = document.getElementById("rulebook-body");
   const openTutorialBtn = document.getElementById("open-tutorial-btn");
@@ -1336,15 +1328,6 @@ async function init() {
     }
     dragState = null;
     document.body.style.userSelect = "";
-  }
-
-  function updatePlayerRows() {
-    const n = parseInt(numPlayersSelect.value, 10);
-    p1Row.classList.toggle("hidden", n < 1);
-    p2Row.classList.toggle("hidden", n < 2);
-    p3Row.classList.toggle("hidden", n < 3);
-    p4Row.classList.toggle("hidden", n < 4);
-    updateLobbyReadiness();
   }
 
   function updateLobbyReadiness() {
@@ -1526,10 +1509,10 @@ async function init() {
           room: roomInput,
           ownerName: currentPlayerName,
           numPlayers,
-          p1Type: p1Type.value,
-          p2Type: p2Type.value,
-          p3Type: p3Type.value,
-          p4Type: p4Type.value,
+          p1Type: "human",
+          p2Type: "human",
+          p3Type: "human",
+          p4Type: "human",
         });
         rememberRoom(created.room || roomInput || "Room A");
         syncRoomToBrowserUrl(currentRoom);
@@ -1553,16 +1536,10 @@ async function init() {
       closeGuided();
       closeRulebook();
 
-      // Guided tutorial uses Player 1 as human and Player 2 as AI.
-      // If Player 2 dropdown is set to Human, default to AI (Medium).
-      let p2 = p2Type.value;
-      if (!p2 || p2 === "human") {
-        p2 = "medium";
-      }
       await postNewGame({
         numPlayers: 2,
         p1Type: "human",
-        p2Type: p2,
+        p2Type: "medium",
         p3Type: "human",
         p4Type: "human",
       });
@@ -1739,13 +1716,13 @@ async function init() {
     }
   });
 
-  numPlayersSelect.addEventListener("change", updatePlayerRows);
+  numPlayersSelect.addEventListener("change", updateLobbyReadiness);
   if (playerNameInput) {
     playerNameInput.addEventListener("input", updateLobbyReadiness);
   }
 
   // Initial state
-  updatePlayerRows();
+  updateLobbyReadiness();
   const pathRoom = roomFromUrlPath();
   if (pathRoom) {
     rememberRoom(pathRoom);
