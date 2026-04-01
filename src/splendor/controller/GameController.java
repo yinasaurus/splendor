@@ -318,6 +318,46 @@ public class GameController {
 	}
 
 	/**
+	 * Executes a reserve-from-top-deck action.
+	 *
+	 * @param level the deck level (1, 2, or 3)
+	 * @return true if the action was successful
+	 */
+	public boolean reserveTopCard(int level) {
+		Player player = getCurrentPlayer();
+
+		// Validate reserve slot availability first.
+		GameRules.ValidationResult result = rules.validateReserveCard(player);
+		if (!result.isValid()) {
+			return false;
+		}
+
+		// Draw top card from selected deck.
+		Card topCard = board.drawCardFromDeck(level);
+		if (topCard == null) {
+			return false;
+		}
+
+		player.reserveCard(topCard);
+
+		// Give player a gold gem if available and hand-size allows.
+		int currentTotalGems = player.getTotalGemCount();
+		if (board.getGemCount(GemType.GOLD) > 0 && currentTotalGems < config.getMaxGemsPerPlayer()) {
+			Map<GemType, Integer> gold = new HashMap<>();
+			gold.put(GemType.GOLD, 1);
+			board.removeGems(gold);
+			player.addGems(gold);
+		}
+
+		statistics.recordReservation(player);
+		statistics.recordTurn(player, "Reserved top card");
+
+		checkNobleVisits(player);
+		afterSuccessfulAction(player);
+		return true;
+	}
+
+	/**
 	 * Executes a purchase card action.
 	 *
 	 * @param card the card to purchase

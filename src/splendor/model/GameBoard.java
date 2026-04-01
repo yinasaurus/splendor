@@ -156,6 +156,22 @@ public class GameBoard {
 	}
 
 	/**
+	 * Peeks at the top card from a deck without removing it.
+	 *
+	 * @param level the card level (1, 2, or 3)
+	 * @return the top card, or null if deck is empty
+	 */
+	public Card peekTopCard(int level) {
+		if (level >= 1 && level <= 3) {
+			List<Card> deck = cardDecks.get(level - 1);
+			if (!deck.isEmpty()) {
+				return deck.get(0);
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * Gets the number of cards remaining in a deck.
 	 *
 	 * @param level the card level (1, 2, or 3)

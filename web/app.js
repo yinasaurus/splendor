@@ -53,6 +53,8 @@ let currentPlayerName = "";
 let currentSessionToken = "";
 let currentReady = false;
 let currentOwner = "";
+let activityLogCollapsed = false;
+let lastLiveStateDigest = "";
 
 async function readErrorMessage(res, fallback) {
   let text = "";
@@ -207,6 +209,64 @@ function replaceGenericSeatNames(text, lobbyNames) {
     out = out.replace(re, safeName);
   });
   return out;
+}
+
+function formatActionEntryText(text, lobbyNames) {
+  let out = replaceGenericSeatNames(text, lobbyNames);
+  if (!out) {
+    return out;
+  }
+  const gemAbbrevToName = {
+    R: "Ruby",
+    E: "Emerald",
+    S: "Sapphire",
+    D: "Diamond",
+    O: "Onyx",
+    G: "Gold",
+  };
+  // Example: "Ex1, Rx1, Dx1" -> "Emerald x1, Ruby x1, Diamond x1"
+  out = String(out).replace(/\b([RESDOG])x(\d+)\b/g, (_, abbr, count) => {
+    const name = gemAbbrevToName[abbr] || abbr;
+    return `${name} x${count}`;
+  });
+  return out;
+}
+
+function computeLiveStateDigest(state) {
+  if (!state) {
+    return "";
+  }
+  const lobbyPlayers =
+    state &&
+    state.lobby &&
+    Array.isArray(state.lobby.players)
+      ? state.lobby.players.map((p) => `${p && p.name ? p.name : ""}:${p && p.ready ? 1 : 0}`).join("|")
+      : "";
+  const players =
+    Array.isArray(state.players)
+      ? state.players
+          .map((p) => {
+            const name = p && p.name ? p.name : "";
+            const prestige = Number(p && p.prestige ? p.prestige : 0);
+            const reserved = Number(p && p.reservedCount ? p.reservedCount : 0);
+            const gems = p && p.gems ? JSON.stringify(p.gems) : "{}";
+            const bonuses = p && p.bonuses ? JSON.stringify(p.bonuses) : "{}";
+            return `${name}:${prestige}:${reserved}:${gems}:${bonuses}`;
+          })
+          .join("||")
+      : "";
+  const deck = state && state.deckRemaining ? JSON.stringify(state.deckRemaining) : "{}";
+  const actions = Array.isArray(state.recentActions) ? state.recentActions.slice(-8).join("||") : "";
+  return [
+    String(state.turnNumber || 0),
+    String(state.roundNumber || 0),
+    String(state.currentPlayer || ""),
+    state.gameOver ? "1" : "0",
+    lobbyPlayers,
+    deck,
+    actions,
+    players,
+  ].join("~");
 }
 
 function ordinalLabel(n) {
@@ -820,7 +880,7 @@ const guidedSteps = [
 
   "Take Gems\n\nOpen the Take Gems row, pick a legal combination, then press \"Confirm Take Gems\". Try it once so you have tokens to spend later.\n\nTip: you cannot hold more than 10 gems total.",
 
-  "Reserve a card (+1 Gold)\n\nUse \"Reserve\" on a market card to move it to your reserved hand (max 3). If gold is available, gain 1 gold token (wild/joker). Market slots refill from the deck.",
+  "Reserve a card (+1 Gold)\n\nUse \"Reserve\" on a market card, or reserve the top card from a level deck (max 3 reserved total). If gold is available, gain 1 gold token (wild/joker).",
 
   "Development cards — Level 1\n\nEach card shows its cost and a bonus gem color. After you buy a card, that color becomes a permanent discount on future purchases.",
 
@@ -837,6 +897,7 @@ const guidedSteps = [
 
 function renderState(state) {
   latestState = state;
+  lastLiveStateDigest = computeLiveStateDigest(state);
   if (state && state.room != null && String(state.room).trim() !== "") {
     const fromServer = String(state.room).trim();
     if (fromServer !== currentRoom) {
@@ -855,6 +916,7 @@ function renderState(state) {
   const players = document.getElementById("players");
   const recommendedSteps = document.getElementById("recommended-steps");
   const activityLog = document.getElementById("activity-log");
+  const activityLogToggle = document.getElementById("activity-log-toggle");
   const lobbyNames = state && state.lobby && Array.isArray(state.lobby.players)
     ? state.lobby.players.map((p) => String(p.name || "").trim()).filter((n) => n.length > 0)
     : [];
@@ -873,6 +935,26 @@ function renderState(state) {
   const isMyTurn = !!(state.isMyTurn != null ? state.isMyTurn : state.isHumanTurn);
   const isAiTurn = state.isHumanTurn === false;
   const currentReservedCount = currentPlayerData ? (currentPlayerData.reservedCount || 0) : 0;
+  const reserveTopL1Btn = document.getElementById("reserve-top-l1-btn");
+  const reserveTopL2Btn = document.getElementById("reserve-top-l2-btn");
+  const reserveTopL3Btn = document.getElementById("reserve-top-l3-btn");
+  const reserveTopButtons = [
+    [1, reserveTopL1Btn],
+    [2, reserveTopL2Btn],
+    [3, reserveTopL3Btn],
+  ];
+  reserveTopButtons.forEach(([level, btn]) => {
+    if (!btn) {
+      return;
+    }
+    const deckLeft =
+      state &&
+      state.deckRemaining &&
+      Number.isFinite(Number(state.deckRemaining[level]))
+        ? Number(state.deckRemaining[level])
+        : 0;
+    btn.disabled = !isMyTurn || currentReservedCount >= 3 || deckLeft <= 0;
+  });
   const turnNo = Number.isFinite(state.turnNumber) ? state.turnNumber : 1;
   const roundNo = Number.isFinite(state.roundNumber) ? state.roundNumber : 1;
   const actions = Array.isArray(state.recentActions) ? state.recentActions : [];
@@ -975,30 +1057,23 @@ function renderState(state) {
       const body = document.createElement("div");
       body.className = "noble-card__body";
 
-      const head = document.createElement("div");
-      head.className = "noble-card__head";
-      const title = document.createElement("span");
-      title.className = "noble-card__title";
-      title.textContent = n.name || "Noble";
       const pts = document.createElement("span");
       pts.className = "noble-card__pts";
-      pts.textContent = `+${Number(n.points) || 0}`;
-      head.appendChild(title);
-      head.appendChild(pts);
+      pts.textContent = `${Number(n.points) || 0}`;
 
       const row = document.createElement("div");
       row.className = "pill-row noble-card__reqs";
       Object.entries(req).forEach(([gem, count]) => {
         const pill = document.createElement("div");
         pill.className = `pill gem-${gem}`;
-        pill.innerHTML = gemPillMarkup(gem, `${gem[0]}:${count}`, "stone");
+        pill.innerHTML = gemPillMarkup(gem, `${count}`, "stone");
         pill.title = `${gem}: ${count}`;
         row.appendChild(pill);
       });
 
-      body.appendChild(head);
       body.appendChild(row);
       card.appendChild(portrait);
+      card.appendChild(pts);
       card.appendChild(body);
       nobles.appendChild(card);
     });
@@ -1191,8 +1266,9 @@ function renderState(state) {
   if (state.players) {
     const basePlayers = displayPlayers.length > 0 ? displayPlayers : (state.players || []);
     const orderedPlayers = [];
+    const startIndex = currentIdx >= 0 ? currentIdx : 0;
     for (let i = 0; i < basePlayers.length; i++) {
-      orderedPlayers.push(basePlayers[(i + playerViewOffset) % basePlayers.length]);
+      orderedPlayers.push(basePlayers[(i + startIndex) % basePlayers.length]);
     }
     orderedPlayers.forEach((p, idx) => {
       const card = document.createElement("div");
@@ -1200,9 +1276,6 @@ function renderState(state) {
       if (p.name === currentDisplayName) {
         card.classList.add("current");
       }
-      const orderBadge = document.createElement("div");
-      orderBadge.className = "player-order-badge";
-      orderBadge.textContent = ordinalLabel(idx + 1);
       const name = document.createElement("div");
       name.className = "player-name";
       name.textContent = p.name;
@@ -1260,7 +1333,6 @@ function renderState(state) {
           : Object.values(p.bonuses || {}).reduce((sum, n) => sum + Number(n || 0), 0);
       extra.textContent = `${nobleText} · Reserved: ${p.reservedCount} · Bought: ${boughtCount} cards`;
 
-      card.appendChild(orderBadge);
       card.appendChild(name);
       card.appendChild(meta);
       if (afkMeta.textContent) {
@@ -1427,11 +1499,11 @@ function renderState(state) {
           cap.textContent = `L${rc.level} · ${rc.bonusAbbr || ""}`;
           mini.appendChild(cap);
           const costBadges = document.createElement("div");
-          costBadges.className = "pill-row reserved-mini__costs";
+          costBadges.className = "reserved-mini__costs";
           devCardCostEntries(rc.cost || {}).forEach(([gem, count]) => {
             const pill = document.createElement("div");
-            pill.className = `pill gem-${gem}`;
-            pill.innerHTML = gemPillMarkup(gem, `${count}`, "stone");
+            pill.className = `dev-card__cost dev-card__cost--${gem}`;
+            pill.innerHTML = `${gemSpriteMarkup(gem, "stone")}<span class="dev-card__cost-num">${count}</span>`;
             pill.title = `${count} ${gemDisplayName(gem)}`;
             costBadges.appendChild(pill);
           });
@@ -1502,6 +1574,10 @@ function renderState(state) {
 
   // Activity feed from backend (human + AI moves).
   if (activityLog) {
+    activityLog.classList.toggle("hidden", activityLogCollapsed);
+    if (activityLogToggle) {
+      activityLogToggle.textContent = activityLogCollapsed ? "Show" : "Hide";
+    }
     activityLog.innerHTML = "";
     if (actions.length === 0) {
       const li = document.createElement("li");
@@ -1510,7 +1586,7 @@ function renderState(state) {
     } else {
       actions.slice(-6).reverse().forEach((entry) => {
         const li = document.createElement("li");
-        li.textContent = replaceGenericSeatNames(entry, lobbyNames);
+        li.textContent = formatActionEntryText(entry, lobbyNames);
         activityLog.appendChild(li);
       });
     }
@@ -1550,6 +1626,7 @@ function renderLobbyStatus(state) {
   const hostAiControls = document.getElementById("host-ai-controls");
   const roomCodeDisplay = document.getElementById("room-code-display");
   const waitingRoomCode = document.getElementById("waiting-room-code");
+  const activityLogToggle = document.getElementById("activity-log-toggle");
   const lobby = state && state.lobby ? state.lobby : null;
   if (!lobby) {
     return;
@@ -2008,6 +2085,27 @@ async function postPurchaseReserved(index) {
   }
 }
 
+async function postReserveTop(level) {
+  const msg = document.getElementById("action-message");
+  try {
+    const result = await postAction({ type: "reserveTop", level });
+    msg.textContent = result.message || (result.success ? "Top card reserved." : "Reserve top failed.");
+    msg.className = "message " + (result.success ? "ok" : "error");
+    if (result.success) {
+      showToast(`Reserved top Level ${level} card.`);
+    } else {
+      showToast(result.message || "Could not reserve top card.", "error");
+    }
+    const state = await fetchState();
+    renderState(state);
+  } catch (e) {
+    const text = e && e.message ? e.message : "Error reserving top card.";
+    msg.textContent = text;
+    msg.className = "message error";
+    showToast(text, "error");
+  }
+}
+
 function setupOtherActions() {
   if (uiState.actionUiBound) {
     return;
@@ -2041,6 +2139,9 @@ async function init() {
   const playerNameInput = document.getElementById("player-name");
   const waitingPlayerNameInput = document.getElementById("waiting-player-name");
   const waitingRoomCode = document.getElementById("waiting-room-code");
+  const reserveTopL1Btn = document.getElementById("reserve-top-l1-btn");
+  const reserveTopL2Btn = document.getElementById("reserve-top-l2-btn");
+  const reserveTopL3Btn = document.getElementById("reserve-top-l3-btn");
   const rulebookOverlay = document.getElementById("rulebook-overlay");
   const rulebookBody = document.getElementById("rulebook-body");
   const openTutorialBtn = document.getElementById("open-tutorial-btn");
@@ -2374,7 +2475,10 @@ async function init() {
           showToast("Match started.");
         }
       } else if (inGame) {
-        renderState(state);
+        const digest = computeLiveStateDigest(state);
+        if (digest !== lastLiveStateDigest) {
+          renderState(state);
+        }
       }
     } catch (_) {
       // Ignore transient network errors; next tick will retry.
@@ -2568,6 +2672,23 @@ async function init() {
   }
   if (joinDialogConfirm) {
     joinDialogConfirm.addEventListener("click", () => submitJoinFromDialog());
+  }
+  if (activityLogToggle) {
+    activityLogToggle.addEventListener("click", () => {
+      activityLogCollapsed = !activityLogCollapsed;
+      if (latestState) {
+        renderState(latestState);
+      }
+    });
+  }
+  if (reserveTopL1Btn) {
+    reserveTopL1Btn.addEventListener("click", () => postReserveTop(1));
+  }
+  if (reserveTopL2Btn) {
+    reserveTopL2Btn.addEventListener("click", () => postReserveTop(2));
+  }
+  if (reserveTopL3Btn) {
+    reserveTopL3Btn.addEventListener("click", () => postReserveTop(3));
   }
   if (createDialogCancel) {
     createDialogCancel.addEventListener("click", () => closeCreateRoomDialog());

@@ -1312,6 +1312,7 @@ public class WebServer {
 
 		// Extremely small and simple "parser" for our limited JSON format.
 		String lower = body.toLowerCase();
+		String actionType = extractStringField(body, "type", "").toLowerCase();
 		boolean success = false;
 		String message = "Unknown action";
 		Player currentPlayer = session.controller.getCurrentPlayer();
@@ -1358,7 +1359,7 @@ public class WebServer {
 		}
 		String actionSummary = null;
 
-		if (lower.contains("\"type\"") && lower.contains("takegems")) {
+		if ("takegems".equals(actionType)) {
 			// Extract gems array e.g. "gems":["R","E","S"]
 			Map<GemType, Integer> gemsToTake = new HashMap<>();
 			Map<GemType, Integer> gemsToDiscard = new HashMap<>();
@@ -1489,7 +1490,25 @@ public class WebServer {
 			} else {
 				message = "No valid gems specified";
 			}
-		} else if (lower.contains("\"type\"") && lower.contains("reserve")) {
+		} else if ("reservetop".equals(actionType)) {
+			int level = extractIntField(body, "level", 1);
+			Card topCard = session.controller.getBoard().peekTopCard(level);
+			GameRules.ValidationResult vr = session.controller.getRules().validateReserveCard(session.controller.getCurrentPlayer());
+			if (!vr.isValid()) {
+				success = false;
+				message = vr.getMessage();
+			} else if (topCard == null) {
+				success = false;
+				message = "No cards left in this deck.";
+			} else {
+				success = session.controller.reserveTopCard(level);
+				message = success ? "Top card reserved." : "Cannot reserve from this deck.";
+				if (success) {
+					actionSummary = actor + " reserved the top card from Level " + topCard.getLevel()
+						+ " (+" + topCard.getPrestigePoints() + " prestige, +" + topCard.getBonusGem().getAbbreviation() + " bonus).";
+				}
+			}
+		} else if ("reserve".equals(actionType)) {
 			int level = extractIntField(body, "level", 1);
 			int index = extractIntField(body, "index", 0);
 			GameRules.ValidationResult vr = session.controller.getRules().validateReserveCard(session.controller.getCurrentPlayer());
@@ -1509,7 +1528,7 @@ public class WebServer {
 						+ " card (+" + card.getPrestigePoints() + " prestige, +" + card.getBonusGem().getAbbreviation() + " bonus).";
 				}
 			}
-		} else if (lower.contains("\"type\"") && lower.contains("purchasevisible")) {
+		} else if ("purchasevisible".equals(actionType)) {
 			int level = extractIntField(body, "level", 1);
 			int index = extractIntField(body, "index", 0);
 			List<Card> visible = session.controller.getBoard().getVisibleCards(level);
@@ -1532,7 +1551,7 @@ public class WebServer {
 					}
 				}
 			}
-		} else if (lower.contains("\"type\"") && lower.contains("purchasereserved")) {
+		} else if ("purchasereserved".equals(actionType)) {
 			int index = extractIntField(body, "index", 0);
 			List<Card> reserved = session.controller.getCurrentPlayer().getReservedCards();
 			if (index < 0 || index >= reserved.size()) {
