@@ -104,6 +104,7 @@ let tutorialFlags = {
 const uiState = {
   gemUiInitialized: false,
   actionUiBound: false,
+  syncTakeGemUi: null,
 };
 
 let toastTimer = null;
@@ -896,6 +897,10 @@ const guidedSteps = [
 ];
 
 function renderState(state) {
+  const boardColEl = document.querySelector(".gameplay-board-col");
+  const sideColEl = document.querySelector(".gameplay-side-col");
+  const boardScrollTop = boardColEl ? boardColEl.scrollTop : null;
+  const sideScrollTop = sideColEl ? sideColEl.scrollTop : null;
   latestState = state;
   lastLiveStateDigest = computeLiveStateDigest(state);
   if (state && state.room != null && String(state.room).trim() !== "") {
@@ -1022,19 +1027,10 @@ function renderState(state) {
       boardGems.appendChild(pill);
     });
   }
-  // Mirror board supply counts into the Take Gems controls.
-  document.querySelectorAll(".take-gem-option").forEach((row) => {
-    const gem = row.getAttribute("data-gem");
-    if (!gem) {
-      return;
-    }
-    const supplyEl = row.querySelector(".take-gem-option__supply");
-    if (!supplyEl) {
-      return;
-    }
-    const count = state.gems && Number.isFinite(Number(state.gems[gem])) ? Number(state.gems[gem]) : 0;
-    supplyEl.textContent = `${count}`;
-  });
+  // Mirror board supply counts + enforce valid take-gem selections.
+  if (typeof uiState.syncTakeGemUi === "function") {
+    uiState.syncTakeGemUi(state);
+  }
 
   // Nobles
   nobles.innerHTML = "";
@@ -1597,9 +1593,9 @@ function renderState(state) {
   if (takeBtn) {
     takeBtn.disabled = !isMyTurn;
   }
-  document.querySelectorAll("#take-gems-options button").forEach((btn) => {
-    btn.disabled = !isMyTurn;
-  });
+  if (typeof uiState.syncTakeGemUi === "function") {
+    uiState.syncTakeGemUi(state);
+  }
   // Realtime popups: new action and turn changes.
   if (!suppressRealtimeToasts) {
     if (actions.length > lastSeenActionCount) {
@@ -1615,6 +1611,16 @@ function renderState(state) {
   lastSeenActionCount = actions.length;
   lastSeenTurnNumber = turnNo;
   suppressRealtimeToasts = false;
+  if (boardColEl || sideColEl) {
+    window.requestAnimationFrame(() => {
+      if (boardColEl && boardScrollTop !== null) {
+        boardColEl.scrollTop = boardScrollTop;
+      }
+      if (sideColEl && sideScrollTop !== null) {
+        sideColEl.scrollTop = sideScrollTop;
+      }
+    });
+  }
 }
 
 function renderLobbyStatus(state) {
@@ -1707,9 +1713,25 @@ function setupGemSelection() {
 
   const gemTypes = ["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"];
   const countByGem = new Map();
+  const plusByGem = new Map();
+  const minusByGem = new Map();
+  const supplyByGem = new Map();
+
+  function getGemSupply(gem) {
+    const raw = latestState && latestState.gems ? Number(latestState.gems[gem]) : 0;
+    return Number.isFinite(raw) ? Math.max(0, raw) : 0;
+  }
+
+  function getMaxSelectableForGem(gem) {
+    if (gem === "GOLD") {
+      return 0;
+    }
+    return Math.min(2, getGemSupply(gem));
+  }
 
   function setGemCount(gem, next) {
-    const value = Math.max(0, Math.min(2, Number(next) || 0));
+    const maxSelectable = getMaxSelectableForGem(gem);
+    const value = Math.max(0, Math.min(maxSelectable, Number(next) || 0));
     if (value === 0) {
       selected.delete(gem);
     } else {
@@ -1721,6 +1743,28 @@ function setupGemSelection() {
     }
   }
 
+  function syncTakeGemUiFromState(state) {
+    gemTypes.forEach((gem) => {
+      const supplyEl = supplyByGem.get(gem);
+      const supply = state && state.gems && Number.isFinite(Number(state.gems[gem])) ? Number(state.gems[gem]) : 0;
+      if (supplyEl) {
+        supplyEl.textContent = `${Math.max(0, supply)}`;
+      }
+      setGemCount(gem, selected.get(gem) || 0);
+      const plusBtn = plusByGem.get(gem);
+      const minusBtn = minusByGem.get(gem);
+      const now = selected.get(gem) || 0;
+      const maxSelectable = getMaxSelectableForGem(gem);
+      const canInteract = !takeGemsSubmitting && !!(state && (state.isMyTurn != null ? state.isMyTurn : state.isHumanTurn));
+      if (plusBtn) {
+        plusBtn.disabled = !canInteract || now >= maxSelectable;
+      }
+      if (minusBtn) {
+        minusBtn.disabled = !canInteract || now <= 0;
+      }
+    });
+  }
+
   gemTypes.forEach((gem) => {
     const row = document.createElement("div");
     row.className = `pill gem-${gem} take-gem-option`;
@@ -1729,6 +1773,10 @@ function setupGemSelection() {
     const preview = document.createElement("div");
     preview.className = "take-gem-option__preview";
     preview.innerHTML = `${gemSpriteMarkup(gem, "stone")}<span class="take-gem-option__supply">0</span>`;
+    const supplyEl = preview.querySelector(".take-gem-option__supply");
+    if (supplyEl) {
+      supplyByGem.set(gem, supplyEl);
+    }
 
     const controls = document.createElement("div");
     controls.className = "take-gem-option__controls";
@@ -1750,6 +1798,7 @@ function setupGemSelection() {
     minusBtn.addEventListener("click", () => {
       const current = selected.get(gem) || 0;
       setGemCount(gem, current - 1);
+      syncTakeGemUiFromState(latestState);
     });
 
     const count = document.createElement("span");
@@ -1765,7 +1814,10 @@ function setupGemSelection() {
     plusBtn.addEventListener("click", () => {
       const current = selected.get(gem) || 0;
       setGemCount(gem, current + 1);
+      syncTakeGemUiFromState(latestState);
     });
+    minusByGem.set(gem, minusBtn);
+    plusByGem.set(gem, plusBtn);
 
     controls.appendChild(minusBtn);
     controls.appendChild(count);
@@ -1798,6 +1850,7 @@ function setupGemSelection() {
     container.querySelectorAll("button").forEach((btn) => {
       btn.disabled = isBusy || !(latestState && (latestState.isMyTurn != null ? latestState.isMyTurn : latestState.isHumanTurn));
     });
+    syncTakeGemUiFromState(latestState);
     if (discardConfirmBtn) {
       discardConfirmBtn.disabled = isBusy || !pendingTakeGems;
     }
@@ -1805,6 +1858,7 @@ function setupGemSelection() {
       discardCancelBtn.disabled = isBusy;
     }
   }
+  uiState.syncTakeGemUi = syncTakeGemUiFromState;
 
   function closeDiscardPanel(animated = false) {
     if (discardCollapseTimer) {

@@ -812,6 +812,17 @@ main {
   color: #b0b8cc;
 }
 
+.panel--nobles-strip h2 {
+  font-family: var(--font-display);
+  font-size: 1.32rem;
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  color: #f2f4fa;
+  margin-bottom: 12px;
+}
+
 .panel--nobles-strip {
   grid-column: 1 / -1;
 }
@@ -1755,7 +1766,7 @@ main {
   position: absolute;
   left: 8px;
   bottom: 8px;
-  z-index: 2;
+  z-index: 4;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 3px;
@@ -1855,7 +1866,7 @@ main {
   gap: 6px;
   justify-content: center;
   padding: 8px 6px 6px;
-  background: linear-gradient(to top, rgba(8, 10, 16, 0.95), rgba(8, 10, 16, 0.72));
+  background: linear-gradient(to top, rgba(8, 10, 16, 0.86) 0%, rgba(8, 10, 16, 0.45) 55%, rgba(8, 10, 16, 0) 100%);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(2px);
   opacity: 0;
@@ -2919,16 +2930,16 @@ button.secondary:focus-visible {
   }
 }
 
-/* Board order: recommended on the right, then gems/actions, then players. */
+/* Right column order: recommendations, players, then actions. */
 .gameplay-side-col .assist-panel {
   order: 1;
 }
 
-.gameplay-side-col .actions {
+.gameplay-side-col .players {
   order: 2;
 }
 
-.gameplay-side-col .players {
+.gameplay-side-col .actions {
   order: 3;
 }
 
