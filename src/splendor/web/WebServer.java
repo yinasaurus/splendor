@@ -39,6 +39,7 @@ import splendor.rules.GameRules;
 public class WebServer {
 
 	private static final String DEFAULT_ROOM = "Room A";
+	private static final int ACTION_LOG_LIMIT = 12;
 	private static final Map<String, GameSession> sessions = new HashMap<>();
 
 	private static class GameSession {
@@ -58,11 +59,19 @@ public class WebServer {
 		if (text == null || text.trim().isEmpty()) {
 			return;
 		}
-		session.actionLog.add(text.trim());
+		String normalized = text.trim();
+		// Skip immediate duplicates to keep the feed readable.
+		if (!session.actionLog.isEmpty()) {
+			String last = session.actionLog.get(session.actionLog.size() - 1);
+			if (normalized.equals(last)) {
+				return;
+			}
+		}
+		session.actionLog.add(normalized);
 		// Keep the feed short and readable.
-		if (session.actionLog.size() > 15) {
+		if (session.actionLog.size() > ACTION_LOG_LIMIT) {
 			session.actionLog = new ArrayList<>(
-				session.actionLog.subList(session.actionLog.size() - 15, session.actionLog.size()));
+				session.actionLog.subList(session.actionLog.size() - ACTION_LOG_LIMIT, session.actionLog.size()));
 		}
 	}
 
@@ -235,10 +244,15 @@ public class WebServer {
 	 * @param numPlayers number of players (2-4)
 	 */
 	private static void startNewGame(GameSession session, int numPlayers, String[] types) {
-		startNewGame(session, numPlayers, types, null);
+		startNewGame(session, numPlayers, types, null, true);
 	}
 
 	private static void startNewGame(GameSession session, int numPlayers, String[] types, List<String> customNames) {
+		startNewGame(session, numPlayers, types, customNames, true);
+	}
+
+	private static void startNewGame(GameSession session, int numPlayers, String[] types, List<String> customNames,
+			boolean logStartMessage) {
 		if (numPlayers < 2) {
 			numPlayers = 2;
 		} else if (numPlayers > 4) {
@@ -275,7 +289,9 @@ public class WebServer {
 			}
 		}
 		session.actionLog.clear();
-		addActionLog(session, "New game started.");
+		if (logStartMessage) {
+			addActionLog(session, "New game started.");
+		}
 		session.turnNumber = 1;
 	}
 
@@ -661,7 +677,7 @@ public class WebServer {
 				types[i] = (aiDifficulty == null || aiDifficulty.trim().isEmpty()) ? "human" : aiDifficulty.trim().toLowerCase();
 			}
 
-			startNewGame(session, actualPlayers, types, lobbyOrder);
+			startNewGame(session, actualPlayers, types, lobbyOrder, false);
 			session.lobbyNumPlayers = actualPlayers;
 			session.gameStarted = true;
 			addActionLog(session, "Match started by " + session.ownerName + ".");

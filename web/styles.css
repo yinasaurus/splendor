@@ -697,11 +697,10 @@ main {
 }
 
 .noble-card {
-  display: grid;
-  grid-template-columns: 76px 1fr;
-  gap: 10px 12px;
+  display: flex;
+  gap: 8px;
   align-items: stretch;
-  padding: 8px 10px;
+  padding: 9px 10px;
   background: linear-gradient(145deg, rgba(32, 28, 44, 0.85), rgba(18, 16, 28, 0.92));
   border-radius: var(--radius-md);
   border: 1px solid rgba(232, 163, 23, 0.2);
@@ -710,26 +709,11 @@ main {
 }
 
 .noble-card__portrait {
-  border-radius: 10px;
-  min-height: 88px;
-  background:
-    radial-gradient(circle at 30% 25%, rgba(255, 224, 130, 0.45), transparent 45%),
-    radial-gradient(circle at 70% 80%, rgba(100, 80, 140, 0.35), transparent 50%),
-    linear-gradient(165deg, #3d2a1a 0%, #1a1210 50%, #2a2038 100%);
-  border: 1px solid rgba(232, 163, 23, 0.35);
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25);
-  position: relative;
+  display: none;
 }
 
 .noble-card__portrait::after {
-  content: "♛";
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 1.25rem;
-  opacity: 0.45;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  display: none;
 }
 
 .noble-card__body {
@@ -744,6 +728,7 @@ main {
   font-weight: 600;
   color: #e8eaf0;
   line-height: 1.25;
+  font-size: 0.78rem;
 }
 
 .noble-card__reqs {
@@ -752,7 +737,7 @@ main {
 }
 
 .noble-card__reqs .pill {
-  padding: 3px 5px;
+  padding: 3px 6px;
   font-size: 0.62rem;
   border-radius: 8px;
 }
@@ -770,17 +755,7 @@ main {
 
 @media (max-width: 520px) {
   .noble-card {
-    grid-template-columns: 1fr;
-  }
-
-  .noble-card__portrait {
-    min-height: 52px;
-    max-height: 64px;
-  }
-
-  .noble-card__portrait::after {
-    font-size: 1rem;
-    bottom: 4px;
+    padding: 8px 9px;
   }
 }
 
@@ -1082,11 +1057,8 @@ main {
   letter-spacing: 0.01em;
 }
 
-.take-gem-option__locked {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #d5b56f;
-  opacity: 0.9;
+.take-gem-option--readonly {
+  opacity: 0.88;
 }
 
 .take-gem-option__controls {

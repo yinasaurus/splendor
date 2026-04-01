@@ -97,6 +97,7 @@ let latestState = null;
 let lastSeenTurnNumber = null;
 let lastSeenActionCount = 0;
 let suppressRealtimeToasts = true;
+let lastAutoRejoinAt = 0;
 
 const KNOWN_GEMS = new Set(["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"]);
 const GEM_ABBR_TO_NAME = {
@@ -1076,7 +1077,7 @@ function renderState(state) {
       .flat()
       .some((c) => !!c.affordable);
     if (!isMyTurn) {
-      suggestions.push("Wait for AI turns to finish.");
+      suggestions.push(isAiTurn ? "Wait for AI turns to finish." : "Wait for the other player to finish their turn.");
     } else {
       if (currentReservedCount >= 3) {
         suggestions.push("Reserve is full (3/3). Purchase a reserved card to free a slot.");
@@ -1253,10 +1254,8 @@ function setupGemSelection() {
     controls.className = "take-gem-option__controls";
 
     if (gem === "GOLD") {
-      const lock = document.createElement("span");
-      lock.className = "take-gem-option__locked";
-      lock.textContent = "Reserve to gain";
-      controls.appendChild(lock);
+      row.classList.add("take-gem-option--readonly");
+      controls.classList.add("hidden");
       row.appendChild(preview);
       row.appendChild(controls);
       container.appendChild(row);
@@ -1627,6 +1626,8 @@ async function init() {
     if (liveSyncInFlight) {
       return;
     }
+    const inWaitingRoom = !waitingRoom.classList.contains("hidden");
+    const inGame = !gameUi.classList.contains("hidden");
     const onHomeScreen =
       !startScreen.classList.contains("hidden") &&
       waitingRoom.classList.contains("hidden") &&
@@ -1636,9 +1637,25 @@ async function init() {
     }
     liveSyncInFlight = true;
     try {
-      const state = await fetchState();
-      const inWaitingRoom = !waitingRoom.classList.contains("hidden");
-      const inGame = !gameUi.classList.contains("hidden");
+      let state = await fetchState();
+      const inLobbyList =
+        !!(
+          currentPlayerName &&
+          state &&
+          state.lobby &&
+          Array.isArray(state.lobby.players) &&
+          state.lobby.players.some((p) => p.name === currentPlayerName)
+        );
+      const now = Date.now();
+      if ((inWaitingRoom || inGame) && currentPlayerName && !inLobbyList && now - lastAutoRejoinAt > 7000) {
+        lastAutoRejoinAt = now;
+        try {
+          await postJoinRoom({ room: currentRoom, name: currentPlayerName });
+          state = await fetchState();
+        } catch (_) {
+          // Ignore and retry later; prevents UI from being stuck after backend idles/restarts.
+        }
+      }
       if (inWaitingRoom) {
         renderLobbyStatus(state);
         if (state && state.lobby && state.lobby.gameStarted) {
