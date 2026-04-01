@@ -149,6 +149,7 @@ let lastRecoveryToastAt = 0;
 let suppressRemovedToastUntil = 0;
 let lastGemUiTurnNumber = null;
 let reconnectInFlight = false;
+let consecutiveLobbyMissingTicks = 0;
 const expandedBoughtByPlayer = new Set();
 
 const KNOWN_GEMS = new Set(["RUBY", "EMERALD", "SAPPHIRE", "DIAMOND", "ONYX", "GOLD"]);
@@ -284,9 +285,11 @@ function computeLiveStateDigest(state) {
             const name = p && p.name ? p.name : "";
             const prestige = Number(p && p.prestige ? p.prestige : 0);
             const reserved = Number(p && p.reservedCount ? p.reservedCount : 0);
+            const afkSeconds = Number.isFinite(Number(p && p.afkSeconds)) ? Number(p.afkSeconds) : 0;
+            const forcedAi = p && p.forcedAi ? 1 : 0;
             const gems = p && p.gems ? JSON.stringify(p.gems) : "{}";
             const bonuses = p && p.bonuses ? JSON.stringify(p.bonuses) : "{}";
-            return `${name}:${prestige}:${reserved}:${gems}:${bonuses}`;
+            return `${name}:${prestige}:${reserved}:${afkSeconds}:${forcedAi}:${gems}:${bonuses}`;
           })
           .join("||")
       : "";
@@ -2596,21 +2599,24 @@ async function init() {
           state.lobby.players.some((p) => samePlayerName(p && p.name, currentPlayerName))
         );
       const now = Date.now();
-      if (!tutorialFlags.active && inWaitingRoom && currentPlayerName && hasLobbyList && !inLobbyList && now - lastAutoRejoinAt > 7000) {
+      if (inLobbyList) {
+        consecutiveLobbyMissingTicks = 0;
+      } else if (inWaitingRoom && hasLobbyList && !inLobbyList) {
+        consecutiveLobbyMissingTicks += 1;
+      }
+      const lobbyGameStarted = !!(state && state.lobby && state.lobby.gameStarted);
+      if (!tutorialFlags.active && inWaitingRoom && currentPlayerName && hasLobbyList && !inLobbyList && !lobbyGameStarted && consecutiveLobbyMissingTicks >= 3 && now - lastAutoRejoinAt > 7000) {
         lastAutoRejoinAt = now;
-        // Transient desyncs happen on reconnect; try to reclaim the same seat once
-        // before treating this as a genuine removal.
+        // Only treat as removed after consecutive misses and failed recovery.
         const recovered = await tryRecoverRoomConnection(inWaitingRoom, inGame);
         if (recovered) {
+          consecutiveLobbyMissingTicks = 0;
           showToast("Reconnected to room.");
           return;
         }
-        showToast("You were removed from this room.", "error");
-        clearAutoRejoinIntent();
-        clearRememberedSeatToken(currentRoom, currentPlayerName);
-        currentSessionToken = "";
-        showStartScreen();
-        stopLiveSync();
+        showToast("Connection issue: could not rejoin automatically. Use Join Room with your code.", "error");
+        // Keep identity/token so manual rejoin can recover the same match.
+        showWaitingRoom();
         return;
       }
       if (inWaitingRoom) {
@@ -3039,12 +3045,18 @@ async function init() {
       currentSessionToken = getRememberedSeatToken(currentRoom, currentPlayerName) || currentSessionToken;
     }
     renderLobbyStatus(state);
-    const inRoom =
+    const inLobbyRoom =
       currentPlayerName &&
       state &&
       state.lobby &&
       Array.isArray(state.lobby.players) &&
       state.lobby.players.some((p) => samePlayerName(p && p.name, currentPlayerName));
+    const inGamePlayers =
+      currentPlayerName &&
+      state &&
+      Array.isArray(state.players) &&
+      state.players.some((p) => samePlayerName(p && p.name, currentPlayerName));
+    const inRoom = !!(inLobbyRoom || inGamePlayers);
     if (inRoom && pathRoom) {
       if (state.lobby.gameStarted) {
         enterGameUiFromState(state, true);
@@ -3053,8 +3065,7 @@ async function init() {
       }
     } else if (pathRoom) {
       clearAutoRejoinIntent();
-      clearRememberedSeatToken(currentRoom, currentPlayerName);
-      currentSessionToken = "";
+      // Keep remembered seat token/name so manual Join Room can still reclaim seat.
       showHome(false);
       showToast(`Could not auto-rejoin ${currentRoom}. Enter your name, then Join Room.`, "error");
     } else {

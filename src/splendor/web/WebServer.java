@@ -376,6 +376,23 @@ public class WebServer {
 		return sessions.get(room);
 	}
 
+	/**
+	 * Returns an in-memory session if present, otherwise restores from snapshot
+	 * only when this room was previously known. Never creates a brand-new room.
+	 */
+	private static GameSession getExistingOrRecoveredSession(String roomName) {
+		String room = cleanRoomName(roomName);
+		GameSession existing = sessions.get(room);
+		if (existing != null) {
+			return existing;
+		}
+		Map<String, LobbySnapshot> snapshots = loadSnapshots();
+		if (snapshots == null || !snapshots.containsKey(room)) {
+			return null;
+		}
+		return getOrCreateSession(room);
+	}
+
 	private static String generateRoomCode() {
 		String raw = UUID.randomUUID().toString().replace("-", "").toUpperCase();
 		return "SP-" + raw.substring(0, 6);
@@ -715,7 +732,16 @@ public class WebServer {
 
 			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 			String room = extractStringField(body, "room", DEFAULT_ROOM);
-			GameSession session = getOrCreateSession(room);
+			GameSession session = getExistingOrRecoveredSession(room);
+			if (session == null) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("sessionMissing", true);
+				resp.put("room", room);
+				resp.put("message", "Room not found or session expired. Ask the host to recreate the room.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			int numPlayers = extractIntField(body, "numPlayers", 2);
 			String[] types = new String[4];
 			types[0] = extractStringField(body, "p1Type", "human");
@@ -756,7 +782,16 @@ public class WebServer {
 			}
 			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 			String room = extractStringField(body, "room", DEFAULT_ROOM);
-			GameSession session = getOrCreateSession(room);
+			GameSession session = getExistingOrRecoveredSession(room);
+			if (session == null) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("sessionMissing", true);
+				resp.put("room", room);
+				resp.put("message", "Room not found or session expired. Ask the host to recreate the room.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			startNewGame(session, 2, new String[] { "human", "human", "human", "human" });
 			initializeLobby(session, "Host", 2, new String[] { "human", "human", "human", "human" });
 			Map<String, Object> resp = new HashMap<>();
@@ -916,7 +951,16 @@ public class WebServer {
 				name = "Guest";
 			}
 
-			GameSession session = getOrCreateSession(room);
+			GameSession session = getExistingOrRecoveredSession(room);
+			if (session == null) {
+				Map<String, Object> resp = new HashMap<>();
+				resp.put("success", false);
+				resp.put("sessionMissing", true);
+				resp.put("room", room);
+				resp.put("message", "Room not found or session expired. Ask the host to recreate the room.");
+				sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
+				return;
+			}
 			name = canonicalizeLobbyName(session, name);
 			if (!session.readyByPlayer.containsKey(name) && session.readyByPlayer.size() >= session.lobbyNumPlayers) {
 				// Room-code join should not be blocked by the original selected count.
