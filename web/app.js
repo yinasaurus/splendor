@@ -569,7 +569,8 @@ function renderState(state) {
   const recommendedSteps = document.getElementById("recommended-steps");
   const activityLog = document.getElementById("activity-log");
   const currentPlayerData = (state.players || []).find((p) => p.name === state.currentPlayer) || null;
-  const isHumanTurn = !!(state.isMyTurn != null ? state.isMyTurn : state.isHumanTurn);
+  const isMyTurn = !!(state.isMyTurn != null ? state.isMyTurn : state.isHumanTurn);
+  const isAiTurn = state.isHumanTurn === false;
   const currentReservedCount = currentPlayerData ? (currentPlayerData.reservedCount || 0) : 0;
   const turnNo = Number.isFinite(state.turnNumber) ? state.turnNumber : 1;
   const roundNo = Number.isFinite(state.roundNumber) ? state.roundNumber : 1;
@@ -611,7 +612,14 @@ function renderState(state) {
     gameOverWrap.classList.add("hidden");
   }
 
-  let turnLine = `Round ${roundNo} · Turn ${turnNo} · Current Player: ${state.currentPlayer}${isHumanTurn ? " (Your turn)" : " (AI turn)"}`;
+  let turnLine = `Round ${roundNo} · Turn ${turnNo} · Current Player: ${state.currentPlayer}`;
+  if (isAiTurn) {
+    turnLine += " (AI turn)";
+  } else if (isMyTurn) {
+    turnLine += " (Your turn)";
+  } else {
+    turnLine += " (Other player's turn)";
+  }
   if (state.endgameFinalRound) {
     turnLine += " · Final round: each player takes one more turn";
   }
@@ -752,17 +760,17 @@ function renderState(state) {
       buyBtn.type = "button";
       buyBtn.className = "card-buy-btn";
       buyBtn.textContent = "Buy";
-      buyBtn.disabled = !isHumanTurn || !card.affordable;
-      const canBuy = isHumanTurn && !!card.affordable;
-      if (isHumanTurn && card.affordable) {
+      buyBtn.disabled = !isMyTurn || !card.affordable;
+      const canBuy = isMyTurn && !!card.affordable;
+      if (isMyTurn && card.affordable) {
         buyBtn.classList.add("card-buy-btn--affordable");
       }
       const reserveBtn = document.createElement("button");
       reserveBtn.type = "button";
       reserveBtn.className = "secondary";
       reserveBtn.textContent = "Reserve";
-      reserveBtn.disabled = !isHumanTurn || currentReservedCount >= 3;
-      const canReserve = isHumanTurn && currentReservedCount < 3;
+      reserveBtn.disabled = !isMyTurn || currentReservedCount >= 3;
+      const canReserve = isMyTurn && currentReservedCount < 3;
       if (!canBuy && !canReserve) {
         li.classList.add("dev-card--locked");
       }
@@ -812,7 +820,7 @@ function renderState(state) {
       li.appendChild(chrome);
 
       li.addEventListener("click", async () => {
-        if (!isHumanTurn) {
+        if (!isMyTurn) {
           return;
         }
         try {
@@ -986,7 +994,7 @@ function renderState(state) {
           buyR.className = "reserved-mini__buy card-buy-btn";
           buyR.textContent = "Buy reserved";
           const isYou = p.name === state.currentPlayer;
-          const canBuyReserved = isHumanTurn && isYou && p.human && !!rc.affordable;
+          const canBuyReserved = isMyTurn && isYou && p.human && !!rc.affordable;
           buyR.disabled = !canBuyReserved;
           buyR.title = canBuyReserved
             ? "Buy this reserved card"
@@ -1019,7 +1027,7 @@ function renderState(state) {
     const affordableVisible = Object.values(state.levels || {})
       .flat()
       .some((c) => !!c.affordable);
-    if (!isHumanTurn) {
+    if (!isMyTurn) {
       suggestions.push("Wait for AI turns to finish.");
     } else {
       if (currentReservedCount >= 3) {
@@ -1061,13 +1069,13 @@ function renderState(state) {
     }
   }
 
-  // Only show available actions for the active human turn.
+  // Only show available actions for the active local player's turn.
   const takeBtn = document.getElementById("take-gems-btn");
   if (takeBtn) {
-    takeBtn.disabled = !isHumanTurn;
+    takeBtn.disabled = !isMyTurn;
   }
   document.querySelectorAll("#take-gems-options button").forEach((btn) => {
-    btn.disabled = !isHumanTurn;
+    btn.disabled = !isMyTurn;
   });
   // Realtime popups: new action and turn changes.
   if (!suppressRealtimeToasts) {
