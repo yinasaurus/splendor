@@ -816,7 +816,7 @@ public class WebServer {
 			}
 
 			String room = getRoomFromQuery(exchange);
-			GameSession session = getExistingSession(room);
+			GameSession session = getExistingOrRecoveredSession(room);
 			if (session == null) {
 				Map<String, Object> resp = new HashMap<>();
 				resp.put("success", false);
@@ -864,7 +864,7 @@ public class WebServer {
 
 			String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
 			String room = extractStringField(body, "room", DEFAULT_ROOM);
-			GameSession session = getExistingSession(room);
+			GameSession session = getExistingOrRecoveredSession(room);
 			if (session == null) {
 				Map<String, Object> resp = new HashMap<>();
 				resp.put("success", false);
