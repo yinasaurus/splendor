@@ -289,6 +289,11 @@ function getRememberedRoom() {
   }
 }
 
+function generateFallbackName(prefix = "Guest") {
+  const n = Math.floor(1000 + Math.random() * 9000);
+  return `${prefix}-${n}`;
+}
+
 /** Pathnames that must not be treated as a room code (static assets, etc.). */
 const URL_PATH_RESERVED = new Set(
   ["app.js", "styles.css", "config.js", "index.html", "favicon.ico", "robots.txt", "sitemap.xml", "media"].map(
@@ -747,6 +752,7 @@ function renderState(state) {
       buyBtn.className = "card-buy-btn";
       buyBtn.textContent = "Buy";
       buyBtn.disabled = !isHumanTurn || !card.affordable;
+      const canBuy = isHumanTurn && !!card.affordable;
       if (isHumanTurn && card.affordable) {
         buyBtn.classList.add("card-buy-btn--affordable");
       }
@@ -755,6 +761,10 @@ function renderState(state) {
       reserveBtn.className = "secondary";
       reserveBtn.textContent = "Reserve";
       reserveBtn.disabled = !isHumanTurn || currentReservedCount >= 3;
+      const canReserve = isHumanTurn && currentReservedCount < 3;
+      if (!canBuy && !canReserve) {
+        li.classList.add("dev-card--locked");
+      }
 
       buyBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
@@ -1607,6 +1617,21 @@ async function init() {
     return (playerNameInput.value || "").trim();
   }
 
+  function ensureCurrentPlayerName(preferredPrefix) {
+    const enteredName = getEnteredName();
+    if (enteredName) {
+      currentPlayerName = enteredName;
+      return currentPlayerName;
+    }
+    const fallback = generateFallbackName(preferredPrefix || "Guest");
+    currentPlayerName = fallback;
+    if (playerNameInput) {
+      playerNameInput.value = fallback;
+    }
+    showToast(`Using temporary name: ${fallback}`);
+    return currentPlayerName;
+  }
+
   function updateGuidedOverlay() {
     guidedStepLabel.textContent = `Step ${guidedIndex + 1} of ${guidedSteps.length}`;
     guidedStepText.textContent = guidedSteps[guidedIndex];
@@ -1680,12 +1705,7 @@ async function init() {
   if (createRoomBtn) {
     createRoomBtn.addEventListener("click", async () => {
       try {
-        const enteredName = getEnteredName();
-        if (!enteredName) {
-          showToast("Please enter your name first.", "error");
-          return;
-        }
-        currentPlayerName = enteredName;
+        currentPlayerName = ensureCurrentPlayerName("Host");
         const numPlayers = parseInt(numPlayersSelect.value, 10);
         const roomInput = "";
         const created = await postCreateRoom({
@@ -1748,12 +1768,7 @@ async function init() {
 
   if (joinRoomBtn) {
     joinRoomBtn.addEventListener("click", () => {
-      const enteredName = getEnteredName();
-      if (!enteredName) {
-        showToast("Please enter your name first.", "error");
-        return;
-      }
-      currentPlayerName = enteredName;
+      currentPlayerName = ensureCurrentPlayerName("Guest");
       openJoinRoomDialog();
     });
   }
@@ -1789,12 +1804,7 @@ async function init() {
     readyBtn.addEventListener("click", async () => {
       try {
         if (!currentPlayerName) {
-          const enteredName = getEnteredName();
-          if (!enteredName) {
-            showToast("Please enter your name first.", "error");
-            return;
-          }
-          currentPlayerName = enteredName;
+          currentPlayerName = ensureCurrentPlayerName("Guest");
         }
         const nextReady = !currentReady;
         await postReady({ room: currentRoom, name: currentPlayerName, ready: nextReady });
