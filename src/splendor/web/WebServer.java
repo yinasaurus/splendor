@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Properties;
 
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
@@ -44,6 +45,15 @@ public class WebServer {
 	private static final int ACTION_LOG_LIMIT = 12;
 	private static final int AFK_AI_THRESHOLD_SECONDS = 90;
 	private static final Map<String, GameSession> sessions = new HashMap<>();
+	private static final Path LOBBY_SNAPSHOT_FILE = Paths.get("data", "web_lobbies.properties");
+
+	private static class LobbySnapshot {
+		String ownerName = "Host";
+		int lobbyNumPlayers = 2;
+		boolean gameStarted = false;
+		LinkedHashMap<String, Boolean> readyByPlayer = new LinkedHashMap<>();
+		LinkedHashMap<String, String> aiByName = new LinkedHashMap<>();
+	}
 
 	private static class GameSession {
 		GameController controller;
@@ -94,6 +104,134 @@ public class WebServer {
 			session.forcedAiByName.remove(name);
 			session.forcedAiDifficultyByName.remove(name);
 			addActionLog(session, name + " returned and resumed control.");
+		}
+	}
+
+	private static String enc(String text) {
+		if (text == null) {
+			return "";
+		}
+		try {
+			return java.net.URLEncoder.encode(text, StandardCharsets.UTF_8.name());
+		} catch (Exception e) {
+			return text;
+		}
+	}
+
+	private static String dec(String text) {
+		if (text == null) {
+			return "";
+		}
+		try {
+			return java.net.URLDecoder.decode(text, StandardCharsets.UTF_8.name());
+		} catch (Exception e) {
+			return text;
+		}
+	}
+
+	private static String encodeSnapshot(LobbySnapshot snap) {
+		StringBuilder players = new StringBuilder();
+		boolean first = true;
+		for (Map.Entry<String, Boolean> e : snap.readyByPlayer.entrySet()) {
+			if (!first) players.append(",");
+			first = false;
+			players.append(enc(e.getKey())).append("~").append(Boolean.TRUE.equals(e.getValue()) ? "1" : "0");
+		}
+		StringBuilder ai = new StringBuilder();
+		first = true;
+		for (Map.Entry<String, String> e : snap.aiByName.entrySet()) {
+			if (!first) ai.append(",");
+			first = false;
+			ai.append(enc(e.getKey())).append("~").append(enc(e.getValue()));
+		}
+		return enc(snap.ownerName) + "|" + snap.lobbyNumPlayers + "|" + (snap.gameStarted ? "1" : "0") + "|" + players + "|" + ai;
+	}
+
+	private static LobbySnapshot decodeSnapshot(String raw) {
+		if (raw == null || raw.trim().isEmpty()) {
+			return null;
+		}
+		String[] parts = raw.split("\\|", -1);
+		if (parts.length < 5) {
+			return null;
+		}
+		LobbySnapshot snap = new LobbySnapshot();
+		snap.ownerName = dec(parts[0]);
+		try {
+			snap.lobbyNumPlayers = Math.max(2, Math.min(4, Integer.parseInt(parts[1])));
+		} catch (NumberFormatException e) {
+			snap.lobbyNumPlayers = 2;
+		}
+		snap.gameStarted = "1".equals(parts[2]);
+		if (!parts[3].isEmpty()) {
+			for (String item : parts[3].split(",")) {
+				if (item == null || item.isEmpty()) continue;
+				String[] kv = item.split("~", -1);
+				if (kv.length < 2) continue;
+				String name = dec(kv[0]).trim();
+				if (name.isEmpty()) continue;
+				snap.readyByPlayer.put(name, "1".equals(kv[1]));
+			}
+		}
+		if (!parts[4].isEmpty()) {
+			for (String item : parts[4].split(",")) {
+				if (item == null || item.isEmpty()) continue;
+				String[] kv = item.split("~", -1);
+				if (kv.length < 2) continue;
+				String name = dec(kv[0]).trim();
+				String diff = dec(kv[1]).trim().toLowerCase();
+				if (name.isEmpty() || diff.isEmpty()) continue;
+				snap.aiByName.put(name, diff);
+			}
+		}
+		return snap;
+	}
+
+	private static LobbySnapshot snapshotFromSession(GameSession session) {
+		LobbySnapshot snap = new LobbySnapshot();
+		snap.ownerName = session.ownerName;
+		snap.lobbyNumPlayers = session.lobbyNumPlayers;
+		snap.gameStarted = session.gameStarted;
+		snap.readyByPlayer.putAll(session.readyByPlayer);
+		snap.aiByName.putAll(session.aiByName);
+		return snap;
+	}
+
+	private static Map<String, LobbySnapshot> loadSnapshots() {
+		Map<String, LobbySnapshot> out = new HashMap<>();
+		try {
+			if (!Files.exists(LOBBY_SNAPSHOT_FILE)) {
+				return out;
+			}
+			Properties p = new Properties();
+			try (java.io.InputStream in = Files.newInputStream(LOBBY_SNAPSHOT_FILE)) {
+				p.load(in);
+			}
+			for (String room : p.stringPropertyNames()) {
+				LobbySnapshot snap = decodeSnapshot(p.getProperty(room));
+				if (snap != null) {
+					out.put(cleanRoomName(room), snap);
+				}
+			}
+		} catch (Exception ignored) {
+		}
+		return out;
+	}
+
+	private static void saveSnapshots() {
+		try {
+			Files.createDirectories(LOBBY_SNAPSHOT_FILE.getParent());
+			Properties p = new Properties();
+			for (Map.Entry<String, GameSession> e : sessions.entrySet()) {
+				String room = cleanRoomName(e.getKey());
+				if (room.isEmpty()) continue;
+				LobbySnapshot snap = snapshotFromSession(e.getValue());
+				p.setProperty(room, encodeSnapshot(snap));
+			}
+			try (java.io.OutputStream out = Files.newOutputStream(LOBBY_SNAPSHOT_FILE)) {
+				p.store(out, "Splendor web lobby snapshots");
+			}
+		} catch (Exception ignored) {
 		}
 	}
 
@@ -165,8 +303,37 @@ public class WebServer {
 			return existing;
 		}
 		GameSession created = new GameSession();
-		startNewGame(created, 2, new String[] { "human", "human", "human", "human" });
+		Map<String, LobbySnapshot> snapshots = loadSnapshots();
+		LobbySnapshot snap = snapshots.get(room);
+		if (snap != null) {
+			initializeLobby(created, snap.ownerName, snap.lobbyNumPlayers, new String[] { "human", "human", "human", "human" });
+			created.readyByPlayer.clear();
+			created.readyByPlayer.putAll(snap.readyByPlayer);
+			created.aiByName.clear();
+			created.aiByName.putAll(snap.aiByName);
+			ensureLobbyOwner(created, snap.ownerName);
+			if (snap.gameStarted && created.readyByPlayer.size() >= 2) {
+				List<String> lobbyOrder = new ArrayList<>(created.readyByPlayer.keySet());
+				int actualPlayers = Math.min(created.lobbyNumPlayers, lobbyOrder.size());
+				String[] types = new String[] { "human", "human", "human", "human" };
+				for (int i = 0; i < actualPlayers; i++) {
+					String name = lobbyOrder.get(i);
+					String diff = created.aiByName.get(name);
+					types[i] = (diff == null || diff.trim().isEmpty()) ? "human" : diff.trim().toLowerCase();
+				}
+				startNewGame(created, actualPlayers, types, lobbyOrder, false);
+				created.gameStarted = true;
+				addActionLog(created, "Room recovered after server restart.");
+			} else {
+				startNewGame(created, Math.max(2, Math.min(4, created.readyByPlayer.size())),
+					new String[] { "human", "human", "human", "human" }, new ArrayList<>(created.readyByPlayer.keySet()), false);
+				created.gameStarted = false;
+			}
+		} else {
+			startNewGame(created, 2, new String[] { "human", "human", "human", "human" });
+		}
 		sessions.put(room, created);
+		saveSnapshots();
 		return created;
 	}
 
@@ -194,6 +361,7 @@ public class WebServer {
 		session.gameStarted = false;
 		session.actionLog.clear();
 		addActionLog(session, "Lobby created by " + session.ownerName + ".");
+		saveSnapshots();
 	}
 
 	private static boolean canStartLobby(GameSession session) {
@@ -516,6 +684,7 @@ public class WebServer {
 			startNewGame(session, numPlayers, types);
 			initializeLobby(session, "Host", numPlayers, types);
 			session.gameStarted = true;
+			saveSnapshots();
 
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
@@ -710,6 +879,7 @@ public class WebServer {
 			markPlayerSeen(session, name);
 			ensureLobbyOwner(session, name);
 			addActionLog(session, name + " joined lobby.");
+			saveSnapshots();
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
 			resp.put("room", room);
@@ -741,6 +911,7 @@ public class WebServer {
 			session.readyByPlayer.put(name, ready);
 			markPlayerSeen(session, name);
 			addActionLog(session, name + (ready ? " is ready." : " is not ready."));
+			saveSnapshots();
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
 			resp.put("room", room);
@@ -805,6 +976,7 @@ public class WebServer {
 			session.lobbyNumPlayers = actualPlayers;
 			session.gameStarted = true;
 			addActionLog(session, "Match started by " + session.ownerName + ".");
+			saveSnapshots();
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
 			resp.put("room", room);
@@ -862,6 +1034,7 @@ public class WebServer {
 				session.forcedAiDifficultyByName.remove(target);
 				addActionLog(session, target + " AI takeover disabled.");
 			}
+			saveSnapshots();
 			resp.put("success", true);
 			resp.put("target", target);
 			resp.put("enabled", enable);
@@ -908,6 +1081,7 @@ public class WebServer {
 			session.aiByName.put(aiName, difficulty);
 			session.readyByPlayer.put(aiName, true);
 			addActionLog(session, aiName + " added (" + difficulty + ").");
+			saveSnapshots();
 			resp.put("success", true);
 			resp.put("name", aiName);
 			resp.put("difficulty", difficulty);
@@ -952,6 +1126,7 @@ public class WebServer {
 			session.readyByPlayer.remove(target);
 			session.aiByName.remove(target);
 			addActionLog(session, target + " was removed from lobby.");
+			saveSnapshots();
 			resp.put("success", true);
 			resp.put("target", target);
 			sendResponse(exchange, 200, toJson(resp), "application/json; charset=utf-8");
@@ -999,6 +1174,7 @@ public class WebServer {
 				session.ownerName = newName;
 			}
 			addActionLog(session, oldName + " is now " + newName + ".");
+			saveSnapshots();
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
 			resp.put("oldName", oldName);

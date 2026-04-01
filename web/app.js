@@ -123,8 +123,7 @@ function gemDotMarkup(gem) {
 function gemSpriteLegacyMarkup(gem, kind) {
   const raw = gem && String(gem);
   const g = KNOWN_GEMS.has(raw) ? raw : "DIAMOND";
-  const useChip = kind !== "stone" || g === "GOLD";
-  const type = useChip ? "chip" : "stone";
+  const type = kind === "stone" ? "stone" : "chip";
   return `<span class="gem-sprite gem-sprite--${type} gem-sprite--${g}" role="img" aria-hidden="true"></span>`;
 }
 
@@ -873,7 +872,6 @@ function renderState(state) {
       buyBtn.textContent = "Buy";
       buyBtn.disabled = !isMyTurn || !card.affordable;
       const canBuy = isMyTurn && !!card.affordable;
-      buyBtn.title = canBuy ? "Buy this card" : !isMyTurn ? "Not your turn" : "Not affordable yet";
       if (isMyTurn && card.affordable) {
         buyBtn.classList.add("card-buy-btn--affordable");
       }
@@ -883,10 +881,8 @@ function renderState(state) {
       reserveBtn.textContent = "Reserve";
       reserveBtn.disabled = !isMyTurn || currentReservedCount >= 3;
       const canReserve = isMyTurn && currentReservedCount < 3;
-      reserveBtn.title = canReserve ? "Reserve this card" : !isMyTurn ? "Not your turn" : "Reserve full (3/3)";
       if (!canBuy && !canReserve) {
         li.classList.add("dev-card--locked");
-        li.title = !isMyTurn ? "This card is locked: not your turn." : "This card is locked: cannot buy or reserve right now.";
       }
 
       buyBtn.addEventListener("click", async (e) => {
@@ -934,7 +930,10 @@ function renderState(state) {
       li.appendChild(chrome);
 
       li.addEventListener("click", async () => {
-        if (!isMyTurn) {
+        if (!isMyTurn || !canBuy) {
+          if (isMyTurn && !canBuy) {
+            showToast("Not affordable yet.", "error");
+          }
           return;
         }
         try {
@@ -961,9 +960,10 @@ function renderState(state) {
   // Players
   players.innerHTML = "";
   if (state.players) {
+    const basePlayers = displayPlayers.length > 0 ? displayPlayers : (state.players || []);
     const orderedPlayers = [];
-    for (let i = 0; i < state.players.length; i++) {
-      orderedPlayers.push(state.players[(i + playerViewOffset) % state.players.length]);
+    for (let i = 0; i < basePlayers.length; i++) {
+      orderedPlayers.push(basePlayers[(i + playerViewOffset) % basePlayers.length]);
     }
     orderedPlayers.forEach((p) => {
       const card = document.createElement("div");
@@ -981,11 +981,15 @@ function renderState(state) {
       const afkMeta = document.createElement("div");
       afkMeta.className = "player-afk-meta";
       const afkSec = Number.isFinite(Number(p.afkSeconds)) ? Number(p.afkSeconds) : 0;
+      const afkThreshold = Number.isFinite(Number(state.afkAiThresholdSeconds))
+        ? Number(state.afkAiThresholdSeconds)
+        : 90;
       const forcedAi = !!p.forcedAi;
       if (p.human && forcedAi) {
         afkMeta.textContent = "AI takeover active";
       } else if (p.human && afkSec >= 15) {
-        afkMeta.textContent = `AFK: ${afkSec}s`;
+        const left = Math.max(0, afkThreshold - afkSec);
+        afkMeta.textContent = left > 0 ? `AFK takeover in: ${left}s` : "AFK takeover available";
       } else {
         afkMeta.textContent = "";
       }
@@ -1184,7 +1188,7 @@ function renderState(state) {
           buyR.type = "button";
           buyR.className = "reserved-mini__buy card-buy-btn";
           buyR.textContent = "Buy reserved";
-          const isYou = p.name === currentDisplayName;
+          const isYou = samePlayerName(p.name, currentDisplayName);
           const canBuyReserved = isMyTurn && isYou && p.human && !!rc.affordable;
           buyR.disabled = !canBuyReserved;
           buyR.title = canBuyReserved
