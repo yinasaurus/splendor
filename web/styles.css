@@ -622,6 +622,18 @@ main {
   font-weight: 700;
 }
 
+.game-over-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#game-ui.game-over-mode .game-over-actions {
+  width: min(760px, 100%);
+  justify-content: flex-start;
+}
+
 .room-code-display {
   font-size: 0.8rem;
   color: #b7c4e8;

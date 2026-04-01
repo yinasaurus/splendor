@@ -1010,6 +1010,8 @@ function renderState(state) {
   const gameOverBanner = document.getElementById("game-over");
   const gameOverHint = document.getElementById("game-over-hint");
   const leaderboardEl = document.getElementById("leaderboard");
+  const playAgainRoomBtn = document.getElementById("play-again-room-btn");
+  const gameOverHomeBtn = document.getElementById("game-over-home-btn");
   const boardGems = document.getElementById("board-gems");
   const nobles = document.getElementById("nobles");
   const players = document.getElementById("players");
@@ -1080,6 +1082,49 @@ function renderState(state) {
       li.textContent = `${idx + 1}. ${p.name} — ${pts} prestige · ${cards} cards`;
       leaderboardEl.appendChild(li);
     });
+    if (playAgainRoomBtn) {
+      playAgainRoomBtn.disabled = false;
+      playAgainRoomBtn.onclick = async () => {
+        if (playAgainRoomBtn.disabled) return;
+        playAgainRoomBtn.disabled = true;
+        playAgainRoomBtn.textContent = "Preparing lobby...";
+        try {
+          const count = Math.max(2, Math.min(4, Array.isArray(state.players) ? state.players.length : 2));
+          const payload = {
+            room: currentRoom,
+            ownerName: currentPlayerName || "Host",
+            numPlayers: count,
+            p1Type: "human",
+            p2Type: "human",
+            p3Type: "human",
+            p4Type: "human",
+            forceReset: true,
+          };
+          const created = await postCreateRoom(payload);
+          if (!created || !created.success) {
+            throw new Error((created && created.message) || "Could not prepare rematch lobby.");
+          }
+          clearTransientUi();
+          showWaitingRoom();
+          startLiveSync();
+          const next = await fetchState();
+          renderLobbyStatus(next);
+          showToast(`New lobby ready in ${currentRoom}. Everyone can ready up again.`);
+        } catch (err) {
+          const msg = err && err.message ? err.message : "Could not prepare rematch lobby.";
+          showToast(msg, "error");
+        } finally {
+          playAgainRoomBtn.disabled = false;
+          playAgainRoomBtn.textContent = "Play again (same room)";
+        }
+      };
+    }
+    if (gameOverHomeBtn) {
+      gameOverHomeBtn.onclick = () => {
+        clearTransientUi();
+        showHome(true);
+      };
+    }
   } else if (gameOverWrap) {
     if (gameUiRoot) {
       gameUiRoot.classList.remove("game-over-mode");
