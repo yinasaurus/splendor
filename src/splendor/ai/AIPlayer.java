@@ -48,7 +48,15 @@ public class AIPlayer {
 				Thread.currentThread().interrupt();
 			}
 		}
-		return strategy.makeMove(controller, aiPlayer);
+		String result = strategy.makeMove(controller, aiPlayer);
+		if (controller.hasLegalMovesAvailable()) {
+			String repair = strategy.tryAnyLegalGemTake(controller, aiPlayer,
+				"AI (" + strategy.getStrategyName() + ") took gems");
+			if (repair != null) {
+				return repair;
+			}
+		}
+		return result;
 	}
 
 	/**

@@ -272,9 +272,9 @@ public class HardAIStrategy implements AIStrategy {
 		if (gemsToTake.size() == 3 && controller.takeGems(gemsToTake)) {
 			return "AI (Hard) took goal-oriented gems";
 		}
-		
-		// Fallback
-		return "AI (Hard) passed turn";
+
+		String fallback = tryAnyLegalGemTake(controller, aiPlayer, "AI (Hard) took goal-oriented gems");
+		return fallback != null ? fallback : "AI (Hard) passed turn";
 	}
 
 	private Card findBestBlockingCard(GameController controller, Player aiPlayer) {

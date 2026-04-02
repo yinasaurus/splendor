@@ -1,14 +1,12 @@
 package splendor.ai;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 
 import splendor.controller.GameController;
 import splendor.model.Card;
-import splendor.model.GemType;
 import splendor.model.Player;
 
 /**
@@ -38,14 +36,16 @@ public class EasyAIStrategy implements AIStrategy {
 		}
 		
 		if (!affordableCards.isEmpty()) {
-			Card card = affordableCards.get(random.nextInt(affordableCards.size()));
-			if (controller.purchaseCard(card)) {
-				return "AI (Easy) purchased: " + card.toString();
+			Collections.shuffle(affordableCards, random);
+			for (Card card : affordableCards) {
+				if (controller.purchaseCard(card)) {
+					return "AI (Easy) purchased: " + card.toString();
+				}
 			}
 		}
-		
-		// Take random gems
-		return takeRandomGems(controller, aiPlayer);
+
+		String gemResult = tryAnyLegalGemTake(controller, aiPlayer, "AI (Easy) took gems");
+		return gemResult != null ? gemResult : "AI (Easy) passed turn";
 	}
 
 	@Override
@@ -53,27 +53,4 @@ public class EasyAIStrategy implements AIStrategy {
 		return "Easy";
 	}
 
-	private String takeRandomGems(GameController controller, Player aiPlayer) {
-		List<GemType> availableTypes = new ArrayList<>();
-		for (GemType type : GemType.values()) {
-			if (type != GemType.GOLD && 
-				controller.getBoard().getGemCount(type) > 0 &&
-				aiPlayer.getTotalGemCount() < 10) {
-				availableTypes.add(type);
-			}
-		}
-		
-		if (availableTypes.size() >= 3) {
-			// Take 3 different
-			Map<GemType, Integer> gemsToTake = new HashMap<>();
-			for (int i = 0; i < 3 && i < availableTypes.size(); i++) {
-				gemsToTake.put(availableTypes.get(i), 1);
-			}
-			if (controller.takeGems(gemsToTake)) {
-				return "AI (Easy) took 3 different gems";
-			}
-		}
-		
-		return "AI (Easy) passed turn";
-	}
 }

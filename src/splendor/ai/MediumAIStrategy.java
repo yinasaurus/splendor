@@ -161,7 +161,8 @@ public class MediumAIStrategy implements AIStrategy {
 				return "AI (Medium) took gems";
 			}
 		}
-		
-		return "AI (Medium) passed turn";
+
+		String fallback = tryAnyLegalGemTake(controller, aiPlayer, "AI (Medium) took gems");
+		return fallback != null ? fallback : "AI (Medium) passed turn";
 	}
 }

@@ -1,12 +1,16 @@
 package splendor.ai;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import splendor.controller.GameController;
 import splendor.model.Card;
+import splendor.model.GameBoard;
 import splendor.model.GemType;
 import splendor.model.Player;
+import splendor.rules.GameRules;
 
 /**
  * Strategy interface for AI players.
@@ -61,5 +65,57 @@ public interface AIStrategy {
 	 */
 	default boolean canAffordCard(Card card, Player player) {
 		return card.canAfford(player.getGems(), player.getBonuses());
+	}
+
+	/**
+	 * Performs some legal take-gems move when the rules allow taking gems.
+	 * AI strategies must not end a turn without acting while
+	 * {@link GameController#hasLegalMovesAvailable()} is still true; this covers
+	 * cases such as taking two of the same color (four or more in the bank),
+	 * which simpler heuristics often omit while only trying three different colors.
+	 *
+	 * @return a message if gems were taken, or {@code null} if no gem take is legal
+	 */
+	default String tryAnyLegalGemTake(GameController controller, Player aiPlayer, String successMessage) {
+		GameRules rules = controller.getRules();
+		GameBoard board = controller.getBoard();
+		if (!rules.existsLegalTakeGems(aiPlayer, board)) {
+			return null;
+		}
+		Map<GemType, Integer> avail = board.getAvailableGems();
+		Map<GemType, Integer> playerGems = aiPlayer.getGems();
+
+		for (GemType t : GemType.values()) {
+			if (t == GemType.GOLD) {
+				continue;
+			}
+			Map<GemType, Integer> take = new HashMap<>();
+			take.put(t, 2);
+			if (rules.validateTakeGems(take, avail, playerGems).isValid() && controller.takeGems(take)) {
+				return successMessage;
+			}
+		}
+
+		List<GemType> stock = new ArrayList<>();
+		for (GemType t : GemType.values()) {
+			if (t != GemType.GOLD && board.getGemCount(t) > 0) {
+				stock.add(t);
+			}
+		}
+		for (int i = 0; i < stock.size(); i++) {
+			for (int j = i + 1; j < stock.size(); j++) {
+				for (int k = j + 1; k < stock.size(); k++) {
+					Map<GemType, Integer> take = new HashMap<>();
+					take.put(stock.get(i), 1);
+					take.put(stock.get(j), 1);
+					take.put(stock.get(k), 1);
+					if (rules.validateTakeGems(take, avail, playerGems).isValid() && controller.takeGems(take)) {
+						return successMessage;
+					}
+				}
+			}
+		}
+
+		return null;
 	}
 }
