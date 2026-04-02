@@ -613,7 +613,7 @@ public class GameController {
 		if (anyAffordablePurchase(p)) {
 			return true;
 		}
-		if (bankAllowsStructuralGemTake()) {
+		if (rules.existsLegalTakeGems(p, board)) {
 			return true;
 		}
 		if (anyReserveAvailable(p)) {
@@ -632,28 +632,6 @@ public class GameController {
 		}
 		for (Card c : p.getReservedCards()) {
 			if (c.canAfford(p.getGems(), p.getBonuses())) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	/** Bank has either 3+ non-gold colors with supply, or 4+ of one color (Splendor take rules). */
-	private boolean bankAllowsStructuralGemTake() {
-		List<GemType> nonGoldWithStock = new ArrayList<>();
-		for (GemType t : GemType.values()) {
-			if (t == GemType.GOLD) {
-				continue;
-			}
-			if (board.getGemCount(t) > 0) {
-				nonGoldWithStock.add(t);
-			}
-		}
-		if (nonGoldWithStock.size() >= 3) {
-			return true;
-		}
-		for (GemType t : nonGoldWithStock) {
-			if (board.getGemCount(t) >= 4) {
 				return true;
 			}
 		}

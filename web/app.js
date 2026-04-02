@@ -1238,17 +1238,32 @@ function sumPlayerGems(gems) {
 }
 
 /**
- * Same structural rule as server bankAllowsStructuralGemTake: can the bank support
- * any take-gems shape (3 different or 2 same with 4+ in bank). Hand size does not
- * matter — player may take then discard.
+ * True if the current player could legally take gems (bank supply and max-gem hand limit).
+ * Matches server GameRules#existsLegalTakeGems.
  */
-function bankAllowsStructuralGemTakeFromState(state) {
+function playerCanTakeAnyGemsFromState(state) {
+  const maxGems = Number(state.maxGemsPerPlayer);
+  const cap = Number.isFinite(maxGems) && maxGems > 0 ? maxGems : 10;
+  const myPlayer = (state.players || []).find((p) => samePlayerName(p.name, state.currentPlayer));
+  const cur = sumPlayerGems(myPlayer?.gems);
   const bankGems = state.gems || {};
-  const nonGoldColors = Object.entries(bankGems).filter(([gem, count]) => gem !== "GOLD" && Number(count) > 0);
-  if (nonGoldColors.length >= 3) {
-    return true;
+  if (cur + 2 <= cap) {
+    for (const [gem, count] of Object.entries(bankGems)) {
+      if (gem === "GOLD") {
+        continue;
+      }
+      if (Number(count) >= 4) {
+        return true;
+      }
+    }
   }
-  return nonGoldColors.some(([, count]) => Number(count) >= 4);
+  if (cur + 3 <= cap) {
+    const nonGoldWithStock = Object.entries(bankGems).filter(([g, c]) => g !== "GOLD" && Number(c) > 0);
+    if (nonGoldWithStock.length >= 3) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -1278,17 +1293,13 @@ function canReserveAnyTarget(state) {
 }
 
 /**
- * Determines if the current player has no valid action available.
- * A player is stuck if they cannot:
- *  (a) take any gems (bank cannot support a legal take pattern), AND
- *  (b) buy any visible or reserved card, AND
- *  (c) reserve a new card (no slot or no card/deck source)
+ * Client-side fallback when API omits mayPassTurn: no purchase, no legal gem take, no reserve.
  *
  * @param {object} state - The current game state.
  * @returns {boolean} true if the player is stuck and should see "Pass Turn".
  */
 function isPlayerStuck(state) {
-  const canTakeGems = bankAllowsStructuralGemTakeFromState(state);
+  const canTakeGems = playerCanTakeAnyGemsFromState(state);
 
   const affordableVisible = Object.values(state.levels || {})
     .flat()
@@ -2107,10 +2118,13 @@ function renderState(state) {
     });
   }
 
-  // Pass Turn button: only show when the current player is truly stuck.
+  // Pass Turn button: only when the server says pass is legal (no legal moves).
   const passTurnBtn = document.getElementById("pass-turn-btn");
   if (passTurnBtn) {
-    const stuck = !state.gameOver && isMyTurn && isPlayerStuck(state);
+    const stuck =
+      !state.gameOver &&
+      isMyTurn &&
+      (state.mayPassTurn === true || (state.mayPassTurn == null && isPlayerStuck(state)));
     passTurnBtn.classList.toggle("hidden", !stuck);
     // Re-attach the click handler (remove old one first to avoid duplicates)
     const newPassBtn = passTurnBtn.cloneNode(true);

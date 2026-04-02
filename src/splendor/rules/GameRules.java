@@ -7,6 +7,7 @@ import java.util.Map;
 
 import splendor.config.GameConfig;
 import splendor.model.Card;
+import splendor.model.GameBoard;
 import splendor.model.GemType;
 import splendor.model.Noble;
 import splendor.model.Player;
@@ -127,6 +128,40 @@ public class GameRules {
 		}
 		
 		return new ValidationResult(true, "Valid action.");
+	}
+
+	/**
+	 * True if the player can legally take gems on this board (hand limit and bank supply).
+	 * Differs from a structural bank-only check: at 9–10 gems, no take pattern fits under the limit.
+	 */
+	public boolean existsLegalTakeGems(Player player, GameBoard board) {
+		int cur = player.getTotalGemCount();
+		int max = config.getMaxGemsPerPlayer();
+		if (cur + 2 <= max) {
+			for (GemType t : GemType.values()) {
+				if (t == GemType.GOLD) {
+					continue;
+				}
+				if (board.getGemCount(t) >= 4) {
+					return true;
+				}
+			}
+		}
+		if (cur + 3 <= max) {
+			int colorsWithStock = 0;
+			for (GemType t : GemType.values()) {
+				if (t == GemType.GOLD) {
+					continue;
+				}
+				if (board.getGemCount(t) > 0) {
+					colorsWithStock++;
+				}
+			}
+			if (colorsWithStock >= 3) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

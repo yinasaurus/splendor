@@ -1954,6 +1954,9 @@ public class WebServer {
 		sb.append("\"roundNumber\":").append(roundNumber).append(",");
 		sb.append("\"isHumanTurn\":").append(current.isHuman()).append(",");
 		sb.append("\"isMyTurn\":").append(isMyTurn).append(",");
+		boolean mayPassTurn = isMyTurn && !session.controller.isGameOver() && !session.controller.hasLegalMovesAvailable();
+		sb.append("\"mayPassTurn\":").append(mayPassTurn).append(",");
+		sb.append("\"maxGemsPerPlayer\":").append(session.controller.getConfig().getMaxGemsPerPlayer()).append(",");
 		sb.append("\"afkAiThresholdSeconds\":").append(AFK_AI_THRESHOLD_SECONDS).append(",");
 		sb.append("\"endgameFinalRound\":").append(session.controller.isEndgamePending()).append(",");
 		sb.append("\"gameOver\":").append(session.controller.isGameOver()).append(",");
