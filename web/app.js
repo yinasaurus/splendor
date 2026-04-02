@@ -2128,6 +2128,8 @@ function renderState(state) {
     passTurnBtn.classList.toggle("hidden", !stuck);
     // Re-attach the click handler (remove old one first to avoid duplicates)
     const newPassBtn = passTurnBtn.cloneNode(true);
+    // cloneNode copies disabled; without this, Pass can stay visible but unclickable after a prior pass
+    newPassBtn.disabled = false;
     passTurnBtn.parentNode.replaceChild(newPassBtn, passTurnBtn);
     if (stuck) {
       newPassBtn.addEventListener("click", async () => {
