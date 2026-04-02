@@ -49,12 +49,29 @@ public class AIPlayer {
 			}
 		}
 		String result = strategy.makeMove(controller, aiPlayer);
-		if (controller.hasLegalMovesAvailable()) {
-			String repair = strategy.tryAnyLegalGemTake(controller, aiPlayer,
-				"AI (" + strategy.getStrategyName() + ") took gems");
-			if (repair != null) {
-				return repair;
-			}
+		if (!controller.hasLegalMovesAvailable()) {
+			return result;
+		}
+		String repair = strategy.tryAnyLegalGemTake(controller, aiPlayer,
+			"AI (" + strategy.getStrategyName() + ") took gems");
+		if (repair != null) {
+			return repair;
+		}
+		if (!controller.hasLegalMovesAvailable()) {
+			return result;
+		}
+		repair = strategy.tryAnyLegalReserve(controller, aiPlayer,
+			"AI (" + strategy.getStrategyName() + ") reserved a card");
+		if (repair != null) {
+			return repair;
+		}
+		if (!controller.hasLegalMovesAvailable()) {
+			return result;
+		}
+		repair = strategy.tryAnyLegalPurchase(controller, aiPlayer,
+			"AI (" + strategy.getStrategyName() + ") purchased a card");
+		if (repair != null) {
+			return repair;
 		}
 		return result;
 	}

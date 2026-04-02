@@ -118,4 +118,47 @@ public interface AIStrategy {
 
 		return null;
 	}
+
+	/**
+	 * Reserve any legal card (visible slot first, then top of deck) when reserving is allowed.
+	 * Needed when the player is at the gem cap so gem takes are impossible but a reserve still is.
+	 */
+	default String tryAnyLegalReserve(GameController controller, Player aiPlayer, String successMessage) {
+		if (!controller.getRules().validateReserveCard(aiPlayer).isValid()) {
+			return null;
+		}
+		GameBoard board = controller.getBoard();
+		for (int level = 1; level <= 3; level++) {
+			List<Card> visible = board.getVisibleCards(level);
+			for (int index = 0; index < visible.size(); index++) {
+				if (controller.reserveCard(level, index)) {
+					return successMessage;
+				}
+			}
+		}
+		for (int level = 1; level <= 3; level++) {
+			if (board.getDeckSize(level) > 0 && controller.reserveTopCard(level)) {
+				return successMessage;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Try purchasing any affordable visible or reserved card (used when a strategy picked a card
+	 * that fails validation but another affordable buy still works).
+	 */
+	default String tryAnyLegalPurchase(GameController controller, Player aiPlayer, String successMessage) {
+		List<Card> order = new ArrayList<>();
+		for (int level = 1; level <= 3; level++) {
+			order.addAll(controller.getBoard().getVisibleCards(level));
+		}
+		order.addAll(aiPlayer.getReservedCards());
+		for (Card card : order) {
+			if (canAffordCard(card, aiPlayer) && controller.purchaseCard(card)) {
+				return successMessage;
+			}
+		}
+		return null;
+	}
 }
