@@ -13,7 +13,7 @@ public class AIPlayer {
 	 * Small delay to make AI turns feel more natural to humans.
 	 * Applied on both console and web server flows since both use AIPlayer.makeMove().
 	 */
-	private static final long THINKING_DELAY_MS = 1000;
+	private static final long THINKING_DELAY_MS = 2000;
 
 	/**
 	 * Constructor for AIPlayer with default medium strategy.
