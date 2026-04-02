@@ -408,6 +408,7 @@ public class WebServer {
 				startNewGame(created, actualPlayers, types, lobbyOrder, false);
 				created.gameStarted = true;
 				addActionLog(created, "Room recovered after server restart.");
+				runAiTurnsWhileCurrentIsAi(created);
 			} else {
 				startNewGame(created, Math.max(2, Math.min(4, created.readyByPlayer.size())),
 					new String[] { "human", "human", "human", "human" }, new ArrayList<>(created.readyByPlayer.keySet()), false);
@@ -1269,6 +1270,7 @@ public class WebServer {
 			session.lobbyNumPlayers = actualPlayers;
 			session.gameStarted = true;
 			addActionLog(session, "Match started by " + session.ownerName + ".");
+			runAiTurnsWhileCurrentIsAi(session);
 			saveSnapshots();
 			Map<String, Object> resp = new HashMap<>();
 			resp.put("success", true);
@@ -1831,6 +1833,55 @@ public class WebServer {
 			return defaultValue;
 		}
 		return json.substring(start + 1, end);
+	}
+
+	/**
+	 * When a match begins, the current player may be an AI. AI moves are normally driven by
+	 * {@link #advanceTurnsAfterHuman} after a human acts, so we must run this once at start
+	 * (and on snapshot recovery) or the first player never moves.
+	 */
+	private static void runAiTurnsWhileCurrentIsAi(GameSession session) {
+		if (session.controller == null || !session.gameStarted) {
+			return;
+		}
+		while (!session.controller.isGameOver()) {
+			Player current = session.controller.getCurrentPlayer();
+			List<Player> players = session.controller.getPlayers();
+			int idx = players.indexOf(current);
+			if (idx < 0) {
+				break;
+			}
+			AIPlayer ai = session.aiPlayers.get(idx);
+			if (ai == null && session.forcedAiByName.contains(current.getName())) {
+				String diff = session.forcedAiDifficultyByName.getOrDefault(current.getName(), "medium");
+				if ("easy".equals(diff)) {
+					ai = new AIPlayer(new EasyAIStrategy());
+				} else if ("hard".equals(diff)) {
+					ai = new AIPlayer(new HardAIStrategy());
+				} else {
+					ai = new AIPlayer(new MediumAIStrategy());
+				}
+			}
+			if (ai == null) {
+				break;
+			}
+			Noble nobleBeforeAi = current.getVisitedNoble();
+			String aiAction = ai.makeMove(session.controller);
+			addActionLog(session, current.getName() + ": " + (aiAction == null ? "took a turn." : aiAction));
+			Noble nobleAfterAi = current.getVisitedNoble();
+			if (nobleAfterAi != null && nobleAfterAi != nobleBeforeAi) {
+				addActionLog(
+					session,
+					current.getName() + " claimed Noble " + nobleAfterAi.getNobleId() + " ("
+						+ nobleAfterAi.getName() + ") for +" + nobleAfterAi.getPrestigePoints() + " prestige."
+				);
+			}
+			if (session.controller.isGameOver()) {
+				break;
+			}
+			session.controller.nextTurn();
+			session.turnNumber++;
+		}
 	}
 
 	/**
