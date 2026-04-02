@@ -70,7 +70,7 @@ http://localhost:8080
 - **Join Room** opens a dialog to enter the host’s game code.
 - Multiple clients can join the same room code to share one game state.
 
-## Deploy (Vercel + Java Backend)
+## Deploy (optional static frontend + Java backend)
 
 Because the game server is stateful Java (rooms/sessions), deploy backend and frontend separately:
 
@@ -78,9 +78,7 @@ Because the game server is stateful Java (rooms/sessions), deploy backend and fr
    - `https://your-splendor-api.onrender.com`
 2. In `web/config.js`, set:
    - `window.__SPLENDOR_API_BASE__ = "https://your-splendor-api.onrender.com";`
-3. Deploy the `web/` folder to Vercel.
-   - Set Vercel project root directory to `web`
-   - `web/vercel.json` is included for root routing
+3. Host the `web/` folder on any static host (configure SPA-style routing to `index.html` if your host requires it).
 
 For local dev, keep `window.__SPLENDOR_API_BASE__ = ""` and run `run_web.bat` / `run_web.sh`.
 
@@ -94,30 +92,8 @@ For local dev, keep `window.__SPLENDOR_API_BASE__ = ""` and run `run_web.bat` / 
 ## Known Limitations
 
 - UI live updates use short-interval polling (not websocket push), so updates are near-real-time rather than instant.
-- Browser-based end-to-end UI tests are currently manual; automated checks focus on API/regression smoke behavior.
+- Browser-based end-to-end UI tests are manual.
 - Long backend idle/restart windows can require one auto-rejoin cycle before full lobby/game state appears stable.
-
-## Automated Regression Smoke Test (API)
-
-Run local web server first:
-
-```bat
-run_web.bat
-```
-
-In a second terminal, run:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\api-regression-smoke.ps1
-```
-
-Optional deployed backend check:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\api-regression-smoke.ps1 -BaseUrl "https://your-backend-url"
-```
-
-This script validates: create/join/ready/start/state/action flow and confirms recent action feed updates.
 
 ## Notes
 

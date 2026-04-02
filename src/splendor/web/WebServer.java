@@ -704,10 +704,10 @@ public class WebServer {
 	}
 
 	/**
-	 * Serves files under {@code web/media/} at {@code /media/...} (chips/gems sprites, card art, etc.).
+	 * Serves files under the project {@code media/} directory at {@code /media/...} (sprites, card art, etc.).
 	 */
 	private static class MediaDirectoryHandler implements HttpHandler {
-		private static final Path MEDIA_ROOT = Paths.get("web", "media").toAbsolutePath().normalize();
+		private static final Path MEDIA_ROOT = Paths.get("media").toAbsolutePath().normalize();
 
 		@Override
 		public void handle(HttpExchange exchange) throws IOException {

@@ -1,25 +1,25 @@
 #!/bin/bash
+set -e
+shopt -s nullglob
 
-# Remove old class files to avoid version conflicts
 if [ -d "classes" ]; then
     echo "Cleaning old class files..."
     rm -rf classes/*
 fi
+mkdir -p classes
 
-# Create classes directory if it doesn't exist
-if [ ! -d "classes" ]; then
-    mkdir classes
-    
-fi
+CP="classes"
+for jar in lib/*.jar; do
+    CP="$CP:$jar"
+done
 
-# Compile main console app and web server entry point
-javac -d classes -cp "lib/*:classes" -sourcepath src \
-  src/splendor/main/SplendorGame.java \
-  src/splendor/web/WebServer.java
-
-if [ $? -eq 0 ]; then
-    echo "Compilation complete. Class files are in the classes directory."
-else
-    echo "Compilation failed. Please check for errors."
+TMP_LIST=$(mktemp 2>/dev/null || echo .compile_sources.tmp)
+trap 'rm -f "$TMP_LIST"' EXIT
+find src -name '*.java' -type f | sort > "$TMP_LIST"
+if [ ! -s "$TMP_LIST" ]; then
+    echo "No Java sources found under src/"
     exit 1
 fi
+
+javac -d classes -cp "$CP" -sourcepath src @"$TMP_LIST"
+echo "Compilation complete. Class files are in the classes directory."

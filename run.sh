@@ -1,4 +1,10 @@
 #!/bin/bash
+set -e
+shopt -s nullglob
 
-# Run the main application
-java -cp "classes:lib/*" splendor.main.SplendorGame
+CP="classes"
+for jar in lib/*.jar; do
+    CP="$CP:$jar"
+done
+
+java -cp "$CP" splendor.main.SplendorGame

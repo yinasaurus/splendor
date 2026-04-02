@@ -14,7 +14,7 @@ window.__SPLENDOR_API_BASE__ = "https://splendor-api-hlrf.onrender.com";
 
 
 
-// Optional: URL prefix for chip/gem sprites (default: same-origin web/media/chips.jpg + gems.png).
+// Optional: URL prefix for chip/gem sprites (default: same-origin media/chips.jpg + gems.png via /media/...).
 
 // window.__SPLENDOR_MEDIA_BASE__ = "";
 
@@ -28,9 +28,9 @@ window.__SPLENDOR_USE_IMAGE_SPRITES__ = true;
 
 
 
-// Development card face images: files in web/media/ (served as /media/...).
+// Development card face images: project root media/ (served as /media/...).
 
-// Your repo media/splendor-1.jpg … splendor-6.jpg, splendor-7.png … splendor-12.png — copy or sync into web/media/.
+// Place splendor-1.jpg … splendor-6.jpg, splendor-7.png … splendor-12.png in media/.
 
 window.__SPLENDOR_DEV_CARD_ART_BASE__ = "media";
 
@@ -55,7 +55,7 @@ window.__SPLENDOR_DEV_CARD_ART_FILENAME__ = function (globalIdx) {
 
 
 
-// Full official-style set (90 files): run scripts/fetch-hexanome-dev-cards.ps1, then set:
+// Full official-style set (90 files): add under media/development-cards/ and set:
 
 // window.__SPLENDOR_DEV_CARD_ART_BASE__ = "media/development-cards";
 

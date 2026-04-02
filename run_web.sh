@@ -1,5 +1,10 @@
 #!/bin/bash
+set -e
+shopt -s nullglob
 
-# Run the web server version of the application
-java -cp "classes:lib/*" splendor.web.WebServer
+CP="classes"
+for jar in lib/*.jar; do
+    CP="$CP:$jar"
+done
 
+java -cp "$CP" splendor.web.WebServer

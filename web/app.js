@@ -17,7 +17,7 @@ const API_BASE = resolveApiBase();
   if (typeof document === "undefined" || typeof window === "undefined") {
     return;
   }
-  /* Default: point sprite vars at web/media. Set __SPLENDOR_USE_CSS_GEMS__ = true to skip (stylesheet defaults only). */
+  /* Default: point sprite vars at /media/... (project root media/). Set __SPLENDOR_USE_CSS_GEMS__ = true to skip. */
   if (window.__SPLENDOR_USE_CSS_GEMS__ === true) {
     return;
   }

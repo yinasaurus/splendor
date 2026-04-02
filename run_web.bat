@@ -1,5 +1,9 @@
 @echo off
+setlocal enabledelayedexpansion
 
-REM Run the web server version of the application
-java -cp "classes;lib/*" splendor.web.WebServer
+set CP=classes
+if exist lib\*.jar (
+    for %%j in (lib\*.jar) do set CP=!CP!;%%j
+)
 
+java -cp "!CP!" splendor.web.WebServer

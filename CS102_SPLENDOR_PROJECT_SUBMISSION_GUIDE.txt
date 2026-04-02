@@ -1,0 +1,339 @@
+================================================================================
+CS102 PROJECT - SPLENDOR CARD GAME
+Comprehensive project documentation + rubric + presentation + Java tour + Q&A
+================================================================================
+Generated for: Splendor (Java engine + console UI + web client)
+
+Use PARTS A through I for submission and presentation. PART J = Java file tour.
+PART K = exam-style Q&A.
+
+This file uses plain ASCII (hyphens, straight quotes, apostrophes) so it opens
+cleanly in any Windows editor. Avoid re-saving as UTF-8 with smart punctuation
+if you see mojibake (double-encoding).
+
+Adjust team names, AI-use details, and deployment URLs before submitting.
+
+
+================================================================================
+PART A - WHAT TO SUBMIT (CHECKLIST VS SPEC)
+================================================================================
+
+Typical required structure:
+  [ ] src/                    - all Java sources
+  [ ] classes/                - empty in zip; filled by compile.bat / compile.sh
+  [ ] media/                  - assets (served at /media/... when using run_web)
+  [ ] lib/                    - jars if any (or note "none")
+  [ ] data/                   - CSV card/noble data + web_lobbies.properties (runtime)
+  [ ] config.properties       - externalized game parameters + CSV paths
+  [ ] compile.bat + compile.sh
+  [ ] run.bat + run.sh        - console entry
+  [ ] run_web.bat + run_web.sh - web server entry (if you ship web)
+  [ ] Slides + appendix "AI Use" (format per course)
+
+Verify on a clean machine:
+  1) compile.bat or compile.sh
+  2) run.bat / run.sh        - console plays end-to-end
+  3) run_web.bat / run_web.sh - browser loads; complete a turn; optional room code flow
+
+
+================================================================================
+PART B - RUBRIC MAPPING (CODE / DESIGN)
+================================================================================
+
+B1) Modularization
+    Packages: splendor.model, splendor.rules, splendor.controller, splendor.ai,
+    splendor.data, splendor.config, splendor.stats, splendor.ui, splendor.web.
+
+B2) Conventions
+    UpperCamelCase classes; lowerCamelCase methods; packages by responsibility.
+
+B3) Design (SRP-style)
+    Model holds state; GameRules validates; GameController applies actions;
+    ConsoleUI / WebServer are I/O and transport only.
+
+B4) Externalized configuration
+    config.properties: winning.points, gem bank sizes per player count, CSV paths,
+    max.gems.per.player, max.reserved.cards. GameConfig loads it.
+
+B5) Data-driven content
+    CardLoader / NobleLoader read CSV paths from config (not hard-coded in rules).
+
+B6) Documentation
+    Javadoc on public API where appropriate; README for how to run.
+
+Penalty reminder: if Java does not compile or run, marks cap heavily - always
+compile before zipping.
+
+
+================================================================================
+PART C - RUBRIC MAPPING (APPLICATION / USABILITY / BONUS)
+================================================================================
+
+C1) Rules
+    Gems, dev cards L1-L3, nobles, illegal moves rejected in engine, winner +
+    tie-breaker (prestige then fewer purchased cards), threshold from config.
+
+C2) Players
+    2-4 players; human and AI (easy/medium/hard strategies).
+
+C3) Usability (talking points)
+    Visible turn, scores, bank, reserves; clear errors; web mirrors engine rules.
+
+C4) Bonus (network)
+    WebServer: HTTP API; browser is thin client; single GameController per room.
+
+C5) Extra features you can mention if implemented
+    Room codes, lobby ready/start, live state polling, table chat, rematch,
+    rulebook overlay, prestige / final-round hints, AI-first-turn handling.
+
+
+================================================================================
+PART D - PACKAGE AND CLASS MAP (FOR UML / SLIDES)
+================================================================================
+
+splendor.model
+  Card, Noble, Player, GameBoard, GemType
+  - Board and player state; gem and card operations.
+
+splendor.rules
+  GameRules (+ ValidationResult)
+  - Validates take gems, reserve, purchase, limits, noble eligibility.
+
+splendor.controller
+  GameController
+  - Applies actions, noble visits, endgame countdown, winner resolution,
+    takeGemsWithDiscard / reserve with discard when over gem cap, passTurn
+    when no legal moves, hasLegalMovesAvailable.
+
+splendor.ai
+  AIPlayer, AIStrategy, EasyAIStrategy, MediumAIStrategy, HardAIStrategy
+
+splendor.data
+  CardLoader, NobleLoader
+
+splendor.config
+  GameConfig
+
+splendor.stats
+  GameStatistics
+
+splendor.ui
+  ConsoleUI - human + AI loop for local play
+
+splendor.main
+  SplendorGame - entry for console
+
+splendor.web
+  WebServer - HttpServer, static files, JSON handlers, GameSession, lobby
+  snapshots (data/web_lobbies.properties), AI turn chaining
+
+
+================================================================================
+PART E - HOW TO RUN (TALKING POINTS)
+================================================================================
+
+Console
+  compile.bat then run.bat (or .sh equivalents).
+  Follow prompts; supports multiple humans and AI seats.
+
+Web
+  compile.bat then run_web.bat.
+  Default http://localhost:8080/ (or PORT env var if supported).
+  Create room or join with code; ready; owner starts match.
+  State: GET /api/state?room=...&name=...&sessionToken=...
+  Actions: POST /api/action JSON body with room, name, sessionToken, type, ...
+
+If the port is busy, change PORT or stop the other process.
+
+
+================================================================================
+PART F - WEB LAYER (ARCHITECTURE FOR SLIDES)
+================================================================================
+
+Single-threaded executor on HttpServer reduces race conditions from double clicks.
+
+Static files
+  /              -> web/index.html
+  /styles.css, /app.js, /config.js
+  /media/...     -> media/ at project root (sprites, card art)
+
+JSON API (representative)
+  GET  /api/state
+       Returns full board JSON: players, gems, visible cards, nobles, lobby,
+       recentActions, chat[], turn flags, gameOver, etc.
+
+  POST /api/chat
+       Body: room, name, sessionToken, message (or text). Seated players only.
+       Chat capped server-side; history included in /api/state.
+
+  POST /api/action
+       type examples: takeGems, reserve, reserveTop, purchaseVisible,
+       purchaseReserved, pass
+       Engine runs move; on success, advanceTurnsAfterHuman runs AI chain.
+
+  POST /api/room/create, /api/room/join, /api/room/ready, /api/room/start
+  POST /api/room/addai, /api/room/kick, /api/room/rename, /api/room/afkai
+  POST /api/newgame, /api/quit
+
+AI turns
+  advanceTurnsAfterHuman(session) - after each successful human action, nextTurn
+  then while current is AI, makeMove, then nextTurn, until human or game over.
+
+  runAiTurnsWhileCurrentIsAi(session) - called when a match STARTS (room start,
+  newgame handler, snapshot recovery) so if the first player in turn order is
+  AI, they actually move (otherwise nothing triggered the first AI).
+
+Browser (web/)
+  app.js - fetchState, postAction, lobby, live sync interval, renderState,
+           gameUiNav for rematch/home from game-over overlay, table chat UI,
+           prestige alerts, etc.
+  index.html - layout, game-over card, chat panel, rulebook overlay
+  styles.css - layout, game-over mode, player cards, chat
+
+
+================================================================================
+PART G - FEATURES WORTH ONE SLIDE EACH (IF YOU SHIP THEM)
+================================================================================
+
+- Room codes and rejoin with sessionToken (seat lock across browsers).
+- Reserve at 10 gems + gold: server accepts discard map; client discard flow.
+- Pass turn only when stuck; server rejects pass if legal moves exist.
+- Game over overlay: rematch (POST room create forceReset), back to home.
+- Table chat: POST /api/chat; state.chat; hide/show; unread badge + toasts.
+- Prestige badge on player row; toast when another player hits 15+ prestige.
+- Live polling (~550ms) for multiplayer feel (tune as needed).
+
+
+================================================================================
+PART H - PRESENTATION OUTLINE (SUGGESTED 10-12 MIN)
+================================================================================
+
+1) Title + team + what Splendor is in one sentence.
+2) Demo 60-90s: web or console - one legal turn + one rejected move.
+3) Architecture diagram: Browser -> WebServer -> GameController -> GameRules / Board.
+4) Config + CSV data-driven cards/nobles (show config.properties + one CSV row).
+5) AI: strategy interface + three difficulties; where turns are triggered.
+6) Hardest bug or design choice (e.g. gem cap discard, AI ordering, chat sync).
+7) AI use appendix: what tools used, prompts, what you verified by hand.
+8) Q&A.
+
+
+================================================================================
+PART I - AI USE APPENDIX (FILL IN FOR YOUR COURSE)
+================================================================================
+
+Suggested bullets:
+  - Tool(s) used (if any): ...
+  - Used for: brainstorming, boilerplate, debugging, docstrings, etc.
+  - Not used for: final exam answers you did not understand, etc.
+  - How you validated: compile, manual play, peer test, etc.
+
+
+================================================================================
+PART J - PER-FILE JAVA TOUR (STUDY + SUBMISSION NOTES)
+================================================================================
+
+splendor/main/SplendorGame.java
+  - main(); launches console game.
+
+splendor/ui/ConsoleUI.java
+  - Game loop: print state, read input, call GameController, AI turns when
+    current player not human.
+
+splendor/controller/GameController.java
+  - Constructs players (names/types), shuffles turn order, loads CSV data,
+    fills visible cards and nobles.
+  - takeGems / takeGemsWithDiscard; reserveCard / reserveTopCard with optional
+    discard after gold; purchase paths; passTurn; nextTurn; endgame and winner.
+
+splendor/rules/GameRules.java
+  - validateTakeGems, validateReserve, validatePurchase, payment calculation,
+    noble checks, win threshold from config, tie-break helpers.
+
+splendor/model/GameBoard.java
+  - Gem bank, decks, visible rows, remove/add cards, nobles available.
+
+splendor/model/Player.java
+  - Gems, bonuses from purchased cards, reserved list, prestige.
+
+splendor/model/Card.java, Noble.java, GemType.java
+  - Data types and small helpers (abbreviations, costs, afford checks).
+
+splendor/data/CardLoader.java, NobleLoader.java
+  - Parse CSV into Card/Noble lists (filter card level by column).
+
+splendor/config/GameConfig.java
+  - Load config.properties; expose getters for limits and paths.
+
+splendor/stats/GameStatistics.java
+  - Optional turn / action recording for analysis or UI.
+
+splendor/ai/AIStrategy.java, AIPlayer.java
+  - Strategy interface; makeMove delegates to strategy.
+
+splendor/ai/EasyAIStrategy.java, MediumAIStrategy.java, HardAIStrategy.java
+  - Different heuristics / lookahead; all must produce legal moves.
+
+splendor/web/WebServer.java
+  - GameSession: controller, aiPlayers map, actionLog, chatLines, lobby maps,
+    seat tokens, snapshots.
+  - Handlers parse minimal JSON; call controller; build JSON state.
+  - advanceTurnsAfterHuman; runAiTurnsWhileCurrentIsAi; buildGameStateJson.
+  - Lobby persistence: load/save snapshots under data/.
+
+
+================================================================================
+PART K - EXAM-STYLE Q&A (SHORT ANSWERS)
+================================================================================
+
+K1) Why separate GameRules from GameController?
+    Rules answer "is this legal?"; controller applies state changes after checks.
+    Stops duplication and keeps validation in one place.
+
+K2) Why externalize winning.points in config.properties?
+    Change game length without recompiling; meets spec for external config.
+
+K3) What happens when a player reaches winning prestige?
+    endgamePending; each other player gets one more turn; then winner by prestige
+    and tie-break (fewer development cards).
+
+K4) Why does the web server call nextTurn and AI in a loop after a human move?
+    The controller action methods do not always advance the current player index
+    the same way for every path; the server normalizes "end of human turn" by
+    advancing and then simulating AI seats until a human is up or game ends.
+
+K5) Why was runAiTurnsWhileCurrentIsAi needed?
+    advanceTurnsAfterHuman only runs after a human POST /api/action. At match
+    start the first player might be AI; no human action happened yet, so AIs
+    must be run once when the game becomes active.
+
+K6) What is validated on take three different gems?
+    Exactly three distinct non-gold colors; bank must have each; player cannot
+    exceed max gems (often 10) without discarding per rules implementation.
+
+K7) How does reserve interact with gold and gem cap?
+    If gold available, player receives one gold; if over cap, discard to bank
+    (web path supports explicit discard map for client UX).
+
+K8) Name two reasons illegal moves must be rejected server-side, not only in JS.
+    Cheating via crafted requests; second client / refresh bypassing UI.
+
+K9) What does GameBoard need to draw a new visible card after purchase?
+    Remove bought card from slot; draw from same level deck; refill slot.
+
+K10) AIStrategy pattern benefit?
+    Swap difficulty without changing GameController or Player; open/closed style.
+
+K11) What is in /api/state JSON "lobby" object?
+    owner, gameStarted, numPlayers, canStart, players list with ready flags
+    and AI flags - used before and during match for UI.
+
+K12) Why seat tokens for web players?
+    So the same display name cannot hijack another browser session mid-game.
+
+
+================================================================================
+END OF GUIDE
+================================================================================
+Keep a backup copy (git, cloud, or second file) so accidental deletes are easy
+to recover. Cursor / VS Code Local History can also restore older versions.
