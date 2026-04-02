@@ -218,7 +218,18 @@ public class GameController {
 		if (!endgamePending) {
 			if (rules.hasWon(actor)) {
 				endgamePending = true;
-				endgameTurnsRemaining = Math.max(0, players.size() - 1);
+				// Splendor rule: once someone reaches winning prestige, finish the
+				// current round so everyone has the same number of turns.
+				// Rounds are cycles through player indices starting at index 0.
+				// If the winner is at index i, only players i+1..(N-1) still have
+				// turns remaining in this round.
+				endgameTurnsRemaining = Math.max(0, (players.size() - 1) - currentPlayerIndex);
+				if (endgameTurnsRemaining <= 0) {
+					winner = rules.determineWinner(players);
+					if (winner == null) {
+						winner = rules.determineWinnerByPrestige(players);
+					}
+				}
 			}
 		} else {
 			endgameTurnsRemaining--;

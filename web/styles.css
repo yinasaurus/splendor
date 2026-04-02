@@ -586,7 +586,7 @@ main {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  overflow-y: auto;
+  overflow-y: hidden;
   background:
     radial-gradient(ellipse 90% 70% at 50% 20%, rgba(232, 163, 23, 0.12), transparent 55%),
     radial-gradient(ellipse 80% 50% at 80% 80%, rgba(100, 149, 237, 0.08), transparent 50%),
@@ -618,6 +618,14 @@ body:has(#game-ui.game-over-mode) .app-header {
   position: relative;
   z-index: 1;
   pointer-events: none;
+}
+
+/* Prevent any "game over" extra-page scroll. */
+body:has(#game-ui.game-over-mode) {
+  overflow: hidden;
+}
+body:has(#game-ui.game-over-mode) .app {
+  padding-bottom: 0;
 }
 
 .game-over-wrap.hidden {
