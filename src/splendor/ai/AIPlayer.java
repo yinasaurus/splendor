@@ -10,6 +10,12 @@ public class AIPlayer {
 	private final AIStrategy strategy;
 
 	/**
+	 * Small delay to make AI turns feel more natural to humans.
+	 * Applied on both console and web server flows since both use AIPlayer.makeMove().
+	 */
+	private static final long THINKING_DELAY_MS = 1000;
+
+	/**
 	 * Constructor for AIPlayer with default medium strategy.
 	 */
 	public AIPlayer() {
@@ -33,6 +39,15 @@ public class AIPlayer {
 	 */
 	public String makeMove(GameController controller) {
 		Player aiPlayer = controller.getCurrentPlayer();
+		// Simulate thinking so players can follow the game flow.
+		// Also prevents "instant" multi-moves in fast console/web loops.
+		if (THINKING_DELAY_MS > 0) {
+			try {
+				Thread.sleep(THINKING_DELAY_MS);
+			} catch (InterruptedException ie) {
+				Thread.currentThread().interrupt();
+			}
+		}
 		return strategy.makeMove(controller, aiPlayer);
 	}
 
