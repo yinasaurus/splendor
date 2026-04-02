@@ -42,6 +42,3 @@ Shared helpers (e.g. card scoring and afford checks) live on `AIStrategy`.
 - Local play: in `web/config.js`, keep `window.__SPLENDOR_API_BASE__ = ""` so the browser talks to the same host as `run_web`.
 - To point a hosted static `web/` build at a remote Java backend, set `__SPLENDOR_API_BASE__` to that server’s URL.
 
-## More detail
-
-See `PROJECT_SUMMARY.md` for architecture and `CS102_SPLENDOR_PROJECT_SUBMISSION_GUIDE.txt` for submission and presentation notes.
