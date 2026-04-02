@@ -71,7 +71,8 @@ public class WebServer {
 
 	private static class GameSession {
 		GameController controller;
-		Map<Integer, AIPlayer> aiPlayers = new HashMap<>();
+		// Key by player name (GameController shuffles players internally, so indices are not stable).
+		Map<String, AIPlayer> aiPlayers = new HashMap<>();
 		List<String> actionLog = new ArrayList<>();
 		List<ChatLine> chatLines = new ArrayList<>();
 		int turnNumber = 1;
@@ -647,12 +648,13 @@ public class WebServer {
 		session.aiPlayers.clear();
 		for (int i = 0; i < numPlayers; i++) {
 			String t = types[i] == null ? "human" : types[i].toLowerCase();
+			String name = playerNames.get(i);
 			if (t.equals("easy")) {
-				session.aiPlayers.put(i, new AIPlayer(new EasyAIStrategy()));
+				session.aiPlayers.put(name, new AIPlayer(new EasyAIStrategy()));
 			} else if (t.equals("medium")) {
-				session.aiPlayers.put(i, new AIPlayer(new MediumAIStrategy()));
+				session.aiPlayers.put(name, new AIPlayer(new MediumAIStrategy()));
 			} else if (t.equals("hard")) {
-				session.aiPlayers.put(i, new AIPlayer(new HardAIStrategy()));
+				session.aiPlayers.put(name, new AIPlayer(new HardAIStrategy()));
 			}
 		}
 		session.actionLog.clear();
@@ -1846,12 +1848,7 @@ public class WebServer {
 		}
 		while (!session.controller.isGameOver()) {
 			Player current = session.controller.getCurrentPlayer();
-			List<Player> players = session.controller.getPlayers();
-			int idx = players.indexOf(current);
-			if (idx < 0) {
-				break;
-			}
-			AIPlayer ai = session.aiPlayers.get(idx);
+			AIPlayer ai = session.aiPlayers.get(current.getName());
 			if (ai == null && session.forcedAiByName.contains(current.getName())) {
 				String diff = session.forcedAiDifficultyByName.getOrDefault(current.getName(), "medium");
 				if ("easy".equals(diff)) {
@@ -1893,9 +1890,7 @@ public class WebServer {
 			session.controller.nextTurn();
 			session.turnNumber++;
 			Player current = session.controller.getCurrentPlayer();
-			List<Player> players = session.controller.getPlayers();
-			int idx = players.indexOf(current);
-			AIPlayer ai = session.aiPlayers.get(idx);
+			AIPlayer ai = session.aiPlayers.get(current.getName());
 			if (ai == null && session.forcedAiByName.contains(current.getName())) {
 				String diff = session.forcedAiDifficultyByName.getOrDefault(current.getName(), "medium");
 				if ("easy".equals(diff)) {
