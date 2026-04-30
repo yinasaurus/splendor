@@ -586,7 +586,8 @@ main {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  overflow-y: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   background:
     radial-gradient(ellipse 90% 70% at 50% 20%, rgba(232, 163, 23, 0.12), transparent 55%),
     radial-gradient(ellipse 80% 50% at 80% 80%, rgba(100, 149, 237, 0.08), transparent 50%),
@@ -598,7 +599,9 @@ main {
   position: relative;
   z-index: 1;
   pointer-events: auto;
-  width: min(28rem, 100%);
+  width: min(42rem, 100%);
+  max-width: 100%;
+  min-width: min(22rem, 100%);
   padding: clamp(1.25rem, 3.5vw, 1.85rem);
   border-radius: 20px;
   background: linear-gradient(155deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
@@ -772,6 +775,42 @@ body:has(#game-ui.game-over-mode) .app {
   flex: 1 1 8rem;
   min-height: 2.65rem;
   border-radius: 999px;
+}
+
+@media (max-width: 640px) {
+  #game-ui.game-over-mode .game-over-wrap {
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px));
+  }
+
+  #game-ui.game-over-mode .game-over-card {
+    width: 100%;
+    min-width: 0;
+    border-radius: 14px;
+    padding: 1rem 0.95rem;
+  }
+
+  #game-ui.game-over-mode .leaderboard__row {
+    grid-template-columns: 2rem minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  #game-ui.game-over-mode .leaderboard__stats {
+    grid-column: 2 / 3;
+    white-space: normal;
+    line-height: 1.3;
+  }
+
+  #game-ui.game-over-mode .game-over-actions {
+    flex-direction: column;
+  }
+
+  #game-ui.game-over-mode .game-over-btn-primary,
+  #game-ui.game-over-mode .game-over-btn-secondary {
+    width: 100%;
+    flex: 1 1 auto;
+  }
 }
 
 .room-code-display {

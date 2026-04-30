@@ -1,4 +1,4 @@
-package splendor.stats;
+package splendor.stats; // Turn log and per-player counters for end screen.
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,10 +12,10 @@ import splendor.model.Player;
  * Tracks game statistics for analysis and display.
  * Demonstrates complexity in handling game metrics.
  */
-public class GameStatistics {
-	private final Map<Player, PlayerStats> playerStats;
-	private int totalTurns;
-	private final List<String> gameHistory;
+public class GameStatistics { // Owned by GameController; updated on each action.
+	private final Map<Player, PlayerStats> playerStats; // One stats object per Player reference.
+	private int totalTurns; // Global action counter (increments on recordTurn).
+	private final List<String> gameHistory; // Human-readable chronological lines.
 
 	/**
 	 * Constructor for GameStatistics.
@@ -26,9 +26,9 @@ public class GameStatistics {
 		this.playerStats = new HashMap<>();
 		this.totalTurns = 0;
 		this.gameHistory = new ArrayList<>();
-		
+
 		for (Player player : players) {
-			playerStats.put(player, new PlayerStats(player.getName()));
+			playerStats.put(player, new PlayerStats(player.getName())); // Keyed by same Player instances controller uses.
 		}
 	}
 
@@ -38,7 +38,7 @@ public class GameStatistics {
 	 * @param player the player who took the turn
 	 * @param action the action taken
 	 */
-	public void recordTurn(Player player, String action) {
+	public void recordTurn(Player player, String action) { // Called from GameController after each successful action.
 		totalTurns++;
 		PlayerStats stats = playerStats.get(player);
 		if (stats != null) {
@@ -57,7 +57,7 @@ public class GameStatistics {
 		PlayerStats stats = playerStats.get(player);
 		if (stats != null) {
 			stats.incrementPurchases();
-			stats.addPrestigePoints(card.getPrestigePoints());
+			stats.addPrestigePoints(card.getPrestigePoints()); // Stats track card-only prestige separately from nobles.
 		}
 	}
 
@@ -126,7 +126,7 @@ public class GameStatistics {
 	/**
 	 * Represents statistics for a single player.
 	 */
-	public static class PlayerStats {
+	public static class PlayerStats { // Nested type: logical grouping inside GameStatistics.
 		private final String playerName;
 		private int turns;
 		private int purchases;

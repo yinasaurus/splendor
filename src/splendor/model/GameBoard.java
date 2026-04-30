@@ -1,38 +1,38 @@
-package splendor.model;
+package splendor.model; // Table state: bank, rows, decks, nobles.
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.ArrayList; // Visible rows and decks per level.
+import java.util.HashMap; // Bank gem counts.
+import java.util.List; // Tiers and nobles.
+import java.util.Map; // GemType → count on bank.
 
 /**
  * Represents the game board containing gems, cards, and nobles.
  */
-public class GameBoard {
-	private final Map<GemType, Integer> availableGems;
+public class GameBoard { // Mutated by GameController during play.
+	private final Map<GemType, Integer> availableGems; // Bank supply (chips not in player hands).
 	private final List<List<Card>> cardTiers; // Three tiers (levels 1, 2, 3) - visible cards
 	private final List<List<Card>> cardDecks; // Three decks (levels 1, 2, 3) - remaining cards
-	private final List<Noble> availableNobles;
-	private final int numPlayers;
+	private final List<Noble> availableNobles; // Nobles still visitable (on table).
+	private final int numPlayers; // Stored for rules that scale with count (display / setup).
 
 	/**
 	 * Constructor for GameBoard.
 	 *
 	 * @param numPlayers the number of players in the game
 	 */
-	public GameBoard(int numPlayers) {
+	public GameBoard(int numPlayers) { // Empty structures until controller loads data.
 		this.numPlayers = numPlayers;
 		this.availableGems = new HashMap<>();
 		this.cardTiers = new ArrayList<>();
 		this.cardDecks = new ArrayList<>();
-		for (int i = 0; i < 3; i++) {
-			cardTiers.add(new ArrayList<>());
-			cardDecks.add(new ArrayList<>());
+		for (int i = 0; i < 3; i++) { // Index 0 = level 1, etc.
+			cardTiers.add(new ArrayList<>()); // Visible slots for this level.
+			cardDecks.add(new ArrayList<>()); // Face-down stack for this level.
 		}
 		this.availableNobles = new ArrayList<>();
-		
+
 		// Initialize all gem types to 0
-		for (GemType type : GemType.values()) {
+		for (GemType type : GemType.values()) { // Controller sets real counts in initializeBoard.
 			availableGems.put(type, 0);
 		}
 	}
@@ -51,7 +51,7 @@ public class GameBoard {
 	 *
 	 * @return a copy of the available gems map
 	 */
-	public Map<GemType, Integer> getAvailableGems() {
+	public Map<GemType, Integer> getAvailableGems() { // Snapshot for validation.
 		return new HashMap<>(availableGems);
 	}
 
@@ -61,7 +61,7 @@ public class GameBoard {
 	 * @param type the gem type
 	 * @return the count
 	 */
-	public int getGemCount(GemType type) {
+	public int getGemCount(GemType type) { // Single pile size.
 		return availableGems.getOrDefault(type, 0);
 	}
 
@@ -71,7 +71,7 @@ public class GameBoard {
 	 * @param type the gem type
 	 * @param count the count to set
 	 */
-	public void setGemCount(GemType type, int count) {
+	public void setGemCount(GemType type, int count) { // Initial setup from config.
 		availableGems.put(type, count);
 	}
 
@@ -80,9 +80,9 @@ public class GameBoard {
 	 *
 	 * @param gems the gems to add
 	 */
-	public void addGems(Map<GemType, Integer> gems) {
+	public void addGems(Map<GemType, Integer> gems) { // Returns from player payments / discards.
 		for (Map.Entry<GemType, Integer> entry : gems.entrySet()) {
-			availableGems.put(entry.getKey(), 
+			availableGems.put(entry.getKey(),
 				availableGems.getOrDefault(entry.getKey(), 0) + entry.getValue());
 		}
 	}
@@ -92,10 +92,10 @@ public class GameBoard {
 	 *
 	 * @param gems the gems to remove
 	 */
-	public void removeGems(Map<GemType, Integer> gems) {
+	public void removeGems(Map<GemType, Integer> gems) { // Player takes or pays (bank receives elsewhere).
 		for (Map.Entry<GemType, Integer> entry : gems.entrySet()) {
 			int current = availableGems.getOrDefault(entry.getKey(), 0);
-			availableGems.put(entry.getKey(), Math.max(0, current - entry.getValue()));
+			availableGems.put(entry.getKey(), Math.max(0, current - entry.getValue())); // Never negative.
 		}
 	}
 
@@ -105,14 +105,14 @@ public class GameBoard {
 	 * @param level the card level (1, 2, or 3)
 	 * @return the list of visible cards
 	 */
-	public List<Card> getVisibleCards(int level) {
+	public List<Card> getVisibleCards(int level) { // Up to first 4 in tier list = “display row”.
 		if (level < 1 || level > 3) {
-			return new ArrayList<>();
+			return new ArrayList<>(); // Safe empty for bad input.
 		}
-		List<Card> tier = cardTiers.get(level - 1);
+		List<Card> tier = cardTiers.get(level - 1); // 0-based index.
 		// Return up to 4 visible cards
-		int visibleCount = Math.min(4, tier.size());
-		return new ArrayList<>(tier.subList(0, visibleCount));
+		int visibleCount = Math.min(4, tier.size()); // Fewer than 4 if deck ran out.
+		return new ArrayList<>(tier.subList(0, visibleCount)); // Copy of visible slice.
 	}
 
 	/**
@@ -121,7 +121,7 @@ public class GameBoard {
 	 * @param level the card level (1, 2, or 3)
 	 * @param card the card to add
 	 */
-	public void addCard(int level, Card card) {
+	public void addCard(int level, Card card) { // Deal to display (append to tier list).
 		if (level >= 1 && level <= 3) {
 			cardTiers.get(level - 1).add(card);
 		}
@@ -133,7 +133,7 @@ public class GameBoard {
 	 * @param level the card level (1, 2, or 3)
 	 * @param card the card to add
 	 */
-	public void addCardToDeck(int level, Card card) {
+	public void addCardToDeck(int level, Card card) { // Build face-down stack (order = list order).
 		if (level >= 1 && level <= 3) {
 			cardDecks.get(level - 1).add(card);
 		}
@@ -145,11 +145,11 @@ public class GameBoard {
 	 * @param level the card level (1, 2, or 3)
 	 * @return the drawn card, or null if deck is empty
 	 */
-	public Card drawCardFromDeck(int level) {
+	public Card drawCardFromDeck(int level) { // Remove from front of deck list (index 0).
 		if (level >= 1 && level <= 3) {
 			List<Card> deck = cardDecks.get(level - 1);
 			if (!deck.isEmpty()) {
-				return deck.remove(0);
+				return deck.remove(0); // Top of deck.
 			}
 		}
 		return null;
@@ -161,7 +161,7 @@ public class GameBoard {
 	 * @param level the card level (1, 2, or 3)
 	 * @return the top card, or null if deck is empty
 	 */
-	public Card peekTopCard(int level) {
+	public Card peekTopCard(int level) { // Optional UI / debug.
 		if (level >= 1 && level <= 3) {
 			List<Card> deck = cardDecks.get(level - 1);
 			if (!deck.isEmpty()) {
@@ -177,7 +177,7 @@ public class GameBoard {
 	 * @param level the card level (1, 2, or 3)
 	 * @return the number of cards remaining
 	 */
-	public int getDeckSize(int level) {
+	public int getDeckSize(int level) { // For AI reserve-top legality.
 		if (level >= 1 && level <= 3) {
 			return cardDecks.get(level - 1).size();
 		}
@@ -191,9 +191,9 @@ public class GameBoard {
 	 * @param card the card to remove
 	 * @return true if the card was removed
 	 */
-	public boolean removeCard(int level, Card card) {
+	public boolean removeCard(int level, Card card) { // Buy or reserve from display—uses reference equality.
 		if (level >= 1 && level <= 3) {
-			return cardTiers.get(level - 1).remove(card);
+			return cardTiers.get(level - 1).remove(card); // List.remove(Object).
 		}
 		return false;
 	}
@@ -212,7 +212,7 @@ public class GameBoard {
 	 *
 	 * @param noble the noble to add
 	 */
-	public void addNoble(Noble noble) {
+	public void addNoble(Noble noble) { // During GameController.loadGameData.
 		availableNobles.add(noble);
 	}
 
@@ -222,7 +222,7 @@ public class GameBoard {
 	 * @param noble the noble to remove
 	 * @return true if the noble was removed
 	 */
-	public boolean removeNoble(Noble noble) {
+	public boolean removeNoble(Noble noble) { // After visit.
 		return availableNobles.remove(noble);
 	}
 }

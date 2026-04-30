@@ -38,29 +38,34 @@ import splendor.rules.GameRules;
 /**
  * Simple embedded HTTP server that exposes the Splendor game via a web UI.
  * This keeps all game logic in Java while allowing a browser-based interface.
+ * <p>
+ * File map (too large for per-line comments everywhere): {@code getOrCreateSession} / lobby / {@code startNewGame};
+ * JSON state in {@code buildGameStateJson}; human actions in {@code handleAction}; AI chains in
+ * {@code runAiTurnsWhileCurrentIsAi} and {@code advanceTurnsAfterHuman}; nested {@link HttpHandler} classes
+ * bind URL paths; {@code GameSession} holds per-room controller + lobby + AI map; chat/action logs capped.
  */
 public class WebServer {
 
-	private static final String DEFAULT_ROOM = "Room A";
-	private static final int ACTION_LOG_LIMIT = 12;
-	private static final int CHAT_LOG_LIMIT = 80;
-	private static final int CHAT_MAX_LENGTH = 400;
-	private static final int AFK_AI_THRESHOLD_SECONDS = 90;
-	private static final Map<String, GameSession> sessions = new ConcurrentHashMap<>();
-	private static final Path LOBBY_SNAPSHOT_FILE = Paths.get("data", "web_lobbies.properties");
+	private static final String DEFAULT_ROOM = "Room A"; // Default room name when none specified.
+	private static final int ACTION_LOG_LIMIT = 12; // Max lines kept in UI action feed per room.
+	private static final int CHAT_LOG_LIMIT = 80; // Max chat messages retained in memory.
+	private static final int CHAT_MAX_LENGTH = 400; // Truncate single chat message for safety.
+	private static final int AFK_AI_THRESHOLD_SECONDS = 90; // Inactivity before AFK→AI replacement offered.
+	private static final Map<String, GameSession> sessions = new ConcurrentHashMap<>(); // roomName → session (thread-safe).
+	private static final Path LOBBY_SNAPSHOT_FILE = Paths.get("data", "web_lobbies.properties"); // Persist lobbies to disk.
 
-	private static class LobbySnapshot {
-		String ownerName = "Host";
-		int lobbyNumPlayers = 2;
-		boolean gameStarted = false;
-		LinkedHashMap<String, Boolean> readyByPlayer = new LinkedHashMap<>();
-		LinkedHashMap<String, String> aiByName = new LinkedHashMap<>();
+	private static class LobbySnapshot { // Serializable subset of lobby for properties file.
+		String ownerName = "Host"; // Restored lobby owner display name.
+		int lobbyNumPlayers = 2; // Target player count for the room.
+		boolean gameStarted = false; // Whether match was in progress when saved.
+		LinkedHashMap<String, Boolean> readyByPlayer = new LinkedHashMap<>(); // Seat name → ready flag (order preserved).
+		LinkedHashMap<String, String> aiByName = new LinkedHashMap<>(); // Seat name → easy/medium/hard or empty = human.
 	}
 
-	private static final class ChatLine {
-		final String from;
-		final String text;
-		final long t;
+	private static final class ChatLine { // One chat message for JSON/history.
+		final String from; // Sender display name.
+		final String text; // Sanitized body.
+		final long t; // Epoch millis when posted.
 
 		ChatLine(String from, String text, long t) {
 			this.from = from;
@@ -69,27 +74,27 @@ public class WebServer {
 		}
 	}
 
-	private static class GameSession {
-		GameController controller;
+	private static class GameSession { // All state for one multiplayer room.
+		GameController controller; // null until game starts; then full Splendor engine.
 		// Key by player name (GameController shuffles players internally, so indices are not stable).
-		Map<String, AIPlayer> aiPlayers = new HashMap<>();
-		List<String> actionLog = new ArrayList<>();
-		List<ChatLine> chatLines = new ArrayList<>();
-		int turnNumber = 1;
-		boolean gameStarted = false;
-		String ownerName = "Host";
-		int lobbyNumPlayers = 2;
-		String[] lobbyTypes = new String[] { "human", "human", "human", "human" };
-		Map<String, Boolean> readyByPlayer = new LinkedHashMap<>();
-		Map<String, String> aiByName = new LinkedHashMap<>();
-		Map<String, String> seatTokenByPlayer = new HashMap<>();
-		Map<String, Long> lastSeenByPlayer = new HashMap<>();
-		Set<String> forcedAiByName = new HashSet<>();
-		Map<String, String> forcedAiDifficultyByName = new HashMap<>();
-		Set<String> kickedNames = new HashSet<>();
+		Map<String, AIPlayer> aiPlayers = new HashMap<>(); // Bot controller per seat name when type is AI.
+		List<String> actionLog = new ArrayList<>(); // Human-readable recent events.
+		List<ChatLine> chatLines = new ArrayList<>(); // In-memory chat history.
+		int turnNumber = 1; // Monotonic counter for display (incremented with nextTurn flows).
+		boolean gameStarted = false; // false = lobby phase.
+		String ownerName = "Host"; // Who can start / configure room.
+		int lobbyNumPlayers = 2; // Slots in this room (2–4).
+		String[] lobbyTypes = new String[] { "human", "human", "human", "human" }; // Legacy per-slot type strings.
+		Map<String, Boolean> readyByPlayer = new LinkedHashMap<>(); // Lobby ready flags by seat name.
+		Map<String, String> aiByName = new LinkedHashMap<>(); // Seat → difficulty for bots.
+		Map<String, String> seatTokenByPlayer = new HashMap<>(); // Auth token per seated player.
+		Map<String, Long> lastSeenByPlayer = new HashMap<>(); // For AFK detection (heartbeat).
+		Set<String> forcedAiByName = new HashSet<>(); // Seats currently controlled by takeover AI.
+		Map<String, String> forcedAiDifficultyByName = new HashMap<>(); // Takeover AI difficulty per seat.
+		Set<String> kickedNames = new HashSet<>(); // Names blocked from rejoin until reset.
 	}
 
-	private static void addActionLog(GameSession session, String text) {
+	private static void addActionLog(GameSession session, String text) { // Append one line to room feed with trim + dedupe + cap.
 		if (text == null || text.trim().isEmpty()) {
 			return;
 		}
@@ -109,7 +114,7 @@ public class WebServer {
 		}
 	}
 
-	private static String sanitizeChatText(String raw) {
+	private static String sanitizeChatText(String raw) { // Strip control chars, collapse spaces, cap length.
 		if (raw == null) {
 			return "";
 		}
@@ -132,7 +137,7 @@ public class WebServer {
 		return s;
 	}
 
-	private static void addChatLine(GameSession session, String from, String text) {
+	private static void addChatLine(GameSession session, String from, String text) { // Push chat; drop oldest over limit.
 		if (session == null || text == null || text.isEmpty()) {
 			return;
 		}
@@ -143,7 +148,7 @@ public class WebServer {
 		}
 	}
 
-	private static void markPlayerSeen(GameSession session, String rawName) {
+	private static void markPlayerSeen(GameSession session, String rawName) { // Update last-seen timestamp for AFK logic.
 		if (session == null || rawName == null) {
 			return;
 		}

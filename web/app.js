@@ -860,14 +860,14 @@ async function postAction(payload) {
     let result = null;
     for (let attempt = 0; attempt < 2; attempt++) {
       const withRoom = { ...payload, room: currentRoom, name: currentPlayerName, sessionToken: currentSessionToken };
-      const res = await fetch(API_ACTION, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(withRoom),
-      });
-      if (!res.ok) {
-        throw new Error("Action failed");
-      }
+  const res = await fetch(API_ACTION, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(withRoom),
+  });
+  if (!res.ok) {
+    throw new Error("Action failed");
+  }
       result = await res.json();
       if (!(result && result.sessionMissing)) {
         break;
@@ -897,20 +897,20 @@ async function postAction(payload) {
       return { success: false, message: "Action failed." };
     }
 
-    // Very simple tutorial tracking: record when the player has
-    // successfully taken gems or bought any card.
-    if (tutorialFlags.active && result && result.success) {
-      if (payload.type === "takeGems") {
-        tutorialFlags.tookGemsOnce = true;
-      } else if (
-        payload.type === "purchaseVisible" ||
-        payload.type === "purchaseReserved"
-      ) {
-        tutorialFlags.boughtLevel1Once = true;
-      }
+  // Very simple tutorial tracking: record when the player has
+  // successfully taken gems or bought any card.
+  if (tutorialFlags.active && result && result.success) {
+    if (payload.type === "takeGems") {
+      tutorialFlags.tookGemsOnce = true;
+    } else if (
+      payload.type === "purchaseVisible" ||
+      payload.type === "purchaseReserved"
+    ) {
+      tutorialFlags.boughtLevel1Once = true;
     }
+  }
 
-    return result;
+  return result;
   } finally {
     actionRequestInFlight = false;
   }
@@ -1895,7 +1895,7 @@ function renderState(state) {
         bonusesLabel.className = "player-resource-label";
         bonusesLabel.textContent = "Bonuses:";
         card.appendChild(bonusesLabel);
-        card.appendChild(bonusesRow);
+      card.appendChild(bonusesRow);
       }
       const gemsLabel = document.createElement("div");
       gemsLabel.className = "player-resource-label";
@@ -2023,21 +2023,21 @@ function renderState(state) {
           const isYou = samePlayerName(p.name, currentPlayerName);
           // Only your own reserved row gets a buy control; opponents’ reserves are hidden information enough without a dummy button.
           if (isYou) {
-            const buyR = document.createElement("button");
-            buyR.type = "button";
-            buyR.className = "reserved-mini__buy card-buy-btn";
-            buyR.textContent = "Buy reserved";
+          const buyR = document.createElement("button");
+          buyR.type = "button";
+          buyR.className = "reserved-mini__buy card-buy-btn";
+          buyR.textContent = "Buy reserved";
             const canBuyReserved = isMyTurn && p.human && !!rc.affordable;
             buyR.disabled = actionRequestInFlight || !canBuyReserved;
             buyR.title = canBuyReserved ? "Buy this reserved card" : "Not affordable yet";
-            buyR.addEventListener("click", async (e) => {
-              e.stopPropagation();
-              if (buyR.disabled) {
-                return;
-              }
-              await postPurchaseReserved(rIdx);
-            });
-            mini.appendChild(buyR);
+          buyR.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            if (buyR.disabled) {
+              return;
+            }
+            await postPurchaseReserved(rIdx);
+          });
+          mini.appendChild(buyR);
           }
           resSlots.appendChild(mini);
         });
@@ -2325,7 +2325,7 @@ function setupGemSelection() {
       }
     }
     if (value === 0) {
-      selected.delete(gem);
+        selected.delete(gem);
     } else {
       selected.set(gem, value);
     }
@@ -3275,7 +3275,7 @@ async function init() {
         enterGameUiFromState(state, true);
       } else {
         showWaitingRoom();
-        renderLobbyStatus(state);
+      renderLobbyStatus(state);
       }
       suppressRealtimeToasts = true;
       lastSeenActionCount = 0;

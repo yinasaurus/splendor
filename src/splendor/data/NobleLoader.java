@@ -1,4 +1,4 @@
-package splendor.data;
+package splendor.data; // CSV → Noble objects.
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -16,16 +16,16 @@ import splendor.model.Noble;
  * Supports legacy rows ({@code id,name,points,reqR,reqE,reqS,reqD,reqO}) and distribution
  * sheets ({@code Game, points, total cost, Black, Red, Green, Blue, White} dev cards).
  */
-public class NobleLoader {
+public class NobleLoader { // Static parsing helpers only.
 
-	private static String stripBom(String line) {
+	private static String stripBom(String line) { // Remove UTF-8 BOM if present.
 		if (line != null && !line.isEmpty() && line.charAt(0) == '\uFEFF') {
 			return line.substring(1);
 		}
 		return line;
 	}
 
-	private static boolean isDistributionNoblesHeader(String line) {
+	private static boolean isDistributionNoblesHeader(String line) { // Recognize Splendor distribution sheet header row.
 		String lower = line.toLowerCase();
 		return lower.contains("black dev cards") || (lower.contains("game") && lower.contains("prestige"));
 	}
@@ -33,12 +33,12 @@ public class NobleLoader {
 	/**
 	 * Distribution: Game, Prestige Points, Total Dev Card Cost, Black, Red, Green, Blue, White.
 	 */
-	private static Noble parseDistributionNobleLine(String line, int nobleId, String name) {
+	private static Noble parseDistributionNobleLine(String line, int nobleId, String name) { // One noble row.
 		String[] parts = line.split(",", -1);
 		if (parts.length < 8) {
 			return null;
 		}
-		String game = parts[0].trim();
+		String game = parts[0].trim(); // "Base" or "Expansion" row filter.
 		if (!game.equalsIgnoreCase("Base") && !game.equalsIgnoreCase("Expansion")) {
 			return null;
 		}
@@ -56,7 +56,7 @@ public class NobleLoader {
 		for (int i = 0; i < 5; i++) {
 			String c = parts[3 + i].trim();
 			if (c.isEmpty()) {
-				continue;
+				continue; // 0 requirement for this color.
 			}
 			try {
 				int n = Integer.parseInt(c);
@@ -68,7 +68,7 @@ public class NobleLoader {
 			}
 		}
 		if (requirement.isEmpty()) {
-			return null;
+			return null; // No requirements parsed.
 		}
 		return new Noble(nobleId, name, prestigePoints, requirement);
 	}
@@ -76,7 +76,7 @@ public class NobleLoader {
 	/**
 	 * Legacy: nobleId,name,prestigePoints,reqRuby,reqEmerald,reqSapphire,reqDiamond,reqOnyx
 	 */
-	private static Noble parseLegacyNobleLine(String line) {
+	private static Noble parseLegacyNobleLine(String line) { // Eight fixed columns.
 		try {
 			String[] parts = line.split(",");
 			if (parts.length < 8) {
@@ -106,7 +106,7 @@ public class NobleLoader {
 	 * @param filePath the path to the CSV file
 	 * @return a list of nobles
 	 */
-	public static List<Noble> loadNobles(String filePath) {
+	public static List<Noble> loadNobles(String filePath) { // Called from GameController.loadGameData.
 		List<Noble> nobles = new ArrayList<>();
 
 		try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
@@ -132,7 +132,7 @@ public class NobleLoader {
 						continue;
 					}
 					// Friendly in-game label (CSV "Base"/"Expansion" are sheet categories, not character names).
-					int id = nobles.size() + 1;
+					int id = nobles.size() + 1; // 1-based sequential ids.
 					String name = "Noble " + id;
 					Noble n = parseDistributionNobleLine(line, id, name);
 					if (n != null) {
@@ -168,7 +168,7 @@ public class NobleLoader {
 	 *
 	 * @return a list of default nobles
 	 */
-	private static List<Noble> generateDefaultNobles() {
+	private static List<Noble> generateDefaultNobles() { // Hardcoded small set.
 		List<Noble> nobles = new ArrayList<>();
 		String[] names = { "Isabella", "Francis", "Catherine", "Charles", "Marie" };
 
@@ -176,7 +176,7 @@ public class NobleLoader {
 			Map<GemType, Integer> requirement = new HashMap<>();
 			GemType[] types = GemType.values();
 			for (int j = 0; j < 3; j++) {
-				requirement.put(types[j], 3);
+				requirement.put(types[j], 3); // First three enum colors need 3 bonuses each.
 			}
 			nobles.add(new Noble(i + 1, names[i], 3, requirement));
 		}

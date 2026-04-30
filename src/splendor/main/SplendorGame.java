@@ -1,4 +1,4 @@
-package splendor.main;
+package splendor.main; // JVM entry point for console Splendor.
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,15 +18,15 @@ import splendor.ui.ConsoleUI;
 /**
  * Main class for the Splendor card game application.
  */
-public class SplendorGame {
-	private static final Scanner scanner = new Scanner(System.in);
+public class SplendorGame { // Console-only launcher (web uses different main).
+	private static final Scanner scanner = new Scanner(System.in); // Shared stdin reader for whole session.
 
 	/**
 	 * Main entry point for the application.
 	 *
 	 * @param args command line arguments
 	 */
-	public static void main(String[] args) {
+	public static void main(String[] args) { // java splendor.main.SplendorGame
 		System.out.println("Welcome to Splendor!");
 		System.out.println("===================\n");
 
@@ -37,15 +37,15 @@ public class SplendorGame {
 			showTutorial();
 			System.out.println();
 		}
-		
+
 		// Get number of players
 		int numPlayers = getNumberOfPlayers();
-		
+
 		// Get player names and types
-		List<String> playerNames = new ArrayList<>();
-		List<Boolean> playerTypes = new ArrayList<>();
-		Map<Integer, AIPlayer> aiPlayers = new HashMap<>();
-		
+		List<String> playerNames = new ArrayList<>(); // Parallel index with playerTypes.
+		List<Boolean> playerTypes = new ArrayList<>(); // true = human.
+		Map<Integer, AIPlayer> aiPlayers = new HashMap<>(); // Key = setup order index (see shuffle caveat).
+
 		for (int i = 0; i < numPlayers; i++) {
 			System.out.print("Enter name for Player " + (i + 1) + ": ");
 			String name = scanner.nextLine().trim();
@@ -53,12 +53,12 @@ public class SplendorGame {
 				name = "Player " + (i + 1);
 			}
 			playerNames.add(name);
-			
+
 			System.out.print("Is " + name + " a human player? (y/n): ");
 			String response = scanner.nextLine().trim().toLowerCase();
 			boolean isHuman = response.startsWith("y");
 			playerTypes.add(isHuman);
-			
+
 			if (!isHuman) {
 				// Get AI difficulty
 				System.out.print("AI difficulty for " + name + " (easy/medium/hard): ");
@@ -66,7 +66,7 @@ public class SplendorGame {
 				if (difficulty.isEmpty()) {
 					difficulty = "medium"; // Default if user just presses Enter
 				}
-				
+
 				AIPlayer aiPlayer;
 				switch (difficulty) {
 					case "easy":
@@ -79,37 +79,37 @@ public class SplendorGame {
 						aiPlayer = new AIPlayer(new MediumAIStrategy());
 						break;
 				}
-				aiPlayers.put(i, aiPlayer);
+				aiPlayers.put(i, aiPlayer); // Maps registration slot → AI (shuffle can desync from current player index).
 			}
 		}
-		
+
 		// Create game controller
-		GameController controller = new GameController(numPlayers, playerNames, playerTypes);
+		GameController controller = new GameController(numPlayers, playerNames, playerTypes); // Shuffles players inside.
 		ConsoleUI ui = new ConsoleUI(controller);
-		
+
 		// Main game loop
 		while (!controller.isGameOver()) {
 			ui.displayGameState();
-			
+
 			if (controller.getCurrentPlayer().isHuman()) {
 				// Human player's turn
 				boolean turnComplete = false;
 				while (!turnComplete) {
-					turnComplete = ui.handleHumanTurn();
+					turnComplete = ui.handleHumanTurn(); // Retry until valid action completes.
 				}
 			} else {
 				// AI player's turn
 				Player currentPlayer = controller.getCurrentPlayer();
-				AIPlayer aiPlayer = aiPlayers.get(controller.getPlayers().indexOf(currentPlayer));
+				AIPlayer aiPlayer = aiPlayers.get(controller.getPlayers().indexOf(currentPlayer)); // Lookup by shuffled index.
 				if (aiPlayer == null) {
 					aiPlayer = new AIPlayer(); // Default medium
 				}
-				
-				System.out.println("\n>>> " + currentPlayer.getName() + "'s Turn (AI - " + 
+
+				System.out.println("\n>>> " + currentPlayer.getName() + "'s Turn (AI - " +
 					aiPlayer.getStrategyName() + ") <<<");
 				String aiAction = aiPlayer.makeMove(controller);
 				System.out.println(aiAction);
-				
+
 				// Small delay for readability
 				try {
 					Thread.sleep(1000);
@@ -117,16 +117,16 @@ public class SplendorGame {
 					// Ignore
 				}
 			}
-			
+
 			// Move to next player
 			controller.nextTurn();
 		}
-		
+
 		// Display winner and statistics
 		ui.displayGameState();
 		ui.displayWinner();
 		ui.displayStatistics();
-		
+
 		scanner.close();
 	}
 
@@ -190,7 +190,7 @@ public class SplendorGame {
 	 * @return the number of players (2-4)
 	 */
 	private static int getNumberOfPlayers() {
-		while (true) {
+		while (true) { // Until valid integer in range.
 			System.out.print("Enter number of players (2-4): ");
 			try {
 				int num = Integer.parseInt(scanner.nextLine().trim());

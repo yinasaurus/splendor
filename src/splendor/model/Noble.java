@@ -1,17 +1,17 @@
-package splendor.model;
+package splendor.model; // Domain model: nobles on the board.
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.HashMap; // Defensive copy of requirement map.
+import java.util.Map; // Bonus requirements per color.
 
 /**
  * Represents a Noble in Splendor.
  * Nobles visit players who meet their gem requirements and provide prestige points.
  */
-public class Noble {
-	private final int nobleId;
-	private final int prestigePoints;
-	private final Map<GemType, Integer> requirement;
-	private final String name;
+public class Noble { // Immutable identity; requirement map copied in constructor.
+	private final int nobleId; // Stable id from CSV or assigned in loader.
+	private final int prestigePoints; // Points granted when visited.
+	private final Map<GemType, Integer> requirement; // Needed **bonuses** (from cards), not loose gems.
+	private final String name; // Display name.
 
 	/**
 	 * Constructor for Noble.
@@ -21,11 +21,11 @@ public class Noble {
 	 * @param prestigePoints the prestige points this noble provides
 	 * @param requirement the gem requirement map (gem type to quantity required)
 	 */
-	public Noble(int nobleId, String name, int prestigePoints, Map<GemType, Integer> requirement) {
+	public Noble(int nobleId, String name, int prestigePoints, Map<GemType, Integer> requirement) { // Copies requirement.
 		this.nobleId = nobleId;
 		this.name = name;
 		this.prestigePoints = prestigePoints;
-		this.requirement = new HashMap<>(requirement);
+		this.requirement = new HashMap<>(requirement); // Protect internal map from caller mutation.
 	}
 
 	/**
@@ -33,7 +33,7 @@ public class Noble {
 	 *
 	 * @return the noble ID
 	 */
-	public int getNobleId() {
+	public int getNobleId() { // For logs / JSON.
 		return nobleId;
 	}
 
@@ -51,7 +51,7 @@ public class Noble {
 	 *
 	 * @return the prestige points
 	 */
-	public int getPrestigePoints() {
+	public int getPrestigePoints() { // Added to player when noble visits.
 		return prestigePoints;
 	}
 
@@ -60,7 +60,7 @@ public class Noble {
 	 *
 	 * @return a copy of the requirement map
 	 */
-	public Map<GemType, Integer> getRequirement() {
+	public Map<GemType, Integer> getRequirement() { // Caller cannot mutate noble’s internal map.
 		return new HashMap<>(requirement);
 	}
 
@@ -70,26 +70,26 @@ public class Noble {
 	 * @param playerBonuses the player's gem bonuses from cards
 	 * @return true if the player meets the requirements
 	 */
-	public boolean meetsRequirement(Map<GemType, Integer> playerBonuses) {
-		for (Map.Entry<GemType, Integer> req : requirement.entrySet()) {
-			int required = req.getValue();
-			int available = playerBonuses.getOrDefault(req.getKey(), 0);
-			if (available < required) {
-				return false;
+	public boolean meetsRequirement(Map<GemType, Integer> playerBonuses) { // Compare bonus counts only.
+		for (Map.Entry<GemType, Integer> req : requirement.entrySet()) { // Each color requirement.
+			int required = req.getValue(); // Needed bonus pips of this color.
+			int available = playerBonuses.getOrDefault(req.getKey(), 0); // Owned bonuses.
+			if (available < required) { // Short on this color.
+				return false; // Noble not satisfied.
 			}
 		}
-		return true;
+		return true; // All entries satisfied.
 	}
 
 	@Override
-	public String toString() {
-		StringBuilder sb = new StringBuilder();
-		sb.append("Noble [").append(name).append("] ");
-		sb.append("Points:").append(prestigePoints).append(" ");
-		sb.append("Requires:");
-		for (Map.Entry<GemType, Integer> entry : requirement.entrySet()) {
+	public String toString() { // Human-readable one-liner for console.
+		StringBuilder sb = new StringBuilder(); // Efficient string build.
+		sb.append("Noble [").append(name).append("] "); // Name in brackets.
+		sb.append("Points:").append(prestigePoints).append(" "); // Prestige reward.
+		sb.append("Requires:"); // Prefix for cost line.
+		for (Map.Entry<GemType, Integer> entry : requirement.entrySet()) { // Abbrev:count pairs.
 			sb.append(" ").append(entry.getKey().getAbbreviation()).append(":").append(entry.getValue());
 		}
-		return sb.toString();
+		return sb.toString(); // Final text.
 	}
 }

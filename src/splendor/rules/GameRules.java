@@ -1,4 +1,4 @@
-package splendor.rules;
+package splendor.rules; // Pure validation and win logic (no board mutation).
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,8 +15,8 @@ import splendor.model.Player;
 /**
  * Validates game rules and actions according to Splendor rules.
  */
-public class GameRules {
-	private final GameConfig config;
+public class GameRules { // Used by GameController before every state change.
+	private final GameConfig config; // Win threshold, max gems, etc.
 
 	/**
 	 * Constructor for GameRules.
@@ -35,24 +35,24 @@ public class GameRules {
 	 * @param playerGems the player's current gems
 	 * @return a validation result
 	 */
-	public ValidationResult validateTakeGems(Map<GemType, Integer> gemsToTake, 
+	public ValidationResult validateTakeGems(Map<GemType, Integer> gemsToTake,
 			Map<GemType, Integer> availableGems, Map<GemType, Integer> playerGems) {
-		
+
 		// Count total gems to take
 		int totalToTake = gemsToTake.values().stream().mapToInt(Integer::intValue).sum();
-		
+
 		// Rule: Can take 2 of same color if there are at least 4 available
 		// Rule: Can take 3 different colors
 		// Rule: Cannot take more than 10 gems total
-		
+
 		if (totalToTake == 0) {
 			return new ValidationResult(false, "Must take at least one gem.");
 		}
-		
+
 		if (totalToTake > 3) {
 			return new ValidationResult(false, "Cannot take more than 3 gems in one turn.");
 		}
-		
+
 		// Check if taking 2 of same color
 		boolean takingTwoSame = false;
 		for (int count : gemsToTake.values()) {
@@ -61,7 +61,7 @@ public class GameRules {
 				break;
 			}
 		}
-		
+
 		if (takingTwoSame) {
 			// Must be exactly 2 of one color and 0 of others
 			int nonZeroCount = 0;
@@ -74,59 +74,59 @@ public class GameRules {
 					}
 				}
 			}
-			
+
 			if (nonZeroCount != 1 || twoColor == null) {
-				return new ValidationResult(false, 
+				return new ValidationResult(false,
 					"When taking 2 gems of same color, must take exactly 2 of one color only.");
 			}
-			
+
 			// Check if at least 4 available
 			if (availableGems.getOrDefault(twoColor, 0) < 4) {
-				return new ValidationResult(false, 
+				return new ValidationResult(false,
 					"Need at least 4 gems of " + twoColor.getName() + " to take 2.");
 			}
 		} else {
 			// Taking different colors - must be 3 different colors
 			if (totalToTake != 3) {
-				return new ValidationResult(false, 
+				return new ValidationResult(false,
 					"When taking different colors, must take exactly 3 different gems.");
 			}
-			
+
 			int differentColors = 0;
 			for (Map.Entry<GemType, Integer> entry : gemsToTake.entrySet()) {
 				if (entry.getValue() == 1) {
 					differentColors++;
 				} else if (entry.getValue() > 1) {
-					return new ValidationResult(false, 
+					return new ValidationResult(false,
 						"When taking different colors, can only take 1 of each color.");
 				}
 			}
-			
+
 			if (differentColors != 3) {
-				return new ValidationResult(false, 
+				return new ValidationResult(false,
 					"Must take exactly 3 different colored gems.");
 			}
 		}
-		
+
 		// Check if gems are available
 		for (Map.Entry<GemType, Integer> entry : gemsToTake.entrySet()) {
 			if (entry.getKey() == GemType.GOLD) {
 				return new ValidationResult(false, "Cannot take gold gems directly.");
 			}
 			if (availableGems.getOrDefault(entry.getKey(), 0) < entry.getValue()) {
-				return new ValidationResult(false, 
+				return new ValidationResult(false,
 					"Not enough " + entry.getKey().getName() + " gems available.");
 			}
 		}
-		
+
 		// Check if player would exceed gem limit
 		int currentTotal = playerGems.values().stream().mapToInt(Integer::intValue).sum();
 		if (currentTotal + totalToTake > config.getMaxGemsPerPlayer()) {
-			return new ValidationResult(false, 
-				"Taking these gems would exceed the maximum gem limit of " + 
+			return new ValidationResult(false,
+				"Taking these gems would exceed the maximum gem limit of " +
 				config.getMaxGemsPerPlayer() + ".");
 		}
-		
+
 		return new ValidationResult(true, "Valid action.");
 	}
 
@@ -134,20 +134,20 @@ public class GameRules {
 	 * True if the player can legally take gems on this board (hand limit and bank supply).
 	 * Differs from a structural bank-only check: at 9–10 gems, no take pattern fits under the limit.
 	 */
-	public boolean existsLegalTakeGems(Player player, GameBoard board) {
+	public boolean existsLegalTakeGems(Player player, GameBoard board) { // AI / pass logic helper.
 		int cur = player.getTotalGemCount();
 		int max = config.getMaxGemsPerPlayer();
-		if (cur + 2 <= max) {
+		if (cur + 2 <= max) { // Room for take-2?
 			for (GemType t : GemType.values()) {
 				if (t == GemType.GOLD) {
 					continue;
 				}
-				if (board.getGemCount(t) >= 4) {
+				if (board.getGemCount(t) >= 4) { // Bank rule for double take.
 					return true;
 				}
 			}
 		}
-		if (cur + 3 <= max) {
+		if (cur + 3 <= max) { // Room for take-3-different?
 			int colorsWithStock = 0;
 			for (GemType t : GemType.values()) {
 				if (t == GemType.GOLD) {
@@ -172,7 +172,7 @@ public class GameRules {
 	 */
 	public ValidationResult validateReserveCard(Player player) {
 		if (player.getReservedCards().size() >= config.getMaxReservedCards()) {
-			return new ValidationResult(false, 
+			return new ValidationResult(false,
 				"Already at maximum reserved cards (" + config.getMaxReservedCards() + ").");
 		}
 		return new ValidationResult(true, "Valid action.");
@@ -186,9 +186,9 @@ public class GameRules {
 	 * @param gemsToPay the gems the player wants to pay
 	 * @return a validation result
 	 */
-	public ValidationResult validatePurchaseCard(Card card, Player player, 
-			Map<GemType, Integer> gemsToPay) {
-		
+	public ValidationResult validatePurchaseCard(Card card, Player player,
+			Map<GemType, Integer> gemsToPay) { // Note: currently checks affordability from hand+bonus, not map equality to gemsToPay.
+
 		Map<GemType, Integer> playerGems = player.getGems();
 		Map<GemType, Integer> playerBonuses = player.getBonuses();
 		Map<GemType, Integer> cost = card.getCost();
@@ -224,28 +224,28 @@ public class GameRules {
 	 * @param player the player purchasing
 	 * @return a map of gems needed to pay
 	 */
-	public Map<GemType, Integer> calculatePayment(Card card, Player player) {
+	public Map<GemType, Integer> calculatePayment(Card card, Player player) { // Preferred payment: color first, then gold.
 		Map<GemType, Integer> payment = new HashMap<>();
 		Map<GemType, Integer> cost = card.getCost();
 		Map<GemType, Integer> playerGems = player.getGems();
 		Map<GemType, Integer> playerBonuses = player.getBonuses();
-		
+
 		for (Map.Entry<GemType, Integer> costEntry : cost.entrySet()) {
 			if (costEntry.getKey() == GemType.GOLD) {
 				continue;
 			}
-			
+
 			int required = costEntry.getValue();
 			int fromBonuses = playerBonuses.getOrDefault(costEntry.getKey(), 0);
 			int needed = Math.max(0, required - fromBonuses);
-			
+
 			if (needed > 0) {
-				int fromGems = Math.min(needed, 
+				int fromGems = Math.min(needed,
 					playerGems.getOrDefault(costEntry.getKey(), 0));
 				if (fromGems > 0) {
 					payment.put(costEntry.getKey(), fromGems);
 				}
-				
+
 				int stillNeeded = needed - fromGems;
 				if (stillNeeded > 0) {
 					int currentGold = payment.getOrDefault(GemType.GOLD, 0);
@@ -253,7 +253,7 @@ public class GameRules {
 				}
 			}
 		}
-		
+
 		return payment;
 	}
 
@@ -291,7 +291,7 @@ public class GameRules {
 	 * @param player the player to check
 	 * @return true if the player has won
 	 */
-	public boolean hasWon(Player player) {
+	public boolean hasWon(Player player) { // Trigger endgame round, not instant stop.
 		return player.getPrestigePoints() >= config.getWinningPoints();
 	}
 
@@ -302,11 +302,11 @@ public class GameRules {
 	 * @param players the list of players
 	 * @return the winning player, or null if no winner
 	 */
-	public Player determineWinner(List<Player> players) {
+	public Player determineWinner(List<Player> players) { // Among those at/above win points.
 		Player winner = null;
 		int maxPoints = 0;
 		int minCards = Integer.MAX_VALUE;
-		
+
 		for (Player player : players) {
 			if (player.getPrestigePoints() >= config.getWinningPoints()) {
 				if (player.getPrestigePoints() > maxPoints) {
@@ -322,7 +322,7 @@ public class GameRules {
 				}
 			}
 		}
-		
+
 		return winner;
 	}
 
@@ -330,7 +330,7 @@ public class GameRules {
 	 * Highest prestige wins; on tie, fewer purchased development cards wins.
 	 * Used as a fallback when {@link #determineWinner(List)} finds no one at the winning threshold.
 	 */
-	public Player determineWinnerByPrestige(List<Player> players) {
+	public Player determineWinnerByPrestige(List<Player> players) { // End-of-round fallback.
 		Player winner = null;
 		int maxPoints = Integer.MIN_VALUE;
 		int minCards = Integer.MAX_VALUE;
@@ -352,7 +352,7 @@ public class GameRules {
 	/**
 	 * Represents the result of a validation.
 	 */
-	public static class ValidationResult {
+	public static class ValidationResult { // Simple OK / message DTO for UI.
 		private final boolean valid;
 		private final String message;
 

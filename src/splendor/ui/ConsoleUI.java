@@ -1,4 +1,4 @@
-package splendor.ui;
+package splendor.ui; // Terminal menus and ANSI-colored state dump.
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,19 +16,19 @@ import splendor.stats.GameStatistics;
 /**
  * Console-based user interface for the Splendor game.
  */
-public class ConsoleUI {
+public class ConsoleUI { // Reads stdin; calls GameController for mutations.
 	// ANSI color codes for nicer console output (works in most terminals, including WSL)
-	private static final String RESET = "\033[0m";
-	private static final String BOLD = "\033[1m";
-	private static final String FG_GREEN = "\033[32m";
-	private static final String FG_RED = "\033[31m";
-	private static final String FG_YELLOW = "\033[33m";
-	private static final String FG_CYAN = "\033[36m";
-	private static final String FG_MAGENTA = "\033[35m";
-	private static final String FG_BLUE = "\033[34m";
+	private static final String RESET = "\033[0m"; // Reset formatting.
+	private static final String BOLD = "\033[1m"; // Bold text.
+	private static final String FG_GREEN = "\033[32m"; // Current player marker / success.
+	private static final String FG_RED = "\033[31m"; // Errors.
+	private static final String FG_YELLOW = "\033[33m"; // Card indices / AI label.
+	private static final String FG_CYAN = "\033[36m"; // Headers / human label.
+	private static final String FG_MAGENTA = "\033[35m"; // Nobles.
+	private static final String FG_BLUE = "\033[34m"; // Separator lines.
 
-	private final Scanner scanner;
-	private final GameController controller;
+	private final Scanner scanner; // Keyboard input.
+	private final GameController controller; // Game brain.
 
 	/**
 	 * Constructor for ConsoleUI.
@@ -43,11 +43,11 @@ public class ConsoleUI {
 	/**
 	 * Displays the current game state.
 	 */
-	public void displayGameState() {
+	public void displayGameState() { // Full snapshot: bank, rows, nobles, all players.
 		System.out.println("\n" + FG_CYAN + repeatString("=", 60) + RESET);
 		System.out.println(BOLD + "CURRENT GAME STATE" + RESET);
 		System.out.println(FG_CYAN + repeatString("=", 60) + RESET);
-		
+
 		// Display board gems
 		System.out.println("\n" + BOLD + "Available Gems on Board:" + RESET);
 		for (GemType type : GemType.values()) {
@@ -58,7 +58,7 @@ public class ConsoleUI {
 			}
 		}
 		System.out.println();
-		
+
 		// Display visible cards
 		for (int level = 1; level <= 3; level++) {
 			System.out.println("\n" + BOLD + "Level " + level + " Cards:" + RESET);
@@ -67,13 +67,13 @@ public class ConsoleUI {
 				System.out.println("  " + FG_YELLOW + "[" + i + "]" + RESET + " " + cards.get(i));
 			}
 		}
-		
+
 		// Display nobles
 		System.out.println("\n" + BOLD + "Available Nobles:" + RESET);
 		for (Noble noble : controller.getBoard().getAvailableNobles()) {
 			System.out.println("  " + FG_MAGENTA + noble + RESET);
 		}
-		
+
 		// Display all players
 		System.out.println("\n" + FG_BLUE + repeatString("-", 60) + RESET);
 		for (Player player : controller.getPlayers()) {
@@ -88,26 +88,26 @@ public class ConsoleUI {
 	 * @param player the player to display
 	 */
 	private void displayPlayerInfo(Player player) {
-		boolean isCurrent = player == controller.getCurrentPlayer();
+		boolean isCurrent = player == controller.getCurrentPlayer(); // Highlight active seat.
 		String marker = isCurrent ? (FG_GREEN + ">>> " + RESET) : "    ";
-		
-		System.out.println(marker + BOLD + player.getName() + RESET + 
+
+		System.out.println(marker + BOLD + player.getName() + RESET +
 			(player.isHuman() ? FG_CYAN + " (Human)" + RESET : FG_YELLOW + " (AI)" + RESET));
 		System.out.println("    Prestige Points: " + BOLD + player.getPrestigePoints() + RESET);
-		
+
 		System.out.print("    Gems: ");
 		for (GemType type : GemType.values()) {
-			int count = player.getGems().getOrDefault(type, 0);
+			int count = player.getGems().getOrDefault(type, 0); // Copy map each call—OK for console.
 			if (count > 0) {
 				String colorCode = getGemColor(type);
 				System.out.print(colorCode + type.getAbbreviation() + RESET + ":" + count + " ");
 			}
 		}
 		System.out.println();
-		
+
 		System.out.print("    Bonuses: ");
 		for (GemType type : GemType.values()) {
-			if (type != GemType.GOLD) {
+			if (type != GemType.GOLD) { // Bonuses only on five colors.
 				int count = player.getBonuses().getOrDefault(type, 0);
 				if (count > 0) {
 					String colorCode = getGemColor(type);
@@ -116,11 +116,11 @@ public class ConsoleUI {
 			}
 		}
 		System.out.println();
-		
+
 		if (!player.getReservedCards().isEmpty()) {
 			System.out.println("    Reserved Cards: " + FG_YELLOW + player.getReservedCards().size() + RESET);
 		}
-		
+
 		if (player.getVisitedNoble() != null) {
 			System.out.println("    Visited Noble: " + FG_MAGENTA + player.getVisitedNoble().getName() + RESET);
 		}
@@ -133,7 +133,7 @@ public class ConsoleUI {
 	 */
 	public boolean handleHumanTurn() {
 		Player player = controller.getCurrentPlayer();
-		
+
 		System.out.println("\n" + FG_GREEN + ">>> " + player.getName() + "'s Turn <<<" + RESET);
 		System.out.println(BOLD + "What would you like to do?" + RESET);
 		System.out.println("1. " + FG_CYAN + "Take gems" + RESET);
@@ -142,16 +142,16 @@ public class ConsoleUI {
 		System.out.println("4. " + FG_CYAN + "View game state" + RESET);
 		System.out.println(FG_YELLOW + "Type !help at any time to view the rule summary." + RESET);
 		System.out.print(BOLD + "Enter choice (1-4 or !help): " + RESET);
-		
+
 		String choice = scanner.nextLine().trim();
-		
+
 		// Show help/rules if requested
 		if ("!help".equalsIgnoreCase(choice) || "help".equalsIgnoreCase(choice)) {
 			displayHelp();
 			// After showing help, re-prompt for action without ending the turn
 			return handleHumanTurn();
 		}
-		
+
 		switch (choice) {
 			case "1":
 				return handleTakeGems();
@@ -225,7 +225,7 @@ public class ConsoleUI {
 	 * Clears the console screen (best-effort, works in most ANSI-capable terminals).
 	 */
 	private void clearScreen() {
-		System.out.print("\033[H\033[2J");
+		System.out.print("\033[H\033[2J"); // ANSI home + clear.
 		System.out.flush();
 	}
 
@@ -265,21 +265,21 @@ public class ConsoleUI {
 		System.out.println("Option 2: Take 2 gems of the same color (enter 1 gem type twice)");
 		System.out.println("Gem types: R=Ruby, E=Emerald, S=Sapphire, D=Diamond, O=Onyx");
 		System.out.print("Enter gem types (space-separated): ");
-		
+
 		String input = scanner.nextLine().trim().toUpperCase();
-		String[] parts = input.split("\\s+");
-		
+		String[] parts = input.split("\\s+"); // Split on whitespace.
+
 		Map<GemType, Integer> gemsToTake = new HashMap<>();
-		
+
 		for (String part : parts) {
 			GemType type = GemType.fromAbbreviation(part);
 			if (type == null || type == GemType.GOLD) {
 				System.out.println(FG_RED + "Invalid gem type: " + part + RESET);
 				return false;
 			}
-			gemsToTake.put(type, gemsToTake.getOrDefault(type, 0) + 1);
+			gemsToTake.put(type, gemsToTake.getOrDefault(type, 0) + 1); // Count duplicates for “2 same”.
 		}
-		
+
 		if (controller.takeGems(gemsToTake)) {
 			System.out.println(FG_GREEN + "Successfully took gems!" + RESET);
 			return true;
@@ -297,28 +297,28 @@ public class ConsoleUI {
 	private boolean handleReserveCard() {
 		System.out.println("\n" + BOLD + "Reserve a Card:" + RESET);
 		System.out.print(BOLD + "Enter card level (1, 2, or 3): " + RESET);
-		
+
 		try {
 			int level = Integer.parseInt(scanner.nextLine().trim());
 			if (level < 1 || level > 3) {
 				System.out.println(FG_RED + "Invalid level." + RESET);
 				return false;
 			}
-			
+
 			List<Card> cards = controller.getBoard().getVisibleCards(level);
 			if (cards.isEmpty()) {
 				System.out.println(FG_YELLOW + "No cards available at level " + level + RESET);
 				return false;
 			}
-			
+
 			System.out.println(BOLD + "Available cards at level " + level + ":" + RESET);
 			for (int i = 0; i < cards.size(); i++) {
 				System.out.println("  [" + i + "] " + cards.get(i));
 			}
-			
+
 			System.out.print(BOLD + "Enter card index: " + RESET);
 			int index = Integer.parseInt(scanner.nextLine().trim());
-			
+
 			if (controller.reserveCard(level, index)) {
 				System.out.println(FG_GREEN + "Successfully reserved card!" + RESET);
 				return true;
@@ -342,9 +342,9 @@ public class ConsoleUI {
 		System.out.println("1. Purchase from visible cards");
 		System.out.println("2. Purchase from reserved cards");
 		System.out.print(BOLD + "Enter choice (1 or 2): " + RESET);
-		
+
 		String choice = scanner.nextLine().trim();
-		
+
 		if (choice.equals("1")) {
 			return handlePurchaseVisibleCard();
 		} else if (choice.equals("2")) {
@@ -362,33 +362,33 @@ public class ConsoleUI {
 	 */
 	private boolean handlePurchaseVisibleCard() {
 		System.out.print(BOLD + "Enter card level (1, 2, or 3): " + RESET);
-		
+
 		try {
 			int level = Integer.parseInt(scanner.nextLine().trim());
 			if (level < 1 || level > 3) {
 				System.out.println(FG_RED + "Invalid level." + RESET);
 				return false;
 			}
-			
+
 			List<Card> cards = controller.getBoard().getVisibleCards(level);
 			if (cards.isEmpty()) {
 				System.out.println(FG_YELLOW + "No cards available at level " + level + RESET);
 				return false;
 			}
-			
+
 			System.out.println(BOLD + "Available cards at level " + level + ":" + RESET);
 			for (int i = 0; i < cards.size(); i++) {
 				System.out.println("  [" + i + "] " + cards.get(i));
 			}
-			
+
 			System.out.print(BOLD + "Enter card index: " + RESET);
 			int index = Integer.parseInt(scanner.nextLine().trim());
-			
+
 			if (index < 0 || index >= cards.size()) {
 				System.out.println(FG_RED + "Invalid index." + RESET);
 				return false;
 			}
-			
+
 			Card card = cards.get(index);
 			if (controller.purchaseCard(card)) {
 				System.out.println(FG_GREEN + "Successfully purchased card!" + RESET);
@@ -411,26 +411,26 @@ public class ConsoleUI {
 	private boolean handlePurchaseReservedCard() {
 		Player player = controller.getCurrentPlayer();
 		List<Card> reserved = player.getReservedCards();
-		
+
 		if (reserved.isEmpty()) {
 			System.out.println(FG_YELLOW + "You have no reserved cards." + RESET);
 			return false;
 		}
-		
+
 		System.out.println(BOLD + "Your reserved cards:" + RESET);
 		for (int i = 0; i < reserved.size(); i++) {
 			System.out.println("  [" + i + "] " + reserved.get(i));
 		}
-		
+
 		System.out.print(BOLD + "Enter card index: " + RESET);
-		
+
 		try {
 			int index = Integer.parseInt(scanner.nextLine().trim());
 			if (index < 0 || index >= reserved.size()) {
 				System.out.println(FG_RED + "Invalid index." + RESET);
 				return false;
 			}
-			
+
 			Card card = reserved.get(index);
 			if (controller.purchaseCard(card)) {
 				System.out.println(FG_GREEN + "Successfully purchased reserved card!" + RESET);
@@ -453,7 +453,7 @@ public class ConsoleUI {
 		if (winner != null) {
 			System.out.println("\n" + FG_CYAN + repeatString("=", 60) + RESET);
 			System.out.println(BOLD + "GAME OVER!" + RESET);
-			System.out.println("Winner: " + FG_GREEN + winner.getName() + RESET + 
+			System.out.println("Winner: " + FG_GREEN + winner.getName() + RESET +
 				" with " + BOLD + winner.getPrestigePoints() + RESET + " prestige points!");
 			System.out.println(FG_CYAN + repeatString("=", 60) + RESET);
 		}
@@ -466,10 +466,10 @@ public class ConsoleUI {
 		System.out.println("\n" + FG_CYAN + repeatString("=", 60) + RESET);
 		System.out.println(BOLD + "GAME STATISTICS" + RESET);
 		System.out.println(FG_CYAN + repeatString("=", 60) + RESET);
-		
+
 		GameStatistics stats = controller.getStatistics();
 		System.out.println("\nTotal Turns: " + BOLD + stats.getTotalTurns() + RESET);
-		
+
 		System.out.println("\nPlayer Statistics:");
 		for (Player player : controller.getPlayers()) {
 			GameStatistics.PlayerStats playerStats = stats.getPlayerStats(player);
@@ -482,7 +482,7 @@ public class ConsoleUI {
 				System.out.println("    Prestige from Cards: " + playerStats.getPrestigeFromCards());
 			}
 		}
-		
+
 		System.out.println("\n" + FG_CYAN + repeatString("=", 60) + RESET);
 	}
 
